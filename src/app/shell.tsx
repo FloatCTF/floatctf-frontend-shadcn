@@ -122,7 +122,7 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 													isActive={isActivePath(location.pathname, item)}
 													tooltip={item.label}
 												>
-													<NavLink to={item.to} end={item.end}>
+													<NavLink to={item.to} end={item.end} reloadDocument={item.reloadDocument}>
 														<Icon />
 														<span>{item.label}</span>
 													</NavLink>
@@ -228,6 +228,7 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 							key={item.to}
 							to={item.to}
 							end={item.end}
+							reloadDocument={item.reloadDocument}
 							className={cn(
 								"flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px]",
 								active ? "text-foreground" : "text-muted-foreground",
