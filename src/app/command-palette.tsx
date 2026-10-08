@@ -97,8 +97,13 @@ export function CommandPalette(): ReactNode {
 	}, [toggle]);
 
 	const go = useCallback(
-		(to: string) => {
+		(to: string, reloadDocument?: boolean) => {
 			setOpen(false);
+			// 同源静态站点（如 `/training/`）不在本前端路由表内，走路由会落到 not-found，必须整页跳转。
+			if (reloadDocument) {
+				window.location.assign(to);
+				return;
+			}
 			void navigate(to);
 		},
 		[navigate, setOpen],
@@ -159,7 +164,7 @@ export function CommandPalette(): ReactNode {
 								<CommandItem
 									key={item.to}
 									value={`${item.label} ${item.to} ${item.description ?? ""}`}
-									onSelect={() => go(item.to)}
+									onSelect={() => go(item.to, item.reloadDocument)}
 								>
 									<Icon className="size-4" />
 									<span>{item.label}</span>

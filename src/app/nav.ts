@@ -13,6 +13,7 @@ import {
 	Database,
 	Dumbbell,
 	Gauge,
+	GraduationCap,
 	Home,
 	Info,
 	ListChecks,
@@ -41,6 +42,13 @@ export interface NavItem {
 	/** 精确匹配（用于 `/` 这类根路径）。 */
 	end?: boolean;
 	description?: string;
+	/**
+	 * 整页加载（真实 `<a>` 跳转），不经过客户端路由。
+	 *
+	 * 用于**同源但不属于本前端路由表**的静态站点（平台在 `/training/` 挂载的教学课程站）：
+	 * `<Link>` 会走客户端路由并落到 not-found 页，必须强制文档级跳转。
+	 */
+	reloadDocument?: boolean;
 }
 
 export interface NavGroup {
@@ -56,6 +64,14 @@ export const playerNav: NavGroup[] = [
 			{ to: "/events", label: "赛事", icon: CalendarDays, description: "全部赛事与工作区" },
 			{ to: "/challenges", label: "题库", icon: Puzzle, description: "练习题库" },
 			{ to: "/challenge-sets", label: "题集", icon: Blocks, description: "按主题组织的题目集合" },
+			// 平台在 `/training/` 直接提供的教学课程站（同源静态站点，不属于本前端路由，故整页加载）。
+			{
+				to: "/training/",
+				label: "课程",
+				icon: GraduationCap,
+				reloadDocument: true,
+				description: "教学课程站（整页打开）",
+			},
 			{ to: "/training", label: "训练场", icon: Dumbbell, description: "AWDP 练习靶机" },
 			{ to: "/instances", label: "我的实例", icon: Boxes, description: "已启动的题目环境" },
 		],
