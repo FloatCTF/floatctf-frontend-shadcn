@@ -16,7 +16,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, RotateCcw, Save, Upload } from "lucide-react";
 
-import type { Users } from "@floatctf/sdk/entity";
+import type { UserDto } from "@floatctf/sdk";
 
 import { call, callVoid, uploadFile } from "~/api/call";
 import { useAppQueryClient, useClient } from "~/api/client";
@@ -61,7 +61,7 @@ export function ProfilePage(): ReactNode {
 
 	const query = useQuery({
 		queryKey: qk.auth.me(),
-		queryFn: () => call<Users>(client.service.users.getMe(), "我的资料"),
+		queryFn: () => call<UserDto>(client.service.users.getMe(), "我的资料"),
 	});
 
 	const me = query.data;

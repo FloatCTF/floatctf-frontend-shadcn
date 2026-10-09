@@ -6,10 +6,12 @@
  * - 通过 `useSyncExternalStore`（zustand）暴露给 React；
  * - token **绝不**进入 URL / query string，界面与日志也绝不回显 token。
  *
- * 注意：`Users` 实体带 `password` 字段（类型如此），**任何界面都不得渲染它**。
+ * 注意：`/me` 的响应类型是 `UserDto`（**不含** `password` 字段）。
+ * 生成实体（entity 子入口的 `Users`）是 DB 列镜像、**带** `password`，
+ * 不得用作响应类型——历史上本文件曾把它当作 `me` 的类型，属于误用。
  */
 
-import type { Users } from "@floatctf/sdk/entity";
+import type { UserDto } from "@floatctf/sdk";
 import { create } from "zustand";
 
 const USER_KEY = "shadcn.user.token";
@@ -39,12 +41,12 @@ export interface AuthState {
 	userToken: string | null;
 	adminToken: string | null;
 	/** 当前选手资料（`GET /users/me`）；未登录为 null。 */
-	me: Users | null;
+	me: UserDto | null;
 	/** 是否已完成一次会话校验（用于避免受保护内容闪现）。 */
 	sessionChecked: boolean;
 	setUserToken: (token: string | null) => void;
 	setAdminToken: (token: string | null) => void;
-	setMe: (me: Users | null) => void;
+	setMe: (me: UserDto | null) => void;
 	setSessionChecked: (checked: boolean) => void;
 	/** 只清某一个作用域（401 时用）—— 另一个作用域不受影响。 */
 	clearScope: (scope: AuthScope) => void;
@@ -110,7 +112,7 @@ export function useAdminTokenSource(): string | null {
 	return useAuthStore((state) => state.adminToken);
 }
 
-export function useMe(): Users | null {
+export function useMe(): UserDto | null {
 	return useAuthStore((state) => state.me);
 }
 

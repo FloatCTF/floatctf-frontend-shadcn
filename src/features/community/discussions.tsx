@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 
 import type { DiscussionWithAuthor } from "@floatctf/sdk";
-import type { Users } from "@floatctf/sdk/entity";
+import type { UserDto } from "@floatctf/sdk";
 
 import { call, callList, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
@@ -364,7 +364,7 @@ export function MyDiscussionsPage(): ReactNode {
 	// 避免拿不到账号时永远停在加载态。
 	const authQuery = useQuery({
 		queryKey: qk.auth.me(),
-		queryFn: () => call<Users>(client.service.users.getMe(), "当前账号"),
+		queryFn: () => call<UserDto>(client.service.users.getMe(), "当前账号"),
 	});
 	const meId = me?.id ?? authQuery.data?.id;
 	const columns = discussionColumns(meId);
