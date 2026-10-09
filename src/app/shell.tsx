@@ -5,7 +5,7 @@
  * 移动端侧边栏收进 Sheet，另有底部导航。主区永远由 `<Outlet/>` 渲染当前页面。
  */
 
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { ChevronsUpDown, LogOut, Monitor, Moon, Sun, UserCircle } from "lucide-react";
 
@@ -42,6 +42,8 @@ import { cn } from "~/lib/utils";
 
 import {
 	adminNav as adminNavGroups,
+	filterNavGroups,
+	filterNavItems,
 	adminMobileNav,
 	type NavGroup,
 	type NavItem,
@@ -79,11 +81,26 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 	const navigate = useNavigate();
 	const theme = useTheme();
 	const me = useMe();
+	// 权限感知导航（v2）：`/me` 回传的有效权限决定显示哪些入口。
+	// 这只是界面裁剪 —— 真正的拒绝在服务端（`RequirePermission<P>`），
+	// 因此这里即使为空也不会让用户越权，只会少看到入口。
+	const permissions = useMemo(
+		() => new Set(me?.permissions ?? []),
+		[me?.permissions],
+	);
+	const visibleNavGroups = useMemo(
+		() => filterNavGroups(navGroups, permissions),
+		[navGroups, permissions],
+	);
+	const visibleMobileNav = useMemo(
+		() => filterNavItems(mobileNav, permissions),
+		[mobileNav, permissions],
+	);
 	const clearScope = useAuthStore((state) => state.clearScope);
 	const clearAll = useAuthStore((state) => state.clearAll);
 	const adminToken = useAuthStore((state) => state.adminToken);
 
-	const title = currentTitle(navGroups, location.pathname);
+	const title = currentTitle(visibleNavGroups, location.pathname);
 	const identity = scope === "admin" ? "管理端会话" : (me?.nickname ?? me?.username ?? "选手会话");
 
 	function logout() {
@@ -108,7 +125,7 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 				</SidebarHeader>
 
 				<SidebarContent>
-					{navGroups.map((group) => (
+					{visibleNavGroups.map((group) => (
 						<SidebarGroup key={group.label}>
 							<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
 							<SidebarGroupContent>
@@ -220,7 +237,7 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 
 			{/* 移动端底部导航 */}
 			<nav className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background/95 backdrop-blur md:hidden">
-				{mobileNav.map((item) => {
+				{visibleMobileNav.map((item) => {
 					const Icon = item.icon;
 					const active = isActivePath(location.pathname, item);
 					return (

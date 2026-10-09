@@ -30,7 +30,6 @@ import {
 	Timer,
 	Trophy,
 	UserCircle,
-	UserCog,
 	Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -49,11 +48,33 @@ export interface NavItem {
 	 * `<Link>` 会走客户端路由并落到 not-found 页，必须强制文档级跳转。
 	 */
 	reloadDocument?: boolean;
+	/**
+	 * 该入口所需的平台权限（v2）。**仅用于界面显隐**，不是授权依据：
+	 * 真正的判定在服务端每个请求上（`RequirePermission<P>`）。
+	 * 若只靠隐藏入口来"保护"页面，直接输入 URL 就能绕过。
+	 */
+	permission?: string;
 }
 
-export interface NavGroup {
+export interface NavGroup<T extends NavItem = NavItem> {
 	label: string;
-	items: NavItem[];
+	items: T[];
+}
+
+/**
+ * 管理端导航条目：`permission` **必填**。
+ *
+ * 为什么要用类型而不是测试来保证：本仓库没有测试运行器（AGENTS.md 规定的门禁是
+ * `tsc --noEmit` + `vite build`）。把「必须声明权限」编码进类型后，
+ * 漏声明一项就是**编译错误**，比一个可能被删掉的测试更可靠。
+ *
+ * 同时它把「导航显隐」与「授权」在类型层面分开：`permission` 只决定显示什么，
+ * 真正的拒绝永远在服务端。
+ */
+export type AdminNavItem = NavItem & { permission: string };
+
+export interface AdminNavGroup extends NavGroup<AdminNavItem> {
+	items: AdminNavItem[];
 }
 
 export const playerNav: NavGroup[] = [
@@ -93,49 +114,48 @@ export const playerNav: NavGroup[] = [
 	},
 ];
 
-export const adminNav: NavGroup[] = [
+export const adminNav: AdminNavGroup[] = [
 	{
 		label: "控制台",
 		items: [
-			{ to: "/admin", label: "总览", icon: Gauge, end: true, description: "平台聚合状态" },
-			{ to: "/admin/events", label: "赛事", icon: CalendarDays, description: "赛事控制台" },
+			{ to: "/admin", permission: "system.read", label: "总览", icon: Gauge, end: true, description: "平台聚合状态" },
+			{ to: "/admin/events", permission: "events.read", label: "赛事", icon: CalendarDays, description: "赛事控制台" },
 		],
 	},
 	{
 		label: "内容",
 		items: [
-			{ to: "/admin/challenges", label: "题库", icon: Puzzle, description: "题目导入 / 构建 / 校验" },
-			{ to: "/admin/challenge-sets", label: "题集", icon: Blocks },
-			{ to: "/admin/gameboxes", label: "GameBox 库", icon: Boxes },
-			{ to: "/admin/network", label: "靶场网络", icon: Network },
+			{ to: "/admin/challenges", permission: "challenges.read", label: "题库", icon: Puzzle, description: "题目导入 / 构建 / 校验" },
+			{ to: "/admin/challenge-sets", permission: "challenges.read", label: "题集", icon: Blocks },
+			{ to: "/admin/gameboxes", permission: "gameboxes.read", label: "GameBox 库", icon: Boxes },
+			{ to: "/admin/network", permission: "awd.read", label: "靶场网络", icon: Network },
 		],
 	},
 	{
 		label: "社区",
 		items: [
-			{ to: "/admin/community/announcements", label: "公告", icon: Megaphone },
-			{ to: "/admin/community/discussions", label: "讨论", icon: MessagesSquare },
-			{ to: "/admin/community/weapons", label: "武器库", icon: Swords },
+			{ to: "/admin/community/announcements", permission: "announcements.manage", label: "公告", icon: Megaphone },
+			{ to: "/admin/community/discussions", permission: "discussions.moderate", label: "讨论", icon: MessagesSquare },
+			{ to: "/admin/community/weapons", permission: "weapons.read", label: "武器库", icon: Swords },
 		],
 	},
 	{
 		label: "平台",
 		items: [
-			{ to: "/admin/platform/users", label: "用户", icon: Users },
-			{ to: "/admin/platform/super-admins", label: "超管", icon: UserCog },
-			{ to: "/admin/platform/logs", label: "日志", icon: ScrollText },
-			{ to: "/admin/platform/settings", label: "设置", icon: Settings },
-			{ to: "/admin/platform/frontends", label: "前端", icon: PanelsTopLeft },
-			{ to: "/admin/platform/tasks", label: "计划任务", icon: Timer },
+			{ to: "/admin/platform/users", permission: "users.read", label: "用户", icon: Users },
+			{ to: "/admin/platform/logs", permission: "logs.read", label: "日志", icon: ScrollText },
+			{ to: "/admin/platform/settings", permission: "settings.read", label: "设置", icon: Settings },
+			{ to: "/admin/platform/frontends", permission: "settings.manage", label: "前端", icon: PanelsTopLeft },
+			{ to: "/admin/platform/tasks", permission: "scheduler.manage", label: "计划任务", icon: Timer },
 		],
 	},
 	{
 		label: "基础设施",
 		items: [
-			{ to: "/admin/infra/docker", label: "Docker", icon: Container },
-			{ to: "/admin/infra/sql", label: "SQL 控制台", icon: Database },
-			{ to: "/admin/infra/terminal", label: "终端", icon: Terminal },
-			{ to: "/admin/version", label: "版本", icon: Info },
+			{ to: "/admin/infra/docker", permission: "docker.read", label: "Docker", icon: Container },
+			{ to: "/admin/infra/sql", permission: "database.execute", label: "SQL 控制台", icon: Database },
+			{ to: "/admin/infra/terminal", permission: "terminal.open", label: "终端", icon: Terminal },
+			{ to: "/admin/version", permission: "system.read", label: "版本", icon: Info },
 		],
 	},
 ];
@@ -149,11 +169,11 @@ export const playerMobileNav: NavItem[] = [
 	{ to: "/profile", label: "我的", icon: UserCircle },
 ];
 
-export const adminMobileNav: NavItem[] = [
-	{ to: "/admin", label: "总览", icon: Gauge, end: true },
-	{ to: "/admin/events", label: "赛事", icon: CalendarDays },
-	{ to: "/admin/challenges", label: "题库", icon: Puzzle },
-	{ to: "/admin/platform/users", label: "用户", icon: Users },
+export const adminMobileNav: AdminNavItem[] = [
+	{ to: "/admin", permission: "system.read", label: "总览", icon: Gauge, end: true },
+	{ to: "/admin/events", permission: "events.read", label: "赛事", icon: CalendarDays },
+	{ to: "/admin/challenges", permission: "challenges.read", label: "题库", icon: Puzzle },
+	{ to: "/admin/platform/users", permission: "users.read", label: "用户", icon: Users },
 ];
 
 export function flatNav(groups: NavGroup[]): NavItem[] {
@@ -162,3 +182,30 @@ export function flatNav(groups: NavGroup[]): NavItem[] {
 
 /** 事件日志 / 列表里常用的安全图标。 */
 export const navIcons = { Shield, ListChecks };
+
+/**
+ * 按权限过滤导航（v2）。
+ *
+ * 语义：
+ * - 没有 `permission` 的条目**始终显示**（例如选手端入口、以及"只需要登录"的页面）；
+ * - 有 `permission` 的条目要求权限集合里含有它；
+ * - `permissions` 为空集合时，所有声明了权限的管理入口都会被隐藏
+ *   —— 这正是「已登录但没有任何平台权限」应有的界面（而不是让用户逐个点开吃 403）。
+ *
+ * 这个函数**不做任何安全判断**：它只决定显示什么。真正的拒绝在服务端。
+ */
+export function filterNavItems(
+	items: NavItem[],
+	permissions: ReadonlySet<string>,
+): NavItem[] {
+	return items.filter((item) => !item.permission || permissions.has(item.permission));
+}
+
+export function filterNavGroups(
+	groups: NavGroup[],
+	permissions: ReadonlySet<string>,
+): NavGroup[] {
+	return groups
+		.map((group) => ({ ...group, items: filterNavItems(group.items, permissions) }))
+		.filter((group) => group.items.length > 0);
+}
