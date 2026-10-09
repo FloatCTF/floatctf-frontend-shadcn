@@ -49,6 +49,7 @@ import {
 } from "~/components/ui/select";
 import { formatInt, formatScore } from "~/lib/format";
 import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
+import { publisherLabel } from "~/lib/publisher";
 
 import { SearchField } from "./components";
 
@@ -503,7 +504,7 @@ export function AnnouncementsPage(): ReactNode {
 			header: "发布者",
 			hideBelow: "sm",
 			sortValue: (row) => row.publisher,
-			cell: (row) => <span className="text-sm">{row.publisher || "—"}</span>,
+			cell: (row) => <span className="text-sm">{publisherLabel(row)}</span>,
 		},
 		{
 			id: "content",
@@ -607,7 +608,7 @@ export function AnnouncementsPage(): ReactNode {
 										{row.content && row.content.trim() !== "" ? row.content : "—"}
 									</p>
 									<div className="flex items-center justify-between text-xs text-muted-foreground">
-										<span>{row.publisher || "—"}</span>
+										<span>{publisherLabel(row)}</span>
 										<RelativeTime value={row.created_at} />
 									</div>
 								</div>

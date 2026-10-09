@@ -52,6 +52,7 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { truncate } from "~/lib/format";
 import { useDocumentTitle } from "~/lib/hooks";
+import { publisherLabel } from "~/lib/publisher";
 
 import {
 	DeleteSelectedButton,
@@ -152,7 +153,7 @@ export function AdminAnnouncementsPage(): ReactNode {
 			header: "发布者",
 			hideBelow: "sm",
 			sortValue: (row) => row.publisher,
-			cell: (row) => <span>{row.publisher}</span>,
+			cell: (row) => <span>{publisherLabel(row)}</span>,
 		},
 		{
 			id: "updated_at",
@@ -268,7 +269,7 @@ export function AdminAnnouncementsPage(): ReactNode {
 											{truncate(row.content ?? "", 120) || "（无正文）"}
 										</p>
 										<div className="flex items-center justify-between gap-2">
-											<MonoText className="text-muted-foreground">{row.publisher}</MonoText>
+											<MonoText className="text-muted-foreground">{publisherLabel(row)}</MonoText>
 											<div className="flex items-center gap-1">
 												<Button variant="ghost" size="sm" onClick={() => setEditing(row)}>
 													<Pencil />
