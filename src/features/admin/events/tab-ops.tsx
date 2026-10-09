@@ -140,7 +140,7 @@ export function EventAwdTab({ eventId }: { eventId: string }): ReactNode {
 				) : status === null ? (
 					<EmptyBlock
 						title="该赛事尚未配置 AWD"
-						description="后端返回空状态：还没有 awd_events 配置行。请在 AWD 运维页创建配置。"
+						description="后端返回空状态：还没有 awd_events 配置行。请在 AWD 运维页创建配置"
 						icon={<ShieldAlert className="size-5" />}
 						action={
 							<Button size="sm" asChild>
@@ -238,7 +238,7 @@ export function EventAwdTab({ eventId }: { eventId: string }): ReactNode {
 				)}
 			</SectionCard>
 
-			<SectionCard title="AWD 积分榜" description="后端 `awd.admin.scores` 的原始排名。">
+			<SectionCard title="AWD 积分榜" description="原始排名">
 				<QueryState
 					query={scoresQuery}
 					errorTitle="加载 AWD 积分失败"
@@ -461,7 +461,7 @@ export function EventAwdpTab({ eventId }: { eventId: string }): ReactNode {
 				</QueryState>
 			</SectionCard>
 
-			<SectionCard title="AWDP 积分榜" description="后端 `awdp.admin.scores` 的原始排名。">
+			<SectionCard title="AWDP 积分榜" description="原始排名">
 				<QueryState
 					query={scoresQuery}
 					errorTitle="加载 AWDP 积分失败"

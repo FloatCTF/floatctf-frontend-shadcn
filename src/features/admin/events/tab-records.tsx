@@ -237,7 +237,7 @@ export function EventWriteupsTab({ eventId }: { eventId: string }): ReactNode {
 	return (
 		<SectionCard
 			title="赛事 Writeup"
-			description="选手 / 战队提交的 Writeup 文件；「导出」会请求后端生成整场赛事的报告压缩包。"
+			description="选手 / 战队提交的 Writeup 文件"
 			actions={
 				<Toolbar>
 					<Button

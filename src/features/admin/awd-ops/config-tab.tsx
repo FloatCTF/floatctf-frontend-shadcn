@@ -276,7 +276,7 @@ function CreateAwdSheet({
 				if (!open) onClose();
 			}}
 			title="开通 AWD"
-			description="为该赛事创建 AWD 配置。留空的字段使用后端默认值；开通后需分配赛事网络才能部署。"
+			description="为该赛事创建 AWD 配置。开通后需分配赛事网络才能部署"
 			width="lg"
 			footer={
 				<FormFooter

@@ -231,7 +231,7 @@ export function AdminUsersPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="用户管理"
-				description="平台账号的增删改查。密码字段是 argon2 哈希，前后端都不展示。"
+				description="平台账号的增删改查"
 				actions={
 					<Toolbar>
 						<Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>

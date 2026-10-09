@@ -373,7 +373,7 @@ export function AdminFrontendsPage(): ReactNode {
 				<StatCard
 					label="API 契约"
 					value={API_CONTRACT_VERSION}
-					hint="API_CONTRACT_VERSION（编译期常量）"
+					hint="编译期常量"
 				/>
 				<StatCard
 					label="当前生效"
@@ -469,7 +469,7 @@ export function AdminFrontendsPage(): ReactNode {
 			{state.status === "error" ? (
 				<SectionCard
 					title="注册表错误明细"
-					description="fail-closed：读取 / 校验失败时不会退化成「空注册表」，错误逐条列出以便定位。"
+					description="读取 / 校验失败时逐条列出错误"
 				>
 					<ul className="list-disc space-y-1 pl-5 text-sm">
 						{state.error.details.map((detail) => (

@@ -156,7 +156,7 @@ export function EventInstancesTab({ eventId }: { eventId: string }): ReactNode {
 	return (
 		<SectionCard
 			title="赛事实例"
-			description="归一化的 event_instances 视图（Challenge 与 GameBox 统一呈现）。管理端列表**不返回 flag**，因此这里不展示任何 flag。"
+			description="归一化的 event_instances 视图（Challenge 与 GameBox 统一呈现）"
 		>
 			<PagedTable
 				query={pagedQuery}

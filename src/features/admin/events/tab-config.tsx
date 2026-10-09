@@ -33,7 +33,7 @@ export function EventConfigTab({ event }: { event: Events }): ReactNode {
 
 	return (
 		<div className="space-y-5">
-			<SectionCard title="赛事身份" description="创建后固定的字段（后端 PATCH 请求体不接收）。">
+			<SectionCard title="赛事身份" description="创建后固定的字段">
 				<KeyValueList
 					columns={2}
 					items={[
@@ -88,7 +88,7 @@ export function EventConfigTab({ event }: { event: Events }): ReactNode {
 
 			<SectionCard
 				title="可编辑配置"
-				description="保存后立即对选手端生效；时间变更会同步 AWD / AWDP 的排期校验。"
+				description="保存后立即对选手端生效"
 				actions={
 					<Button variant="outline" size="sm" onClick={() => setEditing(true)}>
 						<PencilLine /> 编辑配置

@@ -233,7 +233,7 @@ export function AdminSettingsPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="动态设置"
-				description="平台运行时配置（动态设置）。受保护键只能改值，后端禁止删除。"
+				description="平台运行时配置（动态设置）"
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
@@ -281,7 +281,7 @@ export function AdminSettingsPage(): ReactNode {
 					empty={
 						<EmptyBlock
 							title="暂无设置"
-							description="平台启动时会补种默认设置；若此处为空请检查后端初始化。"
+							description="平台启动时会补种默认设置"
 						/>
 					}
 				>

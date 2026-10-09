@@ -213,7 +213,7 @@ export function AdminDiscussionsPage(): ReactNode {
 
 			<SectionCard
 				title="讨论列表"
-				description="按更新时间倒序；搜索仅作用于标题（后端 filter 不支持正文）。"
+				description="按更新时间倒序；搜索仅作用于标题"
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
 						<SearchInput

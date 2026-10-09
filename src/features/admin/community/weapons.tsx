@@ -195,7 +195,7 @@ export function AdminWeaponsPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="武器库"
-				description="平台共享的工具、脚本与利用代码。附件上传走对象存储，字段名为 weapon。"
+				description="平台共享的工具、脚本与利用代码"
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
@@ -218,7 +218,7 @@ export function AdminWeaponsPage(): ReactNode {
 
 			<SectionCard
 				title="武器列表"
-				description="搜索与分页在本页完成：管理端武器接口一次性返回全部条目且不返回分页 meta。"
+				description="搜索与分页在本页完成：管理端武器接口一次性返回全部条目且不返回分页 meta"
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
 						<SearchInput
@@ -512,7 +512,7 @@ function WeaponFormSheet({
 			open={open}
 			onOpenChange={onOpenChange}
 			title={row ? "编辑武器" : "新建武器"}
-			description="附件请用列表行内的「上传」按钮单独上传（字段名 weapon）。"
+			description="附件请用列表行内的「上传」按钮单独上传"
 			width="lg"
 			footer={
 				<FormFooter
@@ -554,7 +554,7 @@ function WeaponFormSheet({
 					<Field
 						label="文件地址"
 						htmlFor="weapon-file-url"
-						hint="对象存储 key；上传附件后由后端写入（形如 weapons/xxx.zip）。"
+						hint="对象存储 key"
 					>
 						<Input
 							id="weapon-file-url"

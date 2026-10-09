@@ -47,7 +47,7 @@ export function AdminVersionPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="平台版本"
-				description="后端 API 版本与前端运行时契约版本。契约版本用于判断可插拔前端是否兼容。"
+				description="后端 API 版本与前端运行时契约版本。契约版本用于判断可插拔前端是否兼容"
 				actions={
 					<Toolbar>
 						<Button
@@ -80,7 +80,7 @@ export function AdminVersionPage(): ReactNode {
 				<StatCard
 					label="API 契约"
 					value={API_CONTRACT_VERSION}
-					hint="API_CONTRACT_VERSION（编译期常量）"
+					hint="编译期常量"
 					icon={<Info className="size-5" />}
 				/>
 				<StatCard
@@ -117,7 +117,7 @@ export function AdminVersionPage(): ReactNode {
 
 			<SectionCard
 				title="契约版本说明"
-				description="三个版本概念互相独立，前端与注册表的 compatibility 必须与运行时 / API 契约 major 一致。"
+				description="三个版本概念互相独立，前端与注册表的 compatibility 必须与运行时 / API 契约 major 一致"
 			>
 				<KeyValueList
 					columns={1}

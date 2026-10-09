@@ -106,7 +106,7 @@ export function AdminDockerPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="Docker"
-				description="宿主容器 / 镜像 / 网络治理。所有调用经宿主 helper 的受限协议；若 helper 未就绪，接口会返回 5xx 并在下方显示后端原文。"
+				description="宿主容器 / 镜像 / 网络治理。所有调用经宿主 helper 的受限协议"
 				badge={<TonePill tone="muted">specialized</TonePill>}
 			/>
 
@@ -299,7 +299,7 @@ function ContainersTab(): ReactNode {
 	return (
 		<SectionCard
 			title="容器"
-			description="服务端按 offset/limit 分页；后端没有过滤接口，搜索只作用于当前页。"
+			description="服务端按 offset/limit 分页"
 			actions={
 				<div className="flex flex-wrap items-center gap-2">
 					<RefreshingBadge active={query.isFetching && !query.isPending} />
@@ -338,7 +338,7 @@ function ContainersTab(): ReactNode {
 							<EmptyBlock
 								variant="filtered"
 								title="当前页没有匹配的容器"
-								description="后端 Docker 接口不支持服务端过滤，请翻页或清空搜索词。"
+								description="后端 Docker 接口不支持服务端过滤，请翻页或清空搜索词"
 							/>
 						) : (
 							<DataTable
@@ -566,7 +566,7 @@ function ImagesTab(): ReactNode {
 							<EmptyBlock
 								variant="filtered"
 								title="当前页没有匹配的镜像"
-								description="后端 Docker 接口不支持服务端过滤，请翻页或清空搜索词。"
+								description="后端 Docker 接口不支持服务端过滤，请翻页或清空搜索词"
 							/>
 						) : (
 							<DataTable
@@ -766,7 +766,7 @@ function NetworksTab(): ReactNode {
 								<EmptyBlock
 									variant="filtered"
 									title="当前页没有匹配的网络"
-									description="后端 Docker 接口不支持服务端过滤，请翻页或清空搜索词。"
+									description="后端 Docker 接口不支持服务端过滤，请翻页或清空搜索词"
 								/>
 							) : (
 								<DataTable
@@ -877,7 +877,7 @@ function CreateNetworkSheet({
 			open={open}
 			onOpenChange={onOpenChange}
 			title="新建 Docker 网络"
-			description="创建自定义 bridge 网络（带显式子网与网关）。名称 / 子网冲突时后端会返回 Docker 原文错误。"
+			description="创建自定义 bridge 网络（带显式子网与网关）"
 			width="lg"
 			footer={
 				<FormFooter

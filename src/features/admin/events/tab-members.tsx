@@ -454,7 +454,7 @@ function AddMembersSheet({
 					add.mutate();
 				}}
 			>
-				<Field label="搜索账号" htmlFor="member-search" hint="按昵称过滤（后端 filter 键 nickname）。">
+				<Field label="搜索账号" htmlFor="member-search" hint="按昵称过滤">
 					<Input
 						id="member-search"
 						value={search}

@@ -496,7 +496,7 @@ export function TrainingActionPanel({
 						label="patch.sh"
 						htmlFor="training-patch"
 						error={!patchGate.allowed ? patchGate.reason : undefined}
-						hint="multipart 字段名为 patch_file；不要手动设置 Content-Type。"
+						hint="multipart 字段名为 patch_file；不要手动设置 Content-Type"
 					>
 						<div className="flex flex-wrap items-center gap-2">
 							<Input
@@ -705,7 +705,7 @@ export function RunRoundsEvaluationsPanel({ runId }: { runId: string }): ReactNo
 
 	return (
 		<div className="space-y-5">
-			<SectionCard title="Fix 回合" description="每个回合 cutoff 时后端对在跑实例做官方判定。">
+			<SectionCard title="Fix 回合" description="每个回合 cutoff 时后端对在跑实例做官方判定">
 				{roundsQuery.isPending ? (
 					<TableSkeleton rows={3} columns={3} />
 				) : roundsQuery.isError ? (

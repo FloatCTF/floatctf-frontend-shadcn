@@ -143,7 +143,7 @@ export function AwdpOpsPage() {
 
 			<SectionCard
 				title="阶段推进"
-				description="后端 tick 会按时间自动推进；这里的按钮用于提前推进，可用性由当前阶段决定。"
+				description="后端 tick 会按时间自动推进；这里的按钮用于提前推进，可用性由当前阶段决定"
 			>
 				<div className="space-y-3">
 					<div className="flex flex-wrap items-center gap-2">
@@ -213,7 +213,7 @@ export function AwdpOpsPage() {
 					{configQuery.isError ? (
 						<ErrorBlock
 							error={configQuery.error}
-							title="加载 AWDP 配置失败（后端要求赛事赛制为 AWDP）"
+							title="加载 AWDP 配置失败"
 							onRetry={() => configQuery.refetch()}
 						/>
 					) : null}

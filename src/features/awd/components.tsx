@@ -129,7 +129,7 @@ export function AwdFlagPanel({
 				<Field
 					label="flag"
 					htmlFor="awd-flag"
-					hint="flag 只提交给后端校验，不会写入 URL 或日志。"
+					hint="flag 只提交给后端校验，不会写入 URL 或日志"
 					error={!gate.allowed ? gate.reason : undefined}
 				>
 					<div className="flex gap-2">
@@ -465,7 +465,7 @@ function AwdWireGuardPanel({ eventId }: { eventId: string }): ReactNode {
 		return (
 			<EmptyBlock
 				title="暂无 WireGuard 配置"
-				description="后端尚未下发隧道配置；赛事部署完成并加入队伍后这里会出现。"
+				description="后端尚未下发隧道配置；赛事部署完成并加入队伍后这里会出现"
 				action={
 					<Button variant="outline" size="sm" onClick={() => void query.refetch()}>
 						<RefreshCw /> 重新检查
@@ -553,7 +553,7 @@ function AwdSshPanel({ eventId }: { eventId: string }): ReactNode {
 		return (
 			<EmptyBlock
 				title="暂无 SSH 凭据"
-				description="后端尚未返回本队的 SSH 凭据；赛事部署完成后这里会出现。"
+				description="后端尚未返回本队的 SSH 凭据；赛事部署完成后这里会出现"
 				action={
 					<Button variant="outline" size="sm" onClick={reload}>
 						<RefreshCw /> 重新检查

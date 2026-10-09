@@ -515,7 +515,7 @@ export function AdminChallengesPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="题库管理"
-				description="题目的身份字段可手工维护；版本内容、镜像与 flag 通过导入题目包进入。"
+				description="题目的身份字段可手工维护；版本内容、镜像与 flag 通过导入题目包进入"
 				actions={
 					<Toolbar>
 						<Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
@@ -863,7 +863,7 @@ export function AdminChallengesPage(): ReactNode {
 								label="静态 Flag（明文）"
 								htmlFor="challenge-static-flag"
 								error={errors.staticFlagValue}
-								hint="仅 flag_type=static 时生效；留空表示清空。此处填写的内容会以明文提交到后端。"
+								hint="仅 flag_type=static 时生效；留空表示清空"
 							>
 								<Input
 									id="challenge-static-flag"

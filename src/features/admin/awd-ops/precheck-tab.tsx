@@ -315,7 +315,7 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 
 			<SectionCard
 				title="内部令牌轮换"
-				description="key_version +1 并替换 FlagServer / JudgeServer 的内部调用令牌（会原地重建这两个容器）。"
+				description="key_version +1 并替换 FlagServer / JudgeServer 的内部调用令牌（会原地重建这两个容器）"
 				actions={
 					<Button
 						variant="destructive"

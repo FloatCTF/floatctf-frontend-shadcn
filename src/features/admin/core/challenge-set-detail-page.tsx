@@ -268,7 +268,7 @@ export function AdminChallengeSetDetailPage(): ReactNode {
 
 			<SectionCard
 				title="题集内题目"
-				description="该接口（GET /challenge_sets/{id}）在服务端只支持分页，不支持搜索过滤，因此这里不提供搜索框。"
+				description="服务端只支持分页"
 				actions={
 					selectedIds.length > 0 ? (
 						<Button
@@ -384,7 +384,7 @@ export function AdminChallengeSetDetailPage(): ReactNode {
 					}
 				}}
 				title="向题集添加题目"
-				description="从题库中选择题目；已加入的题目重复添加会被后端唯一约束拒绝。"
+				description="从题库中选择题目"
 				width="xl"
 				footer={
 					<div className="flex w-full items-center justify-between gap-2">

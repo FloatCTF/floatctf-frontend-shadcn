@@ -312,7 +312,7 @@ export function AdminScheduledTasksPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="计划任务"
-				description="平台定时 / 一次性 / 启动任务。手动执行只会把任务入队，不会同步等待结果。"
+				description="平台定时 / 一次性 / 启动任务"
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
@@ -335,7 +335,7 @@ export function AdminScheduledTasksPage(): ReactNode {
 
 			<SectionCard
 				title="任务列表"
-				description="搜索与分组条件会同时下发给后端（filter 语法：`kind:x & task_key:y`）。"
+				description="搜索与分组条件会同时下发给后端"
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
 						<Select value={kind} onValueChange={(value) => setKind(value as Kind)}>
@@ -734,7 +734,7 @@ function ScheduledTaskFormSheet({
 			open={open}
 			onOpenChange={onOpenChange}
 			title={row ? `编辑任务 ${row.task_name}` : "新建计划任务"}
-			description="任务键必须是平台已注册的键（后端校验），未知键会被拒绝并返回具体错误。"
+			description="任务键必须是平台已注册的键，未知键会被拒绝并返回具体错误"
 			width="lg"
 			footer={
 				<FormFooter
@@ -760,7 +760,7 @@ function ScheduledTaskFormSheet({
 						htmlFor="task-key"
 						required
 						error={errors.taskKey}
-						hint="平台注册的 TaskKey，例如 awd.round.end；未知键后端返回 400。"
+						hint="平台注册的 TaskKey，例如 awd.round.end"
 					>
 						<Input
 							id="task-key"
@@ -794,7 +794,7 @@ function ScheduledTaskFormSheet({
 						label="Cron 表达式"
 						htmlFor="task-cron"
 						error={errors.cronExpr}
-						hint="trigger_type=cron 时必填（后端用 cron 库校验）。"
+						hint="trigger_type=cron 时必填（后端用 cron 库校验）"
 					>
 						<Input
 							id="task-cron"

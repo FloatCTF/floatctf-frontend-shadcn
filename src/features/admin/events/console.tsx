@@ -138,7 +138,7 @@ export function EventConsolePage(): ReactNode {
 		if (isForbidden(query.error)) {
 			return (
 				<PageBody>
-					<PermissionDeniedBlock description="当前管理员账号无权读取该赛事（后端返回 403）。" />
+					<PermissionDeniedBlock description="当前管理员账号无权读取该赛事" />
 				</PageBody>
 			);
 		}

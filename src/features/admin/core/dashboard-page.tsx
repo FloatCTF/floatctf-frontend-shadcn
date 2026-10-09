@@ -256,7 +256,7 @@ export function AdminDashboardPage(): ReactNode {
 
 			<SystemMonitorSection monitor={monitor} />
 
-			<SectionCard title="平台版本" description="后端二进制版本（GET /api/admin/system/version）。">
+			<SectionCard title="平台版本" description="后端二进制版本">
 				<QueryState query={version} skeleton={<LoadingBlock label="读取版本…" />}>
 					{(value) =>
 						value ? (

@@ -207,7 +207,7 @@ export function DashboardPage(): ReactNode {
 
 				<SectionCard
 					title="最近练习解题"
-					description="你在题库练习中的解题记录（30s 轮询；赛事解题不计入此接口）。"
+					description="你在题库练习中的解题记录"
 					actions={
 						<Button variant="ghost" size="sm" asChild>
 							<Link to="/solves">
@@ -250,7 +250,7 @@ export function DashboardPage(): ReactNode {
 
 				<SectionCard
 					title="Top15 排行"
-					description="系统练习赛事的解题数排名（后端固定返回最多 15 条）。"
+					description="系统练习赛事的解题数排名"
 					actions={
 						<Button variant="ghost" size="sm" asChild>
 							<Link to="/rank">

@@ -145,7 +145,7 @@ export function WriteupsPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="题解"
-				description="全站公开题解与自己的 AWDP 练习题解。后端接口一次性返回全部条目，搜索与分页在视图内完成。"
+				description="全站公开题解与自己的 AWDP 练习题解"
 				badge={<TonePill tone="info">Writeup</TonePill>}
 			/>
 

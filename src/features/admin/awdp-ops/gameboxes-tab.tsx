@@ -99,7 +99,7 @@ function AttachGameboxSheet({
 				if (!open) onClose();
 			}}
 			title="挂载 GameBox"
-			description="仅列出已构建成功（ready）且尚未挂载的 GameBox；[awdp] capability 由后端校验。"
+			description="仅列出已构建成功（ready）且尚未挂载的 GameBox"
 			footer={
 				<FormFooter
 					onCancel={onClose}

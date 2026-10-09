@@ -729,7 +729,7 @@ export function AdminGameboxesPage(): ReactNode {
 						) : (
 							<EmptyBlock
 								title="GameBox 库是空的"
-								description="导入靶机包，或扫描后端 GAMEBOXES_DIR 里已有的 package。"
+								description="导入靶机包，或扫描后端 GAMEBOXES_DIR 里已有的 package"
 								action={
 									<Button size="sm" onClick={() => fileInputRef.current?.click()}>
 										<FileUp /> 导入 GameBox 包
@@ -868,7 +868,7 @@ export function AdminGameboxesPage(): ReactNode {
 					if (!open) setEditing(null);
 				}}
 				title={`编辑 GameBox${editing ? `：${editing.name}` : ""}`}
-				description="身份与运行参数可改；版本、镜像 digest 与 build_status 由导入决定。"
+				description="身份与运行参数可改"
 				width="xl"
 				footer={
 					<FormFooter
@@ -1038,7 +1038,7 @@ export function AdminGameboxesPage(): ReactNode {
 						label="healthchecks_json"
 						htmlFor="gamebox-healthchecks"
 						error={errors.healthchecksJson}
-						hint="JSON 文本；留空 = 清空该配置，内容未修改则不会提交。后端会按 JSON 解析，非法 JSON 会 400。"
+						hint="JSON 文本；留空 = 清空该配置，内容未修改则不会提交"
 					>
 						<Textarea
 							id="gamebox-healthchecks"

@@ -528,7 +528,7 @@ export function AwdpActionPanel({
 							label="patch.sh"
 							htmlFor="awdp-patch"
 							error={!patchGate.allowed ? patchGate.reason : undefined}
-							hint="以 multipart 字段 patch_file 上传；不要设置 Content-Type，SDK 会自动带 boundary。"
+							hint="以 multipart 字段 patch_file 上传"
 						>
 							<div className="flex flex-wrap items-center gap-2">
 								<Input

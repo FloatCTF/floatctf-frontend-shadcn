@@ -178,7 +178,7 @@ export function AwdOpsPage() {
 
 			<SectionCard
 				title="生命周期操作"
-				description="按钮可用性由后端状态决定；禁用原因写在按钮悬浮提示与下方说明里。"
+				description="按钮可用性由后端状态决定；禁用原因写在按钮悬浮提示与下方说明里"
 				actions={
 					<Button
 						variant="ghost"

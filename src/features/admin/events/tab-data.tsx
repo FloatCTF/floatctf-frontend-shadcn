@@ -185,7 +185,7 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 
 			<SectionCard
 				title="总分走势"
-				description="后端按解出流水的总分快照生成；悬停可查看各主体分数。"
+				description="后端按解出流水的总分快照生成；悬停可查看各主体分数"
 			>
 				<TrendChart
 					series={trendSeries}

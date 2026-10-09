@@ -176,7 +176,7 @@ export function AdminSuperAdminsPage(): ReactNode {
 
 			<SectionCard
 				title="账号列表"
-				description="后端列表接口不支持服务端过滤，本页在已加载的账号上做搜索与分页。"
+				description="后端列表接口不支持服务端过滤，本页在已加载的账号上做搜索与分页"
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
 						<SearchInput
@@ -201,7 +201,7 @@ export function AdminSuperAdminsPage(): ReactNode {
 					empty={
 						<EmptyBlock
 							title="没有管理员账号"
-							description="平台启动时会自动补种默认超管；若这里为空请检查后端初始化。"
+							description="平台启动时会自动补种默认超管"
 						/>
 					}
 				>

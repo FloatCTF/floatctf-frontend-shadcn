@@ -170,7 +170,7 @@ export function AdminLogsPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="操作日志"
-				description="平台审计日志（只读）。级别为精确匹配，其余字段按后端映射做包含 / 精确匹配。"
+				description="平台审计日志（只读）"
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />

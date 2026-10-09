@@ -128,7 +128,7 @@ export function RankPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="排行榜"
-				description="练习赛事按解题数排名的 Top15 选手（30 秒自动刷新）。后端固定返回 15 条，分页为视图内分页。"
+				description="练习赛事按解题数排名的 Top15 选手（30 秒自动刷新）"
 				badge={<TonePill tone="info">Top15</TonePill>}
 				actions={
 					<Toolbar>
@@ -325,7 +325,7 @@ export function SolvesPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="解题流水"
-				description="平台按当前账号返回你在练习赛事中的解题记录（后端接口即此语义，不是全站流水）。"
+				description="平台按当前账号返回你在练习赛事中的解题记录"
 				actions={
 					<Toolbar>
 						<Button variant="outline" asChild>
@@ -360,7 +360,7 @@ export function SolvesPage(): ReactNode {
 
 			<SectionCard
 				title="我的解题记录"
-				description="按提交时间倒序，可用题目下拉过滤（后端 challenge_id 过滤参数）。"
+				description="按提交时间倒序，可用题目下拉过滤"
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
@@ -542,7 +542,7 @@ export function AnnouncementsPage(): ReactNode {
 
 			<SectionCard
 				title="公告列表"
-				description="按最近更新时间排序，支持按标题搜索（后端 title 过滤参数）。"
+				description="按最近更新时间排序，支持按标题搜索"
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
@@ -688,7 +688,7 @@ export function ArsenalPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="武器库"
-				description="平台共享的工具与脚本附件，按名称搜索（后端 name 过滤参数）。"
+				description="平台共享的工具与脚本附件，按名称搜索"
 				badge={<TonePill tone="info">只读</TonePill>}
 			/>
 

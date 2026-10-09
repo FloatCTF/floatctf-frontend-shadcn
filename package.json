@@ -1,6 +1,6 @@
 {
 	"name": "@floatctf/frontend-shadcn",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"private": true,
 	"type": "module",
 	"description": "FloatCTF shadcn/ui frontend — a complete, pluggable replacement frontend (player + admin) built on shadcn/ui",

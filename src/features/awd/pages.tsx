@@ -268,7 +268,7 @@ export function ArenaPage(): ReactNode {
 
 						<SectionCard
 							title="攻击流程提示"
-							description="能力语义与 Default 一致，操作路径由本前端重新设计。"
+							description="能力语义与 Default 一致，操作路径由本前端重新设计"
 						>
 							<ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
 								<li>

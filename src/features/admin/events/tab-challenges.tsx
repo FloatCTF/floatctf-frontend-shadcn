@@ -247,7 +247,7 @@ export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode 
 	return (
 		<SectionCard
 			title="赛事题目"
-			description="挂载自题库的题目；隐藏的题目不会出现在选手端（发布状态逐题控制）。"
+			description="挂载自题库的题目"
 			actions={
 				<Toolbar>
 					{selectedIds.length > 0 ? (
@@ -429,7 +429,7 @@ function AddChallengesSheet({
 			}}
 			width="xl"
 			title="从题库添加题目"
-			description="只有 build_status = ready 的题目可以被加入赛事（后端会拒绝未就绪的包）。分值留空则后端默认 100。"
+			description="只有 build_status = ready 的题目可以被加入赛事"
 			footer={
 				<FormFooter
 					formId="add-challenges-form"

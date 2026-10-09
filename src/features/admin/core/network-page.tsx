@@ -159,7 +159,7 @@ export function AdminNetworkPage(): ReactNode {
 
 			<SectionCard
 				title="平台地址池设置"
-				description="GameBox 与 WireGuard 各自独立的地址池与子网长度；容量由后端按已保存配置计算。"
+				description="GameBox 与 WireGuard 各自独立的地址池与子网长度"
 			>
 				<QueryState
 					query={settings}
@@ -245,7 +245,7 @@ export function AdminNetworkPage(): ReactNode {
 
 			<SectionCard
 				title="宿主网络能力"
-				description="只读观测：宿主 nftables / WireGuard / Docker 防火墙后端等实际情况。"
+				description="只读观测：宿主 nftables / WireGuard / Docker 防火墙后端等实际情况"
 				actions={
 					<TonePill
 						tone={
@@ -305,7 +305,7 @@ export function AdminNetworkPage(): ReactNode {
 
 			<SectionCard
 				title="地址分配账本"
-				description="平台的网段分配记录（接口一次性返回全部，因此本表不分页、不提供搜索）。"
+				description="平台的网段分配记录"
 				contentClassName="p-0"
 				actions={
 					allocations.data ? (
@@ -362,7 +362,7 @@ export function AdminNetworkPage(): ReactNode {
 					if (!open) setSheetOpen(false);
 				}}
 				title="编辑平台网络设置"
-				description="保存后仅影响**后续**的赛事网络分配；已分配的赛事保持原网段，不会被打断。"
+				description="保存后仅影响**后续**的赛事网络分配"
 				width="xl"
 				footer={
 					<FormFooter

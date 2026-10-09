@@ -194,7 +194,7 @@ export function LabPage(): ReactNode {
 		<PageBody>
 			<PageHeader
 				title="AWDP 工作台"
-				description="Break 阶段拿 flag、Fix 阶段上传补丁并自检；所有状态来自后端，实时刷新。"
+				description="Break 阶段拿 flag、Fix 阶段上传补丁并自检"
 				breadcrumbs={
 					<nav className="flex items-center gap-1.5">
 						<Link to="/events" className="hover:underline">
@@ -252,7 +252,7 @@ export function LabPage(): ReactNode {
 				<div className="space-y-5">
 					<SectionCard
 							title="阶段"
-							description="阶段由后端推进；preparing_fix 是 Break→Fix 之间的过渡态，此时不可提交。"
+							description="阶段由后端推进；preparing_fix 是 Break→Fix 之间的过渡态，此时不可提交"
 							actions={
 								overview.next_action_at ? (
 									<span className="tnum text-xs text-muted-foreground">

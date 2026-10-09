@@ -122,7 +122,7 @@ export function TrainingCatalogPage(): ReactNode {
 
 			<SectionCard
 				title="练习靶机目录"
-				description="目录只暴露安全展示字段（不含 exploit / 源码 / 凭据）。"
+				description="目录只暴露安全展示字段（不含 exploit / 源码 / 凭据）"
 				actions={
 					<div className="flex items-center gap-2">
 						<Input
@@ -544,7 +544,7 @@ export function TrainingRunPage(): ReactNode {
 						<div className="space-y-5">
 							<SectionCard
 								title="训练阶段与生命周期"
-								description="练习 run 可以手动控阶段；阶段推进与回合物化由后端完成。"
+								description="练习 run 可以手动控阶段"
 								actions={
 									run.next_action_at ? (
 										<span className="tnum text-xs text-muted-foreground">
