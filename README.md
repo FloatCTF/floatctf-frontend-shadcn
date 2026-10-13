@@ -25,11 +25,12 @@
 | **独立 checkout**（本仓库单独克隆） | `@floatctf/*` **未发布到 npm**，需按 [AI-FRONTEND-GUIDE §18](../../docs/frontend/AI-FRONTEND-GUIDE.md) 用 release tarball | 见 §1.1 |
 
 > 两种用法共用**同一个** `mount(context)` 制品入口，平台契约不会分叉；
-> 差异只在依赖解析方式（`workspace:*` vs `file:` tarball）。
+> 差异只在依赖解析方式（monorepo 里链本地包 `packages/*` vs 独立 checkout 用 `file:` tarball）。
 
 ## 1. 快速开始（开发）
 
-本前端是 FloatCTF monorepo 内的 pnpm workspace 成员，`@floatctf/*` 通过 `workspace:*` 解析到本地包。
+本前端是 FloatCTF monorepo 内的 pnpm workspace 成员：`@floatctf/*` 声明为 `^1.0.0`，
+monorepo 根 `pnpm-workspace.yaml` 的 `linkWorkspacePackages: true` 把它链到本地 `packages/*`。
 
 ```bash
 # 依赖（在 monorepo 根执行一次）
@@ -52,22 +53,24 @@ mise exec -- pnpm --filter @floatctf/frontend-shadcn dev
 
 ### 1.1 独立 checkout（仓库外构建）
 
-`@floatctf/*` 目前没有发布到 npm registry，因此单独克隆本仓库时先把三个公共包打成 tarball：
+`@floatctf/*` 目前没有发布到 npm registry，因此单独克隆本仓库时先把三个公共包打成 tarball，
+再用本仓库的 `scripts/use-local-packages.sh` 把依赖指过去（CI 走的就是这条路径）：
 
 ```bash
-# 1) 在 FloatCTF 主仓库里打包（会先构建 packages/*）
-git clone https://github.com/FloatCTF/floatctf /tmp/floatctf && cd /tmp/floatctf
-scripts/package-sdk-dist.sh /tmp/floatctf-dist
+# 1) 在 FloatCTF 主仓库里打包（会先 build:packages；确定性命名 + fail-closed 校验）
+git clone --depth 1 https://github.com/FloatCTF/floatctf /tmp/floatctf
+( cd /tmp/floatctf && pnpm install --frozen-lockfile && ./scripts/package-sdk-dist.sh /tmp/floatctf-dist )
 ( cd /tmp/floatctf-dist && sha256sum -c SDK-SHA256SUMS )
 
-# 2) 在本仓库安装（注意用 npm：未发布包之间的 pnpm 解析会 404）
-npm install /tmp/floatctf-dist/floatctf-sdk-1.0.0.tgz \
-            /tmp/floatctf-dist/floatctf-frontend-runtime-1.0.0.tgz \
-            /tmp/floatctf-dist/floatctf-react-1.0.0.tgz
-npm install react@^19 react-dom@^19 @tanstack/react-query@^5
-# 3) 把 package.json 里的 "workspace:*" 换成对应版本（或 file:/tmp/floatctf-dist/*.tgz）
-npm run build          # vite build && tsc --noEmit
+# 2) 在本仓库：把 pnpm-workspace.yaml 的 overrides 指向这些 tarball，然后安装
+./scripts/use-local-packages.sh /tmp/floatctf-dist
+pnpm install --no-lockfile
+pnpm build          # vite build && tsc --noEmit，产出 dist/ 与自检过的 frontend.json
 ```
+
+> 为什么是 `overrides`：`@floatctf/react` 自身依赖 `@floatctf/sdk`，只改直接依赖的话这条
+> **传递依赖**仍会去 registry 找而 404；且 pnpm 11 起 `package.json` 的 `pnpm.overrides`
+> 不再被读取，必须写在 `pnpm-workspace.yaml`。
 
 > 本仓库的 `docs/` 里有若干指向主仓库 `docs/frontend/*` 的相对链接：作为 submodule 时有效，
 > 单独克隆时请到主仓库阅读对应文档。
@@ -229,6 +232,38 @@ export const feature: FeatureModule = {
 > `PUBLIC SDK GAP` 均属**类型/契约漂移或服务端参数缺失**，全部可用公共面安全实现，
 > 因此本前端 **complete 判定不受影响**；未修改任何后端或平台包。
 
-## 10. 许可
+## 10. 制品发布（CI / GitHub Release）
+
+`.github/workflows/release.yml` 在 `main`、`v*` tag 与手动 dispatch 时构建 3 个资产，
+消费方（平台宿主）**只下载、不构建**：不执行本仓库代码，也不需要 Node。
+
+| 资产 | 说明 |
+|---|---|
+| `frontend-dist.tar.gz` | `tar -C dist .` 打包，`frontend.json` 在归档根部（`frontend.sh` 的 `normalize_artifact_root` 无需猜层级） |
+| `frontend-dist.tar.gz.sha256` | 校验和 |
+| `BUILD_INFO.json` | 构建元数据（repository/commit/ref/workflow_run/node/files/bytes/built_at）。其中 **`frontend` 字段是 `dist/frontend.json`（制品 manifest）的原样副本**，供前端市场与人工核对读取 `id`/`version`/`compatibility`，**无需下载整个 tar.gz** |
+
+稳定下载地址（滚动通道，public 仓库无需凭据）：
+
+```bash
+gh release download frontend-latest -R FloatCTF/floatctf-frontend-shadcn -p 'frontend-dist.tar.gz*'
+sha256sum -c frontend-dist.tar.gz.sha256
+frontend.sh install frontend-dist.tar.gz
+```
+
+`v*` tag 会额外产出永久保留的版本 release（资产名相同）。
+
+`@floatctf/*` 未发布到 npm，CI 因此：克隆平台 monorepo → `pnpm install --frozen-lockfile` →
+`scripts/package-sdk-dist.sh`（构建并打包三个包，确定性命名 + fail-closed 校验）→
+`./scripts/use-local-packages.sh <dir>`（把 `pnpm-workspace.yaml` 的 `overrides` 指向本地 tarball，
+覆盖传递依赖）→ `pnpm install --no-lockfile` → `pnpm build` →
+硬检查 `dist/frontend.json`（存在、**不含 `build` 段**、字段齐全、声明的 entry/styles 在）→ 打包。
+
+> 契约对齐：制品的 `compatibility.frontendRuntime` / `apiContract` 必须与平台 monorepo 的
+> `packages/frontend-runtime/src/version.ts` 一致，否则消费侧 `frontend.sh` 会拒绝安装。
+> 可用仓库变量 `FLOATCTF_MONOREPO_REF`（默认 `main`）指定平台 ref；不一致时 CI 在构建前显式失败，
+> 而不是产出装不上的制品。
+
+## 11. 许可
 
 AGPL-3.0-only（与平台一致）。
