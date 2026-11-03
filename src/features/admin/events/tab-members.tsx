@@ -31,13 +31,15 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import type { EventUserResult } from "@floatctf/sdk";
-import type { Users } from "@floatctf/sdk/entity";
+// 账号响应一律用 `UserDto`，**不要**用生成实体 `Users`——
+// 后者是 DB 列镜像、含 `password`，把它当响应类型等于邀请调用方去读哈希。
+import type { UserDto } from "@floatctf/sdk";
 import { formatDateTime } from "~/lib/format";
 import { useDebouncedValue } from "~/lib/hooks";
 
 import { MobileFacts, PagedTable } from "./shared";
 
-function displayName(user: Users): string {
+function displayName(user: UserDto): string {
 	return user.nickname && user.nickname.length > 0 ? user.nickname : user.username;
 }
 
@@ -391,7 +393,7 @@ function AddMembersSheet({
 
 	const query = useQuery({
 		queryKey: qk.admin.users({ page, limit: pageSize, filter }),
-		queryFn: () => callList<Users>(client.admin.users.fetch({ page, limit: pageSize, filter })),
+		queryFn: () => callList<UserDto>(client.admin.users.fetch({ page, limit: pageSize, filter })),
 	});
 
 	const add = useMutation({
@@ -405,7 +407,7 @@ function AddMembersSheet({
 		onError: (error) => toast.apiError("添加成员失败", error),
 	});
 
-	const columns: DataTableColumn<Users>[] = [
+	const columns: DataTableColumn<UserDto>[] = [
 		{
 			id: "username",
 			header: "用户名",

@@ -11,13 +11,11 @@ import {
 	AdminLogsPage,
 	AdminScheduledTasksPage,
 	AdminSettingsPage,
-	AdminSuperAdminsPage,
 } from "./pages";
 
 export const feature: FeatureModule = {
 	shell: "admin",
 	routes: [
-		{ path: "/admin/platform/super-admins", element: <AdminSuperAdminsPage /> },
 		{ path: "/admin/platform/logs", element: <AdminLogsPage /> },
 		{ path: "/admin/platform/settings", element: <AdminSettingsPage /> },
 		{ path: "/admin/platform/frontends", element: <AdminFrontendsPage /> },

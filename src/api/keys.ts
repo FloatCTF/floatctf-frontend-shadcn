@@ -162,7 +162,6 @@ export const qk = {
 		discussionComments: (discussionId: string) =>
 			["admin-discussion-comments", discussionId] as const,
 		weapons: (params: Filters = {}) => ["admin-weapons", params] as const,
-		superAdmins: (params: Filters = {}) => ["admin-super-admins", params] as const,
 		scheduledTasks: (params: Filters = {}) => ["admin-scheduled-tasks", params] as const,
 		dockerContainers: () => ["admin-docker-containers"] as const,
 		dockerImages: () => ["admin-docker-images"] as const,
