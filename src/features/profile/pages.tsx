@@ -13,10 +13,11 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, RotateCcw, Save, Upload } from "lucide-react";
 
-import type { Users } from "@floatctf/sdk/entity";
+import type { MeDto } from "@floatctf/sdk";
 
 import { call, callVoid, uploadFile } from "~/api/call";
 import { useAppQueryClient, useClient } from "~/api/client";
@@ -44,7 +45,8 @@ import { useDocumentTitle } from "~/lib/hooks";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function ProfilePage(): ReactNode {
-	useDocumentTitle("我的资料 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("profile.documentTitle"));
 	const client = useClient();
 	const queryClient = useAppQueryClient();
 	const cachedMe = useMe();
@@ -61,7 +63,7 @@ export function ProfilePage(): ReactNode {
 
 	const query = useQuery({
 		queryKey: qk.auth.me(),
-		queryFn: () => call<Users>(client.service.users.getMe(), "我的资料"),
+		queryFn: () => call<MeDto>(client.service.users.getMe(), t("profile.load.what")),
 	});
 
 	const me = query.data;
@@ -96,10 +98,10 @@ export function ProfilePage(): ReactNode {
 					email: input.email,
 					...(input.password ? { password: input.password } : {}),
 				}),
-				"保存资料",
+				t("profile.save.what"),
 			),
 		onSuccess: (_data, input) => {
-			toast.success("资料已保存");
+			toast.success(t("profile.save.success"));
 			setPassword("");
 			setConfirmPassword("");
 			setFormError(null);
@@ -114,7 +116,7 @@ export function ProfilePage(): ReactNode {
 			}
 			void queryClient.invalidateQueries({ queryKey: qk.auth.me() });
 		},
-		onError: (error) => toast.apiError("保存失败", error),
+		onError: (error) => toast.apiError(t("profile.save.failed"), error),
 	});
 
 	const upload = useMutation({
@@ -129,14 +131,14 @@ export function ProfilePage(): ReactNode {
 				onProgress: (percent) => setProgress(percent),
 			}),
 		onSuccess: (avatarUrl) => {
-			toast.success("头像已更新");
+			toast.success(t("profile.avatar.updated"));
 			const current = useAuthStore.getState().me;
 			if (current) useAuthStore.getState().setMe({ ...current, avatar: avatarUrl });
 			void queryClient.invalidateQueries({ queryKey: qk.auth.me() });
 			setAvatarFile(null);
 			setPreviewUrl("");
 		},
-		onError: (error) => toast.apiError("头像上传失败", error),
+		onError: (error) => toast.apiError(t("profile.avatar.uploadFailed"), error),
 	});
 
 	function resetForm(): void {
@@ -152,20 +154,20 @@ export function ProfilePage(): ReactNode {
 		const nextNickname = nickname.trim();
 		const nextEmail = email.trim();
 		if (nextNickname === "") {
-			setFormError("昵称不能为空。");
+			setFormError(t("profile.errors.nicknameRequired"));
 			return;
 		}
 		if (nextEmail !== "" && !EMAIL_PATTERN.test(nextEmail)) {
-			setFormError("邮箱格式不正确（需要形如 name@example.com）。");
+			setFormError(t("profile.errors.emailInvalid"));
 			return;
 		}
 		if (password !== "") {
 			if (password.length < 8) {
-				setFormError("新密码至少 8 位（平台管理端校验口径一致）。");
+				setFormError(t("profile.errors.passwordTooShort"));
 				return;
 			}
 			if (password !== confirmPassword) {
-				setFormError("两次输入的新密码不一致。");
+				setFormError(t("profile.errors.passwordMismatch"));
 				return;
 			}
 		}
@@ -179,40 +181,34 @@ export function ProfilePage(): ReactNode {
 	}
 
 	const avatarSrc = previewUrl !== "" ? previewUrl : (me?.avatar ?? cachedMe?.avatar ?? null);
-	const displayName = me?.nickname || me?.username || "我";
+	const displayName = me?.nickname || me?.username || t("profile.me");
 
 	return (
 		<PageBody>
-			<PageHeader
-				title="我的资料"
-				description="修改公开昵称、联系邮箱与登录密码；头像上传后立即生效。"
-			/>
+			<PageHeader title={t("profile.title")} description={t("profile.description")} />
 
 			<QueryState
 				query={query}
-				skeleton={<LoadingBlock label="加载个人资料…" />}
-				errorTitle="加载个人资料失败"
+				skeleton={<LoadingBlock label={t("profile.load.loading")} />}
+				errorTitle={t("profile.load.failed")}
 			>
 				{(data) => (
 					<div className="space-y-5">
 						<div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
-							<SectionCard
-								title="基本资料"
-								description="账号不可修改；其余字段保存后立即生效。"
-							>
+							<SectionCard title={t("profile.basic.title")} description={t("profile.basic.description")}>
 								<div className="space-y-4">
 									<Field
-										label="账号"
+										label={t("profile.fields.username")}
 										htmlFor="profile-username"
-										hint="登录用账号，注册后不可更改。"
+										hint={t("profile.fields.usernameHint")}
 									>
 										<Input id="profile-username" value={data.username} disabled readOnly />
 									</Field>
 									<Field
-										label="昵称"
+										label={t("profile.fields.nickname")}
 										htmlFor="profile-nickname"
 										required
-										hint="公开展示在排行榜、讨论区与解题流水里。"
+										hint={t("profile.fields.nicknameHint")}
 										error={formError && nickname.trim() === "" ? formError : undefined}
 									>
 										<Input
@@ -224,9 +220,9 @@ export function ProfilePage(): ReactNode {
 										/>
 									</Field>
 									<Field
-										label="邮箱"
+										label={t("profile.fields.email")}
 										htmlFor="profile-email"
-										hint="用于找回密码；会出现在你分享的题解上。"
+										hint={t("profile.fields.emailHint")}
 									>
 										<Input
 											id="profile-email"
@@ -239,9 +235,9 @@ export function ProfilePage(): ReactNode {
 									</Field>
 									<div className="grid gap-4 sm:grid-cols-2">
 										<Field
-											label="新密码"
+											label={t("profile.fields.newPassword")}
 											htmlFor="profile-password"
-											hint="留空表示不修改密码。"
+											hint={t("profile.fields.newPasswordHint")}
 										>
 											<Input
 												id="profile-password"
@@ -253,9 +249,9 @@ export function ProfilePage(): ReactNode {
 											/>
 										</Field>
 										<Field
-											label="确认新密码"
+											label={t("profile.fields.confirmNewPassword")}
 											htmlFor="profile-password-confirm"
-											hint="与上方输入保持一致。"
+											hint={t("profile.fields.confirmNewPasswordHint")}
 										>
 											<Input
 												id="profile-password-confirm"
@@ -278,20 +274,20 @@ export function ProfilePage(): ReactNode {
 											) : (
 												<Save />
 											)}
-											保存修改
+											{t("profile.save.submit")}
 										</Button>
 										<Button
 											variant="outline"
 											disabled={save.isPending}
 											onClick={resetForm}
 										>
-											<RotateCcw /> 重置
+											<RotateCcw /> {t("common.reset")}
 										</Button>
 									</Toolbar>
 								</div>
 							</SectionCard>
 
-							<SectionCard title="头像" description="支持 PNG / JPEG / WebP / GIF，单文件最大 50MB。">
+							<SectionCard title={t("profile.avatar.title")} description={t("profile.avatar.description")}>
 								<div className="space-y-4">
 									<div className="flex items-center gap-4">
 										<UserAvatar
@@ -304,9 +300,7 @@ export function ProfilePage(): ReactNode {
 											<p className="truncate text-sm font-medium">{displayName}</p>
 											<MonoText className="block">{data.username}</MonoText>
 											<p className="text-xs text-muted-foreground">
-												{data.avatar
-													? "当前已有头像，重新上传会覆盖旧文件。"
-													: "还没有头像，上传一张让队友认出你。"}
+												{data.avatar ? t("profile.avatar.current") : t("profile.avatar.none")}
 											</p>
 										</div>
 									</div>
@@ -328,7 +322,7 @@ export function ProfilePage(): ReactNode {
 										/>
 										<Button variant="outline" asChild disabled={upload.isPending}>
 											<span>
-												<Upload /> 选择图片
+												<Upload /> {t("profile.avatar.choose")}
 											</span>
 										</Button>
 									</label>
@@ -336,13 +330,13 @@ export function ProfilePage(): ReactNode {
 									{avatarFile ? (
 										<div className="space-y-2">
 											<p className="truncate text-xs text-muted-foreground">
-												待上传：{avatarFile.name}
+												{t("profile.avatar.pending", { name: avatarFile.name })}
 											</p>
 											{upload.isPending ? (
 												<div className="space-y-1">
-													<Progress value={progress} aria-label="头像上传进度" />
+													<Progress value={progress} aria-label={t("profile.avatar.progressLabel")} />
 													<p className="tnum text-xs text-muted-foreground">
-														上传中 {progress}%
+														{t("profile.avatar.uploading", { percent: progress })}
 													</p>
 												</div>
 											) : null}
@@ -356,7 +350,7 @@ export function ProfilePage(): ReactNode {
 													) : (
 														<Upload />
 													)}
-													上传头像
+													{t("profile.avatar.upload")}
 												</Button>
 												<Button
 													variant="outline"
@@ -367,40 +361,38 @@ export function ProfilePage(): ReactNode {
 														setProgress(0);
 													}}
 												>
-													取消
+														{t("common.cancel")}
 												</Button>
 											</Toolbar>
 										</div>
 									) : (
-										<p className="text-xs text-muted-foreground">
-											先选择图片，再点「上传头像」；上传过程会显示进度。
-										</p>
+										<p className="text-xs text-muted-foreground">{t("profile.avatar.hint")}</p>
 									)}
 								</div>
 							</SectionCard>
 						</div>
 
-						<SectionCard title="账号信息" description="后端返回的账号元数据（只读）。">
+						<SectionCard title={t("profile.meta.title")} description={t("profile.meta.description")}>
 							<KeyValueList
 								columns={2}
 								items={[
-									{ key: "账号", value: <MonoText>{data.username}</MonoText> },
+									{ key: t("profile.meta.username"), value: <MonoText>{data.username}</MonoText> },
 									{
-										key: "昵称",
+										key: t("profile.meta.nickname"),
 										value: data.nickname ? data.nickname : "—",
 									},
-									{ key: "邮箱", value: data.email ? data.email : "—" },
+									{ key: t("profile.meta.email"), value: data.email ? data.email : "—" },
 									{
-										key: "注册时间",
+										key: t("profile.meta.createdAt"),
 										value: formatDateTime(data.created_at, { seconds: true }),
 									},
 									{
-										key: "资料更新时间",
+										key: t("profile.meta.updatedAt"),
 										value: formatDateTime(data.updated_at, { seconds: true }),
 									},
 									{
-										key: "用户 ID",
-										value: <CopyText value={data.id} label="用户 ID" />,
+										key: t("profile.meta.userId"),
+										value: <CopyText value={data.id} label={t("profile.meta.userId")} />,
 									},
 								]}
 							/>

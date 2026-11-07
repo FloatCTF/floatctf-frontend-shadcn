@@ -1,3 +1,65 @@
-/** profile 域文案（中文）。 */
+/** 我的资料域文案。 */
 
-export default {} as Record<string, unknown>;
+export default {
+	documentTitle: "我的资料 · FloatCTF",
+	title: "我的资料",
+	description: "修改公开昵称、联系邮箱与登录密码；头像上传后立即生效。",
+	me: "我",
+	load: {
+		what: "我的资料",
+		loading: "加载个人资料…",
+		failed: "加载个人资料失败",
+	},
+	basic: {
+		title: "基本资料",
+		description: "账号不可修改；其余字段保存后立即生效。",
+	},
+	fields: {
+		username: "账号",
+		usernameHint: "登录用账号，注册后不可更改。",
+		nickname: "昵称",
+		nicknameHint: "公开展示在排行榜、讨论区与解题流水里。",
+		email: "邮箱",
+		emailHint: "用于找回密码；会出现在你分享的题解上。",
+		newPassword: "新密码",
+		newPasswordHint: "留空表示不修改密码。",
+		confirmNewPassword: "确认新密码",
+		confirmNewPasswordHint: "与上方输入保持一致。",
+	},
+	save: {
+		what: "保存资料",
+		submit: "保存修改",
+		success: "资料已保存",
+		failed: "保存失败",
+	},
+	errors: {
+		nicknameRequired: "昵称不能为空。",
+		emailInvalid: "邮箱格式不正确（需要形如 name@example.com）。",
+		passwordTooShort: "新密码至少 8 位（平台管理端校验口径一致）。",
+		passwordMismatch: "两次输入的新密码不一致。",
+	},
+	avatar: {
+		title: "头像",
+		description: "支持 PNG / JPEG / WebP / GIF，单文件最大 50MB。",
+		current: "当前已有头像，重新上传会覆盖旧文件。",
+		none: "还没有头像，上传一张让队友认出你。",
+		choose: "选择图片",
+		pending: "待上传：{{name}}",
+		progressLabel: "头像上传进度",
+		uploading: "上传中 {{percent}}%",
+		upload: "上传头像",
+		updated: "头像已更新",
+		uploadFailed: "头像上传失败",
+		hint: "先选择图片，再点「上传头像」；上传过程会显示进度。",
+	},
+	meta: {
+		title: "账号信息",
+		description: "后端返回的账号元数据（只读）。",
+		username: "账号",
+		nickname: "昵称",
+		email: "邮箱",
+		createdAt: "注册时间",
+		updatedAt: "资料更新时间",
+		userId: "用户 ID",
+	},
+};

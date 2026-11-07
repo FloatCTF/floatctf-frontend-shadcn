@@ -20,6 +20,16 @@ export default {
 		openPalette: "打开命令面板",
 		trigger: "搜索 / 命令",
 	},
+	notFound: {
+		title: "页面不存在",
+		description: "这个地址没有对应的页面。可能是链接过期，或该资源已被删除。",
+		toPlayer: "返回选手端",
+		toAdmin: "前往管理端",
+	},
+	renderError: {
+		title: "界面渲染出错",
+		hint: "如果反复出现，请刷新页面；已登录状态不会丢失。",
+	},
 	toggleNav: "切换导航",
 	commandPlaceholder: "搜索页面、题目、账号…",
 	commandEmpty: "没有匹配的命令",

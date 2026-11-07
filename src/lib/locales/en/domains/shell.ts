@@ -20,6 +20,16 @@ export default {
 		openPalette: "Open command palette",
 		trigger: "Search / command",
 	},
+	notFound: {
+		title: "Page not found",
+		description: "This address has no matching page. The link may be stale, or the resource was deleted.",
+		toPlayer: "Back to player view",
+		toAdmin: "Go to admin",
+	},
+	renderError: {
+		title: "The interface failed to render",
+		hint: "If this keeps happening, refresh the page; your session will not be lost.",
+	},
 	toggleNav: "Toggle navigation",
 	commandPlaceholder: "Search pages, challenges, accounts…",
 	commandEmpty: "No matching command",

@@ -1,3 +1,91 @@
-/** auth domain copy (English). */
+/**
+ * Auth domain copy (login / register / forgot / reset / admin login).
+ */
 
-export default {} as Record<string, unknown>;
+export default {
+	brand: {
+		headline: "A calm, restrained, data-first competition console",
+		description:
+			"From Jeopardy solving to AWD offense and defense, one workspace carries your pace.",
+		points: {
+			jeopardy: { title: "Jeopardy", description: "Challenges, sets and live scoring" },
+			awd: { title: "AWD", description: "Rounds, flag submission and GameBox control" },
+			awdp: { title: "AWDP", description: "Automated phases and fix confirmation" },
+		},
+		footer: "Pluggable frontend · shadcn",
+	},
+	toolbar: {
+		backToConsole: "Back to console",
+		adminLogin: "Admin sign-in",
+	},
+	fields: {
+		username: "Account",
+		nickname: "Nickname",
+		email: "Email",
+		password: "Password",
+		confirmPassword: "Confirm password",
+		newPassword: "New password",
+		confirmNewPassword: "Confirm new password",
+		resetToken: "Reset token",
+	},
+	passwordMismatch: "The two passwords do not match",
+	backToLogin: "Back to sign-in",
+	login: {
+		documentTitle: "Sign in · FloatCTF",
+		title: "Player sign-in",
+		description: "Sign in with your platform account to enter your competition workspace.",
+		usernamePlaceholder: "Student ID / username",
+		submit: "Sign in",
+		success: "Signed in",
+		failed: "Sign-in failed",
+		noToken: "The backend did not return a token",
+		missingFields: "Enter both account and password",
+		noAccount: "No account yet?",
+		forgot: "Forgot password?",
+	},
+	register: {
+		documentTitle: "Register · FloatCTF",
+		title: "Create account",
+		description: "After registering you can join events and submit flags.",
+		submit: "Register",
+		success: "Account created",
+		successHint: "Sign in with the new account.",
+		failed: "Registration failed",
+		missingFields: "Account, nickname and password are required",
+		usernameHint: "Used to sign in and cannot be changed afterwards.",
+		emailHint: "Used for password recovery.",
+		haveAccount: "Already have an account?",
+	},
+	forgot: {
+		documentTitle: "Forgot password · FloatCTF",
+		title: "Forgot password",
+		description: "Provide either the account or the email; the platform will send a reset link.",
+		submit: "Send reset email",
+		success: "Reset request submitted",
+		successHint: "If the account exists, a reset email will be sent.",
+		failed: "Failed to send",
+		missingFields: "Fill in at least one of account or email",
+		hintBefore: "After receiving the email, open the link (of the form",
+		hintAfter: ") to set a new password.",
+	},
+	reset: {
+		documentTitle: "Set new password · FloatCTF",
+		title: "Set new password",
+		description: "Paste the reset token from the email, or enter this page from the email link.",
+		submit: "Reset password",
+		success: "Password reset",
+		successHint: "Sign in with the new password.",
+		failed: "Reset failed",
+		missingToken: "Enter the reset token",
+	},
+	adminLogin: {
+		documentTitle: "Admin sign-in · FloatCTF",
+		title: "Admin sign-in",
+		description: "Administrator accounts only. Admin and player sessions are independent.",
+		usernameLabel: "Administrator account",
+		submit: "Enter console",
+		success: "Console unlocked",
+		missingFields: "Enter the administrator account and password",
+		goPlayer: "Go to player sign-in",
+	},
+};

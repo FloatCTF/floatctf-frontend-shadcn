@@ -248,3 +248,12 @@
 		transition-duration: 0.01ms !important;
 	}
 }
+
+/* 认证页品牌区细网格纹理（theme.md §6.4.E）：32px 网格，极低对比。 */
+.grid-backdrop {
+	background-image:
+		linear-gradient(to right, color-mix(in oklch, var(--border) 60%, transparent) 1px, transparent 1px),
+		linear-gradient(to bottom, color-mix(in oklch, var(--border) 60%, transparent) 1px, transparent 1px);
+	background-size: 32px 32px;
+	background-position: -1px -1px;
+}
