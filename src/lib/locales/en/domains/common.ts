@@ -78,6 +78,7 @@ export default {
 		emptyDescription: "There is nothing to show under the current conditions.",
 		emptyFilteredTitle: "No matching records",
 		emptyFilteredDescription: "Try another search term or clear the filters.",
+		sortColumn: "Sort by {{column}}",
 		selectAll: "Select this page",
 		selectRow: "Select this row",
 		page: "Page {{page}}",

@@ -209,6 +209,15 @@ export function DataTable<T>({
 									return (
 										<TableHead
 											key={header.id}
+											aria-sort={
+												canSort
+													? sorted === "asc"
+														? "ascending"
+														: sorted === "desc"
+															? "descending"
+															: "none"
+													: undefined
+											}
 											className={cn(
 												column?.align ? alignClass[column.align] : "text-left",
 												column?.hideBelow ? hideClass[column.hideBelow] : "",
@@ -220,6 +229,9 @@ export function DataTable<T>({
 													type="button"
 													className="inline-flex items-center gap-1 text-xs font-medium hover:text-foreground"
 													onClick={header.column.getToggleSortingHandler()}
+													aria-label={t("common.table.sortColumn", {
+														column: typeof column?.header === "string" ? column.header : header.id,
+													})}
 												>
 													{flexRender(header.column.columnDef.header, header.getContext())}
 													{sorted === "asc" ? (
@@ -253,6 +265,17 @@ export function DataTable<T>({
 									data-state={row.getIsSelected() ? "selected" : undefined}
 									className={cn(onRowClick && "cursor-pointer")}
 									onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+									tabIndex={onRowClick ? 0 : undefined}
+									onKeyDown={
+										onRowClick
+											? (event) => {
+													if (event.key === "Enter" || event.key === " ") {
+														event.preventDefault();
+														onRowClick(row.original);
+													}
+												}
+											: undefined
+									}
 								>
 									{row.getVisibleCells().map((cell) => {
 										const meta = cell.column.columnDef.meta as

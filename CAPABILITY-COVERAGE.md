@@ -6,6 +6,9 @@
 
 ## 结论
 
+- 全部页面已按 [`docs/theme.md`](../../docs/theme.md) 完成 UI 重做（中性黑白控制台、亮色默认、
+  语义色无独立令牌），且**所有用户可见文案走 i18n（中英双语）**；一致性由
+  `pnpm i18n:check` 与 `pnpm theme:audit` 守护。
 - `required`：**89/89 覆盖**（complete 范围）
 - `optional`：30 行，除个别平台侧只读信息外均已实现
 - `specialized`：8 行，Docker / SQL / 终端 / 平台网络 / 前端选择器均已实现

@@ -44,6 +44,10 @@ cd /home/fb0sh/Projects/floatctf && mise exec -- pnpm install
 mise exec -- pnpm --filter @floatctf/frontend-shadcn typecheck
 mise exec -- pnpm --filter @floatctf/frontend-shadcn build
 
+# 单独跑两项守护检查（build 也会自动跑）
+mise exec -- pnpm --filter @floatctf/frontend-shadcn i18n:check     # 中英 key / 插值 / 代码引用
+mise exec -- pnpm --filter @floatctf/frontend-shadcn theme:audit    # theme.md 可机械检查的部分
+
 # 开发服务器（默认 :13400，自己代理 /api 到开发入口 Caddy :7780）
 mise exec -- pnpm --filter @floatctf/frontend-shadcn dev
 ```

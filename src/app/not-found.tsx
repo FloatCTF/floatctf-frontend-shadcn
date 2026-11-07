@@ -5,10 +5,12 @@ import { Link } from "react-router";
 
 import { PageBody } from "~/components/app/page";
 import { NotFoundBlock } from "~/components/app/states";
+import { useDocumentTitle } from "~/lib/hooks";
 import { Button } from "~/components/ui/button";
 
 export function NotFoundPage() {
 	const { t } = useTranslation();
+	useDocumentTitle(t("shell.notFound.title"));
 	return (
 		<PageBody className="max-w-2xl">
 			<NotFoundBlock

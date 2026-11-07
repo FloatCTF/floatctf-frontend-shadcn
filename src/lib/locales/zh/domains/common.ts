@@ -77,6 +77,7 @@ export default {
 		emptyDescription: "当前条件下没有可展示的记录。",
 		emptyFilteredTitle: "没有匹配的记录",
 		emptyFilteredDescription: "换个搜索词或清除筛选试试。",
+		sortColumn: "按{{column}}排序",
 		selectAll: "全选本页",
 		selectRow: "选择该行",
 		page: "第 {{page}} 页",
