@@ -55,7 +55,7 @@ export function ProfilePage(): ReactNode {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
-	const [formError, setFormError] = useState<string | null>(null);
+	const [formError, setFormError] = useState<{ message: string; field?: "nickname" | "email" | "password" | "confirm" } | null>(null);
 	const [syncedId, setSyncedId] = useState<string | null>(null);
 	const avatarInputRef = useRef<HTMLInputElement>(null);
 	const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -155,20 +155,20 @@ export function ProfilePage(): ReactNode {
 		const nextNickname = nickname.trim();
 		const nextEmail = email.trim();
 		if (nextNickname === "") {
-			setFormError(t("profile.errors.nicknameRequired"));
+			setFormError({ message: t("profile.errors.nicknameRequired"), field: "nickname" });
 			return;
 		}
 		if (nextEmail !== "" && !EMAIL_PATTERN.test(nextEmail)) {
-			setFormError(t("profile.errors.emailInvalid"));
+			setFormError({ message: t("profile.errors.emailInvalid"), field: "email" });
 			return;
 		}
 		if (password !== "") {
 			if (password.length < 8) {
-				setFormError(t("profile.errors.passwordTooShort"));
+				setFormError({ message: t("profile.errors.passwordTooShort"), field: "password" });
 				return;
 			}
 			if (password !== confirmPassword) {
-				setFormError(t("profile.errors.passwordMismatch"));
+				setFormError({ message: t("profile.errors.passwordMismatch"), field: "confirm" });
 				return;
 			}
 		}
@@ -210,7 +210,7 @@ export function ProfilePage(): ReactNode {
 										htmlFor="profile-nickname"
 										required
 										hint={t("profile.fields.nicknameHint")}
-										error={formError && nickname.trim() === "" ? formError : undefined}
+										error={formError?.field === "nickname" ? formError.message : undefined}
 									>
 										<Input
 											id="profile-nickname"
@@ -224,6 +224,7 @@ export function ProfilePage(): ReactNode {
 										label={t("profile.fields.email")}
 										htmlFor="profile-email"
 										hint={t("profile.fields.emailHint")}
+										error={formError?.field === "email" ? formError.message : undefined}
 									>
 										<Input
 											id="profile-email"
@@ -239,6 +240,7 @@ export function ProfilePage(): ReactNode {
 											label={t("profile.fields.newPassword")}
 											htmlFor="profile-password"
 											hint={t("profile.fields.newPasswordHint")}
+											error={formError?.field === "password" ? formError.message : undefined}
 										>
 											<Input
 												id="profile-password"
@@ -253,6 +255,7 @@ export function ProfilePage(): ReactNode {
 											label={t("profile.fields.confirmNewPassword")}
 											htmlFor="profile-password-confirm"
 											hint={t("profile.fields.confirmNewPasswordHint")}
+											error={formError?.field === "confirm" ? formError.message : undefined}
 										>
 											<Input
 												id="profile-password-confirm"
@@ -264,7 +267,9 @@ export function ProfilePage(): ReactNode {
 											/>
 										</Field>
 									</div>
-									{formError ? <InlineError error={formError} /> : null}
+									{formError && !formError.field ? (
+										<InlineError error={formError.message} />
+									) : null}
 									<Toolbar>
 										<Button
 											disabled={save.isPending}
