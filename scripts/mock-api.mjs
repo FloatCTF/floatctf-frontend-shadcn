@@ -436,7 +436,7 @@ const routes = [
 	["GET", /^\/api\/events\/([^/]+)\/trend$/, (_m, res) => ok(res, trend)],
 	["GET", /^\/api\/events\/([^/]+)\/announcements$/, (_m, res, req) => ok(res, announcements, req)],
 	["GET", /^\/api\/events\/([^/]+)\/instances$/, (_m, res) => ok(res, [])],
-	["GET", /^\/api\/events\/([^/]+)\/own_wp$/, (_m, res) => ok(res, [])],
+	["GET", /^\/api\/events\/([^/]+)\/own_wp$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/events\/([^/]+)\/join$/, (_m, res) => ok(res, null)],
 	["DELETE", /^\/api\/events\/([^/]+)\/leave$/, (_m, res) => ok(res, null)],
 

@@ -117,6 +117,7 @@ export default {
 		loading: "读取 writeup 状态…",
 		submitted: "已提交 writeup",
 		notSubmitted: "还没有提交 writeup（PDF）。",
+		choose: "选择 PDF",
 		fileLabel: "选择 writeup PDF",
 		submit: "提交 writeup",
 		resubmit: "重新提交",

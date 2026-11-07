@@ -134,7 +134,8 @@ export function EventFactsCard({ event }: { event: Events }) {
 						value: <span className="text-xs">{formatRelative(event.updated_at, now)}</span>,
 					},
 				]}
-				columns={2}
+				// 右栏宽度约 200px：两列会把「Jeopardy 解题」和时间窗挤成折行，单列更好读。
+				columns={1}
 			/>
 		</SectionCard>
 	);
@@ -469,7 +470,8 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 
 	if (own.isPending) return <LoadingBlock label={t("events.writeup.loading")} />;
 
-	const submitted = own.data && own.data.trim().length > 0;
+	// 防御：真实后端返回 string | null；非字符串（契约漂移）按「未提交」处理，绝不崩页。
+	const submitted = typeof own.data === "string" && own.data.trim().length > 0;
 
 	return (
 		<div className="space-y-3">
@@ -482,13 +484,26 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 				<p className="text-sm text-muted-foreground">{t("events.writeup.notSubmitted")}</p>
 			)}
 			<div className="flex flex-wrap items-center gap-2">
-				<Input
-					type="file"
-					accept="application/pdf"
-					aria-label={t("events.writeup.fileLabel")}
-					className="max-w-xs"
-					onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-				/>
+				<label className="inline-flex cursor-pointer">
+					<input
+						type="file"
+						accept="application/pdf"
+						aria-label={t("events.writeup.fileLabel")}
+						className="hidden"
+						onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+					/>
+					<Button type="button" variant="outline" asChild>
+						<span>
+							<FileUp aria-hidden="true" />
+							{t("events.writeup.choose")}
+						</span>
+					</Button>
+				</label>
+				{file ? (
+					<span className="max-w-48 truncate text-xs text-muted-foreground" title={file.name}>
+						{file.name}
+					</span>
+				) : null}
 				<Button
 					disabled={!file || upload.isPending}
 					onClick={() => file && upload.mutate(file)}

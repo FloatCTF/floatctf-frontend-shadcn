@@ -119,6 +119,7 @@ export default {
 		loading: "Reading write-up status…",
 		submitted: "Write-up submitted",
 		notSubmitted: "No write-up (PDF) submitted yet.",
+		choose: "Choose PDF",
 		fileLabel: "Choose write-up PDF",
 		submit: "Submit write-up",
 		resubmit: "Resubmit",
