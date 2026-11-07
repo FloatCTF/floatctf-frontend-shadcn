@@ -3,7 +3,7 @@
  * 页面级组件只组合这些基元，不各自发明间距与层级。
  */
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff } from "lucide-react";
 
@@ -300,6 +300,10 @@ export function PaginationBar({
 }) {
 	const { t } = useTranslation();
 	const totalPages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
+	// 删除 / 过滤后当前页可能越界：自动回到最后一页，避免「显示 21–20」这种空页。
+	useEffect(() => {
+		if (page > totalPages) onPageChange(totalPages);
+	}, [page, totalPages, onPageChange]);
 	const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
 	const to = Math.min(total, page * pageSize);
 	return (

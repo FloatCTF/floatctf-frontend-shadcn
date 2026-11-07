@@ -30,6 +30,8 @@
 | `player-practice-gate.png` | 练习赛门禁（不显示报名，引导去题库/训练场） |
 | `check-login-validation.png` | 登录页字段级校验（必填 + 焦点） |
 | `check-task-confirm.png` | 高危操作确认（后果清单 + 输入确认词） |
+| `player-awd-arena.png` | AWD 驾驶舱（4 指标 + flag/靶机/积分/凭据） |
+| `player-awdp-lab.png` | AWDP 工作台（阶段 / Break·Fix / 评测 / 矩阵） |
 | `player-rank.png` | 排行榜 |
 | `player-solves.png` | 解题流水 |
 | `player-discussions.png` | 讨论区 |
