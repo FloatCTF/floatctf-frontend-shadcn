@@ -491,6 +491,185 @@ const ok = (res, data, req) => {
 	json(res, 200, { code: 0, message: "OK", data, meta: Array.isArray(data) ? meta : null });
 };
 
+// ── 管理端 AWDP 运维 ──────────────────────────────────────────────────
+let awdpAdminPhase = process.env.MOCK_AWDP_ADMIN_PHASE ?? "break";
+const awdpAdminConfig = (eventId) => ({
+	event_id: eventId,
+	phase: awdpAdminPhase,
+	break_duration_secs: 5400,
+	fix_duration_secs: 3600,
+	fix_round_interval_secs: 600,
+	break_score: 200,
+	fix_round_score: 100,
+	total_rounds: 3,
+	configuration_generation: 4,
+	updated_at: iso(now - 40 * 60000),
+	started_at: awdpAdminPhase === "pending" ? null : iso(now - 50 * 60000),
+	break_ends_at: awdpAdminPhase === "break" ? iso(now + 40 * 60000) : iso(now - 10 * 60000),
+	fix_started_at: ["fix", "ended"].includes(awdpAdminPhase) ? iso(now - 10 * 60000) : null,
+	fix_ends_at: awdpAdminPhase === "fix" ? iso(now + 50 * 60000) : null,
+	finished_at: awdpAdminPhase === "ended" ? iso(now - 60000) : null,
+	current_round: awdpAdminPhase === "fix" ? 1 : 0,
+	next_action_at: iso(now + 40 * 60000),
+});
+const awdpAdminGameboxes = (eventId) => [
+	{
+		id: "aegb-1",
+		event_id: eventId,
+		gamebox_id: "gb-lib-1",
+		name: "web-shop",
+		safe_name: "web-shop",
+		category: "Web",
+		enabled: true,
+		hidden: false,
+		cpu_millis: 500,
+		memory_bytes: 268435456,
+		pids_limit: 128,
+		awdp_capable: true,
+		awdp_source_code_dir: "src/web-shop",
+		build_status: "ready",
+	},
+];
+const awdpAdminInstances = [
+	{
+		instance_id: "ainst-1",
+		event_gamebox_id: "aegb-1",
+		gamebox_name: "web-shop",
+		owner_user_id: "8f1c2d7a-0001-4a11-9a11-000000000001",
+		owner_team_id: null,
+		runtime_state: "running",
+		runtime_generation: 1,
+		container_name: "awdp-e1-web-shop-u1",
+		endpoints: [{ protocol: "http", container_port: 8080, public_host: "10.42.20.11", public_port: 18080 }],
+	},
+];
+
+const awdTeams = (eventId) => [
+	{
+		id: "team-1",
+		team: {
+			id: "team-1",
+			event_id: eventId,
+			name: "Byte Me",
+			description: "Mock 战队",
+			points: 1240,
+			created_at: iso(now - 3 * D),
+			updated_at: iso(now - 2 * H),
+			banned: false,
+		},
+		captain: "李明",
+		members: [
+			{ username: "2024001", nickname: "李明", role: "captain", points: 1240 },
+			{ username: "2024002", nickname: "NOP Sled", role: "member", points: 640 },
+		],
+	},
+	{
+		id: "team-2",
+		team: {
+			id: "team-2",
+			event_id: eventId,
+			name: "SegFault Club",
+			description: "Mock 战队",
+			points: 1020,
+			created_at: iso(now - 3 * D),
+			updated_at: iso(now - 3 * H),
+			banned: true,
+		},
+		captain: "Byte Me",
+		members: [{ username: "2024003", nickname: "Byte Me", role: "captain", points: 1020 }],
+	},
+];
+
+// ── 管理端 AWD 运维（赛事状态机 / 网络 / 赛事靶机 / 预检）──────────────
+let awdAdminStatus = process.env.MOCK_AWD_ADMIN_STATUS ?? "verified";
+const awdAdminState = (eventId) => ({
+	event_id: eventId,
+	status: awdAdminStatus,
+	phase: ["running", "paused"].includes(awdAdminStatus) ? "attack" : "hardening",
+	round_count: 8,
+	round_duration_secs: 600,
+	initial_score: 1000,
+	free_reset_count: 2,
+	extra_reset_penalty: 50,
+	judge_max_concurrency: 8,
+	judge_default_timeout_secs: 120,
+	judge_retry_interval_secs: 30,
+	archive_retention_hours: 72,
+	planned_start_at: iso(now - 2 * H),
+	verified_at: awdAdminStatus === "draft" || awdAdminStatus === "configuring" ? null : iso(now - 3 * H),
+	started_at: ["running", "paused", "finished", "archived"].includes(awdAdminStatus)
+		? iso(now - 40 * 60000)
+		: null,
+	updated_at: iso(now - 5 * 60000),
+	final_settlement: false,
+});
+const awdEventNetwork = (eventId) => ({
+	event_id: eventId,
+	allocation_mode: "automatic",
+	gamebox_cidr: "10.42.16.0/24",
+	wireguard_cidr: "10.66.3.0/24",
+	infrastructure_subnet: "10.42.16.0/28",
+	flagserver_ip: "10.42.16.2",
+	judgeserver_ip: "10.42.16.3",
+	wireguard_interface_name: "wg-awd-3",
+	wireguard_listen_port: 51823,
+	docker_network_name: "floatctf-awd-3",
+	locked: false,
+});
+const awdEventGameboxes = (eventId) => [
+	{
+		id: "egb-1",
+		event_id: eventId,
+		gamebox_id: "gb-lib-1",
+		gamebox_name: "web-01",
+		gamebox_safe_name: "web-01",
+		gamebox_version: "1.2.0",
+		host_offset: 1,
+		enabled: true,
+		hidden: false,
+		cpu_millis: 500,
+		memory_bytes: 268435456,
+		pids_limit: 128,
+		judge_timeout_secs: 120,
+		judge_retry_interval_secs: 30,
+		attack_score: 100,
+		judge_down_penalty: 20,
+		first_bonus: 50,
+		created_at: iso(now - 3 * D),
+	},
+	{
+		id: "egb-2",
+		event_id: eventId,
+		gamebox_id: "gb-lib-2",
+		gamebox_name: "pwn-02",
+		gamebox_safe_name: "pwn-02",
+		gamebox_version: "0.9.3",
+		host_offset: 2,
+		enabled: true,
+		hidden: false,
+		cpu_millis: 500,
+		memory_bytes: 536870912,
+		pids_limit: 64,
+		judge_timeout_secs: 120,
+		judge_retry_interval_secs: 30,
+		attack_score: 120,
+		judge_down_penalty: 20,
+		first_bonus: 50,
+		created_at: iso(now - 3 * D),
+	},
+];
+const awdPrecheckRuns = (eventId) => [
+	{
+		id: "pc-1",
+		event_id: eventId,
+		status: "succeeded",
+		trigger: "manual",
+		error_msg: null,
+		created_at: iso(now - 50 * 60000),
+		finished_at: iso(now - 48 * 60000),
+	},
+];
+
 // ── AWDP 训练场（目录 + Practice Run）──────────────────────────────────
 const trainingCatalog = [
 	{
@@ -713,116 +892,39 @@ const awdpScores = [
 const routes = [
 
 
-	// AWDP 训练场（目录 / Practice Run / 阶段动作 / 实例 / 评测 / 积分 / Writeup）
-	["GET", /^\/api\/service\/gameboxes$/, (_m, res, req) => ok(res, trainingCatalog, req)],
-	["POST", /^\/api\/service\/gameboxes\/([^/]+)\/awdp\/runs$/, (_m, res) => ok(res, trainingRun("pending"))],
-	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)$/, (m, res) => ok(res, trainingRun(mockRunPhase, m[1]))],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/start$/, (m, res) => {
-		mockRunPhase = "break";
-		return ok(res, trainingRun(mockRunPhase, m[1]));
-	}],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/stop$/, (_m, res) => ok(res, null)],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/reset$/, (m, res) => {
-		mockRunPhase = "break";
-		return ok(res, trainingRun(mockRunPhase, m[1]));
-	}],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/end$/, (m, res) => {
-		mockRunPhase = "ended";
-		return ok(res, trainingRun(mockRunPhase, m[1]));
-	}],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/restart-training$/, (_m, res) => ok(res, trainingRun("pending", "run-2"))],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/phase$/, (m, res) => {
-		// 前端只会切到「另一个阶段」；mock 用反转模拟（不解析 body）。
-		mockRunPhase = mockRunPhase === "fix" ? "break" : "fix";
-		return ok(res, trainingRun(mockRunPhase, m[1]));
-	}],
-	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/rounds$/, (_m, res) => ok(res, runRounds)],
-	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/evaluations$/, (_m, res) => ok(res, runEvaluations)],
-	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/scores$/, (_m, res) => ok(res, runScores)],
-	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res) =>
-		ok(res, { run_id: m[1], content: "", updated_at: null })],
-	["PUT", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res) =>
-		ok(res, { run_id: m[1], content: "## 训练复盘\n\n（mock）", updated_at: iso(now) })],
-	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, runInstance)],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/start$/, (_m, res) => ok(res, runInstance)],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => ok(res, runInstance)],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/break$/, (_m, res) =>
-		ok(res, { accepted: true, scored: true, already_broken: false })],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/patch$/, (_m, res) =>
-		ok(res, { status: "applied", error_message: null })],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/test-check$/, (_m, res) =>
-		ok(res, {
-			evaluation_id: "ev-run-manual",
-			status: "completed",
-			healthcheck_ok: true,
-			healthcheck_detail: ["mock: 服务可用"],
-			judge_ok: true,
-			judge_detail: "mock: judge 通过",
-			exploit_ok: true,
-			exploit_detail: "mock: exploit 被阻断",
-		})],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/all-check$/, (_m, res) =>
-		ok(res, {
-			status: "patched",
-			swept: false,
-			swept_rounds: 0,
-			healthcheck_ok: true,
-			judge_ok: true,
-			exploit_ok: true,
-			detail: "mock: ALL Check 通过",
-		})],
-	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/source$/, (_m, res) =>
-		ok(res, "https://files.example.edu/mock/web-shop-src.tar.gz")],
 
-	// AWD 选手端（mock：赛事状态 / 靶机 / 积分 / 下发凭据）
-	["GET", /^\/api\/events\/([^/]+)\/awd\/status$/, (m, res) => ok(res, awdStatus(m[1]))],
-	["GET", /^\/api\/events\/([^/]+)\/awd\/gameboxes$/, (_m, res) => ok(res, awdGameboxes)],
-	["POST", /^\/api\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)\/reset$/, (_m, res) => ok(res, null)],
-	["POST", /^\/api\/events\/([^/]+)\/awd\/submissions$/, (_m, res) => ok(res, null)],
-	["GET", /^\/api\/events\/([^/]+)\/awd\/scores$/, (_m, res) => ok(res, awdScores)],
-	["GET", /^\/api\/events\/([^/]+)\/awd\/wireguard\/config$/, (_m, res) => ok(res, { config: wireguardConfig })],
-	["GET", /^\/api\/events\/([^/]+)\/awd\/ssh-config$/, (_m, res) =>
-		ok(res, {
-			port: 2222,
-			password: "mock-ssh-password",
-			instances: awdGameboxes.map((box) => ({
-				id: box.id,
-				gamebox_ip: box.gamebox_ip,
-				username: "root",
-				container_name: box.container_name,
-				health_status: box.health_status,
-			})),
-		})],
+	// 管理端 AWD 运维（状态机 / 网络 / 赛事靶机 / 预检 / 积分）
+	["GET", /^\/api\/admin\/events\/([^/]+)\/awd$/, (m, res) => ok(res, awdAdminState(m[1]))],
+	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awd$/, (m, res) => ok(res, awdAdminState(m[1]))],
 
-	// AWDP 选手端（mock：总览 / 轮次 / 评估 / 积分 / 趋势 / 单实例）
-	["GET", /^\/api\/events\/([^/]+)\/awdp$/, (m, res) => ok(res, awdpOverview(m[1]))],
-	["GET", /^\/api\/events\/([^/]+)\/awdp\/rounds$/, (_m, res) => ok(res, awdpRounds)],
-	["GET", /^\/api\/events\/([^/]+)\/awdp\/evaluations$/, (_m, res) => ok(res, awdpEvaluations)],
-	["GET", /^\/api\/events\/([^/]+)\/awdp\/scores$/, (_m, res) => ok(res, awdpScores)],
-	["GET", /^\/api\/events\/([^/]+)\/awdp\/scoreboard$/, (_m, res) =>
-		ok(res, {
-			participant_mode: "individual",
-			gameboxes: [{ id: awdpGameboxId, name: "web-shop", category: "Web" }],
-			rounds: awdpRounds.map((r) => ({ sequence: r.sequence, status: r.status, cutoff_at: r.cutoff_at })),
-			rows: awdpScores.map((row) => ({
-				subject_id: row.subject_id,
-				subject_name: row.subject_name,
-				rank: row.rank,
-				break_score: row.break_score,
-				fix_score: row.fix_score,
-				total_score: row.total_score,
-				is_me: row.subject_id === "s-1",
-				break_status: [row.break_score > 0],
-				fix_gamebox_score: [row.fix_score],
-				fix_round_status: [[row.fix_score > 0 ? "patched" : null, null]],
-			})),
-		})],
-	["GET", /^\/api\/events\/([^/]+)\/awdp\/trend$/, (_m, res) =>
-		ok(res, [
-			{ name: "Byte Me", points: [{ name: "Byte Me", score: 200, time: iso(now - 30 * 60000) }, { name: "Byte Me", score: 300, time: iso(now - 10 * 60000) }] },
-			{ name: "NOP Sled", points: [{ name: "NOP Sled", score: 200, time: iso(now - 30 * 60000) }, { name: "NOP Sled", score: 200, time: iso(now - 10 * 60000) }] },
-		])],
+
+	// 管理端 AWDP 运维（配置 / 阶段推进 / 挂载 / 实例 / 积分 / 大屏）
+	["GET", /^\/api\/admin\/events\/([^/]+)\/awdp$/, (m, res) => ok(res, awdpAdminConfig(m[1]))],
+	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awdp$/, (m, res) => ok(res, awdpAdminConfig(m[1]))],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awdp\/start$/, (m, res) => { awdpAdminPhase = "break"; return ok(res, null); }],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awdp\/break-to-fix$/, (m, res) => { awdpAdminPhase = "fix"; return ok(res, null); }],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awdp\/finish$/, (m, res) => { awdpAdminPhase = "ended"; return ok(res, null); }],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/awdp\/gameboxes$/, (m, res) => ok(res, awdpAdminGameboxes(m[1]))],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awdp\/gameboxes$/, (m, res) => ok(res, awdpAdminGameboxes(m[1])[0])],
+	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)$/, (_m, res) => ok(res, null)],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/awdp\/instances$/, (_m, res) => ok(res, awdpAdminInstances)],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/awdp\/scores$/, (_m, res) => ok(res, awdpScores)],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/awdp\/data$/, (m, res) => {
+		const event = events.find((e) => e.id === m[1]) ?? events[0];
+		return ok(res, {
+			event,
+			user_count: 3,
+			team_count: 0,
+			gameboxes: [{ id: "aegb-1", name: "web-shop", category: "Web", break_count: 2, fix_count: 1 }],
+			scoreboard_top10: awdpScores,
+			trend: [
+				{ name: "Byte Me", points: [{ name: "Byte Me", score: 200, time: iso(now - 30 * 60000) }, { name: "Byte Me", score: 300, time: iso(now - 10 * 60000) }] },
+			],
+			recent_activity: [
+				{ subject_name: "Byte Me", gamebox_name: "web-shop", gamebox_category: "Web", action: "break", delta: 200, created_at: iso(now - 20 * 60000) },
+			],
+		});
+	}],
 	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, awdpInstance)],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => ok(res, awdpInstance)],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],

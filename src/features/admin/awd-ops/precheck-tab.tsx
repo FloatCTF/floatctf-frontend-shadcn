@@ -143,7 +143,7 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 		{
 			id: "trigger",
 			header: t("adminAwdOps.precheck.columns.trigger"),
-			cell: (row) => row.trigger ?? "—",
+			cell: (row) => (row.trigger ? t(`adminAwdOps.precheck.trigger.${row.trigger}`) : "—"),
 			hideBelow: "sm",
 		},
 		{
@@ -322,7 +322,9 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 											</TonePill>
 											<p className="tnum text-xs text-muted-foreground">
 												{formatDateTime(row.started_at, { seconds: true })}
-												{row.trigger ? ` · ${row.trigger}` : ""}
+												{row.trigger
+													? ` · ${t(`adminAwdOps.precheck.trigger.${row.trigger}`)}`
+													: ""}
 											</p>
 										</div>
 										<Button

@@ -409,6 +409,10 @@ export default {
 	},
 
 	precheck: {
+		trigger: {
+			manual: "Manual",
+			scheduled: "Scheduled",
+		},
 		title: "Precheck",
 		description:
 			"Check configuration / containers / WireGuard / network / flags / the judging chain; on success the status becomes precheck passed.",

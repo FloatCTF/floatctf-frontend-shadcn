@@ -124,7 +124,13 @@ export function AwdpDataTab({ eventId }: { eventId: string }): ReactNode {
 			skeleton={<TableSkeleton rows={5} columns={4} />}
 			errorTitle={t("adminAwdpOps.data.loadError")}
 		>
-			{(data) => (
+			{(data) => {
+				// 旧版 / 部分响应可能缺字段：不要让数据大屏白屏（platform 级要求）。
+				const gameboxes = data.gameboxes ?? [];
+				const recentActivity = data.recent_activity ?? [];
+				const top10 = data.scoreboard_top10 ?? [];
+				const trend = data.trend ?? [];
+				return (
 				<div className="flex flex-col gap-4">
 					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 						<StatCard
@@ -137,12 +143,12 @@ export function AwdpDataTab({ eventId }: { eventId: string }): ReactNode {
 						/>
 						<StatCard
 							label={t("adminAwdpOps.data.stats.gameboxes")}
-							value={<span className="tnum">{formatInt(data.gameboxes.length)}</span>}
+							value={<span className="tnum">{formatInt(gameboxes.length)}</span>}
 							hint={t("adminAwdpOps.data.statsHint.gameboxes")}
 						/>
 						<StatCard
 							label={t("adminAwdpOps.data.stats.recent")}
-							value={<span className="tnum">{formatInt(data.recent_activity.length)}</span>}
+							value={<span className="tnum">{formatInt(recentActivity.length)}</span>}
 							hint={t("adminAwdpOps.data.statsHint.recent")}
 						/>
 					</div>
@@ -165,14 +171,14 @@ export function AwdpDataTab({ eventId }: { eventId: string }): ReactNode {
 							</Button>
 						}
 					>
-						{data.scoreboard_top10.length === 0 ? (
+						{top10.length === 0 ? (
 							<EmptyBlock
 								title={t("adminAwdpOps.data.top.emptyTitle")}
 								description={t("adminAwdpOps.data.top.emptyDescription")}
 							/>
 						) : (
 							<DataTable
-								data={data.scoreboard_top10}
+								data={top10}
 								getRowId={(row) => row.subject_id}
 								columns={topColumns}
 								mobileCard={(row) => (
@@ -226,7 +232,7 @@ export function AwdpDataTab({ eventId }: { eventId: string }): ReactNode {
 						description={t("adminAwdpOps.data.trend.description")}
 					>
 						<TrendChart
-							series={data.trend.map((item) => ({
+							series={trend.map((item) => ({
 								name: item.name,
 								points: item.points.map((point) => ({
 									x: Date.parse(point.time),
@@ -278,7 +284,8 @@ export function AwdpDataTab({ eventId }: { eventId: string }): ReactNode {
 						)}
 					</SectionCard>
 				</div>
-			)}
+				);
+			}}
 		</QueryState>
 	);
 }

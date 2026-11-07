@@ -371,6 +371,10 @@ export default {
 	},
 
 	precheck: {
+		trigger: {
+			manual: "手动",
+			scheduled: "定时",
+		},
 		title: "预检",
 		description: "检查配置 / 容器 / WireGuard / 网络 / flag / 判题链路；通过后状态变为「预检通过」。",
 		run: "运行预检",

@@ -26,7 +26,6 @@ import { RealtimePill, TonePill } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import {
 	KeyValueList,
-	MonoText,
 	PageBody,
 	PageHeader,
 	SectionCard,
@@ -404,7 +403,11 @@ export function AwdOpsPage() {
 								},
 								{
 									key: t("adminAwdOps.lifecycle.fields.configVersion"),
-									value: <MonoText>{status.updated_at}</MonoText>,
+									value: (
+										<span className="tnum text-sm">
+											{formatDateTime(status.updated_at, { seconds: true })}
+										</span>
+									),
 								},
 							]}
 						/>
