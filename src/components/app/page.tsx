@@ -25,7 +25,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "~/components/ui/select";
-import { Separator } from "~/components/ui/separator";
 import { useCopyToClipboard } from "~/lib/hooks";
 import { cn } from "~/lib/utils";
 
@@ -65,7 +64,7 @@ export function PageHeader({
 
 export function PageBody({ children, className }: { children: ReactNode; className?: string }) {
 	return (
-		<div className={cn("mx-auto w-full max-w-screen-2xl space-y-5 px-4 py-5 lg:px-6", className)}>
+		<div className={cn("mx-auto w-full max-w-screen-2xl space-y-6 p-4 md:p-6", className)}>
 			{children}
 		</div>
 	);
@@ -99,12 +98,9 @@ export function SectionCard({
 			) : null}
 			<CardContent className={cn(title ? "" : "pt-5", contentClassName)}>{children}</CardContent>
 			{footer ? (
-				<>
-					<Separator />
-					<div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-						{footer}
-					</div>
-				</>
+				<div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/50 px-4 py-3">
+					{footer}
+				</div>
 			) : null}
 		</Card>
 	);
@@ -133,7 +129,7 @@ export function StatCard({
 					: "text-foreground";
 	return (
 		<Card>
-			<CardContent className="flex items-start justify-between gap-3 pt-5">
+			<CardContent className="flex items-start justify-between gap-3">
 				<div className="min-w-0 space-y-1">
 					<p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
 						{label}

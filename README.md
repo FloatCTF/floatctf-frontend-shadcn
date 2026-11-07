@@ -8,7 +8,12 @@
   逐行状态见 [CAPABILITY-COVERAGE.md](./CAPABILITY-COVERAGE.md)。
 - **技术栈**：React 19 · TypeScript 5.7 · Vite 6 · Tailwind CSS v4 · shadcn/ui（Radix + CVA）·
   react-router v7 · TanStack Query v5 · TanStack Table v8 · Zustand v5 · sonner · cmdk ·
-  react-markdown + remark-gfm · @xterm/xterm。
+  react-markdown + remark-gfm · @xterm/xterm · **react-i18next（中英双语）** · Geist Variable。
+- **视觉**：严格遵循主仓库 [`docs/theme.md`](../../docs/theme.md) 的「中性控制台」主题 ——
+  纯中性 OKLCH 灰阶（chroma=0）、亮色默认（`#fafafa` / `#0f0f0f`）、Geist 字体、1px 描边优先、
+  颜色只表达状态（emerald / amber / sky / destructive，带暗色变体）、10px 控件圆角 / 14px 卡片圆角。
+- **多语言**：所有用户可见文案走 `t()`，中英资源按域命名空间存放（`src/lib/locales/{zh,en}/domains/`），
+  一致性由 `pnpm i18n:check` 守护（key 与插值占位符必须两端一致）。
 - **交互模型**：双工作区（选手端 **Field** / 管理端 **Control Room**）+ 赛事工作区（标签面板）+
   AWD/AWDP 单页驾驶舱 + 全局命令面板（⌘K）+ 移动端底部导航。
 - **依赖边界**：只 import `@floatctf/sdk`、`@floatctf/frontend-runtime`、`@floatctf/react` 与第三方库；

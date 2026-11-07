@@ -24,10 +24,7 @@ function readStoredLocale(): Locale {
 	} catch {
 		/* 忽略存储失败 */
 	}
-	// 浏览器主语言是英文时默认英文，否则中文。
-	if (typeof navigator !== "undefined" && navigator.language?.toLowerCase().startsWith("en")) {
-		return "en";
-	}
+	// 中文为第一语言（theme.md §8.1）；英文由用户在切换器里显式选择。
 	return "zh-CN";
 }
 
