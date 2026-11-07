@@ -37,9 +37,8 @@ export function eventStatusOf(event: Events, nowMs?: number): EventStatus {
 /**
  * 状态 / 赛制 / 参赛模式 / 目的 → i18n key。
  *
- * 界面必须用这些 key + `t()` 渲染，**不要**直接用下面的 `*_LABEL` 常量：
- * 常量在模块加载时求值，语言切换后不会更新，且把中文写死进了共享层。
- * （`*_LABEL` 仅为兼容尚未迁移的调用点保留，迁移完成后删除。）
+ * 界面必须用这些 key + `t()` 渲染；不要再新增在模块加载时求值的文案常量
+ * （那样语言切换后不会更新，且把单一语言写死进共享层）。
  */
 export const EVENT_STATUS_KEY: Record<EventStatus, string> = {
 	upcoming: "common.eventStatus.upcoming",
@@ -64,34 +63,11 @@ export const EVENT_PURPOSE_KEY: Record<string, string> = {
 	practice: "common.eventPurpose.practice",
 };
 
-export const EVENT_STATUS_LABEL: Record<EventStatus, string> = {
-	upcoming: "未开始",
-	ongoing: "进行中",
-	ended: "已结束",
-	unknown: "时间未知",
-};
-
 export const EVENT_STATUS_TONE: Record<EventStatus, StatusTone> = {
 	upcoming: "info",
 	ongoing: "success",
 	ended: "muted",
 	unknown: "warning",
-};
-
-export const EVENT_FAMILY_LABEL: Record<string, string> = {
-	jeopardy: "Jeopardy 解题",
-	awd: "AWD 攻防",
-	awdp: "AWDP 攻防",
-};
-
-export const PARTICIPANT_MODE_LABEL: Record<string, string> = {
-	individual: "个人赛",
-	team: "战队赛",
-};
-
-export const EVENT_PURPOSE_LABEL: Record<string, string> = {
-	competition: "正式赛",
-	practice: "练习",
 };
 
 export interface EventCapabilities {

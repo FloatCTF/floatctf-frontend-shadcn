@@ -42,7 +42,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import type { EventChallengeResult, EventInfo } from "@floatctf/sdk";
 import { formatRange, formatScore } from "~/lib/format";
 import {
-	EVENT_STATUS_LABEL,
 	EVENT_STATUS_TONE,
 	computeEventStatus,
 	eventCapabilities,
@@ -637,4 +636,4 @@ export function EventChallengePage() {
 	);
 }
 
-export { EVENT_STATUS_LABEL, EVENT_STATUS_TONE };
+export { EVENT_STATUS_TONE };

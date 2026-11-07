@@ -43,7 +43,7 @@ export function Field({
 		<div className={cn("space-y-1.5", className)}>
 			{label ? (
 				<div className="flex items-center justify-between gap-2">
-					<Label htmlFor={htmlFor} className="text-xs">
+					<Label htmlFor={htmlFor} className="text-sm font-medium">
 						{label}
 						{required ? <span className="ml-0.5 text-destructive">*</span> : null}
 					</Label>
@@ -64,9 +64,9 @@ export function FieldError({ error }: { error: unknown }) {
 		? error.map((item) => String(item))
 		: [typeof error === "string" ? error : String((error as { message?: string })?.message ?? error)];
 	return (
-		<ul className="space-y-0.5">
+		<ul className="space-y-0.5" role="alert">
 			{messages.map((message) => (
-				<li key={message} className="text-xs text-destructive">
+				<li key={message} className="text-sm text-destructive">
 					{message}
 				</li>
 			))}

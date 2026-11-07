@@ -56,7 +56,7 @@ export function MarkdownView({
 		return <p className="text-sm text-muted-foreground">{emptyText ?? t("common.misc.emptyBlock")}</p>;
 	}
 	return (
-		<div className={cn("prose-ctf max-w-none", className)}>
+		<div className={cn("prose-ctf max-w-none break-words", className)}>
 			<Markdown
 				remarkPlugins={[remarkGfm]}
 				urlTransform={safeUrlTransform}
