@@ -98,8 +98,9 @@ export default {
 	confirm: {
 		defaultTitle: "确认操作",
 		defaultDescription: "此操作将立即生效。",
+		typePhraseHint: "在这里输入上面的确认词",
 		confirmPhrase: "输入 {{phrase}} 以确认",
-	irreversible: "此操作不可恢复。",
+		irreversible: "此操作不可恢复。",
 	},
 	time: {
 		justNow: "刚刚",

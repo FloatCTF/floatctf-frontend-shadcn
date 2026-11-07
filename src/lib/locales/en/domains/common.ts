@@ -99,8 +99,9 @@ export default {
 	confirm: {
 		defaultTitle: "Confirm action",
 		defaultDescription: "This takes effect immediately.",
+		typePhraseHint: "Type the confirmation phrase above",
 		confirmPhrase: "Type {{phrase}} to confirm",
-	irreversible: "This cannot be undone.",
+		irreversible: "This cannot be undone.",
 	},
 	time: {
 		justNow: "just now",

@@ -134,7 +134,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 								value={phrase}
 								autoComplete="off"
 								onChange={(event) => setPhrase(event.target.value)}
-								placeholder={pending.confirmPhrase}
+								placeholder={t("common.confirm.typePhraseHint")}
 							/>
 						</div>
 					) : null}
