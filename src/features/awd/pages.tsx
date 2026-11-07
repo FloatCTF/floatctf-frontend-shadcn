@@ -49,6 +49,8 @@ import {
 	AwdScoreboardPanel,
 	AwdStatePills,
 } from "./components";
+import { useCommands } from "~/app/command-palette";
+
 import { awdPhaseKey, awdStatusKey, eventFamilyKey } from "./domain";
 
 export function ArenaPage(): ReactNode {
@@ -73,6 +75,31 @@ export function ArenaPage(): ReactNode {
 			call<EventInfo>(client.service.events.get(eventId), t("awd.actionNames.event")),
 		enabled: Boolean(eventId),
 	});
+
+	// 命令面板的上下文命令：只注册本页真实存在的动作（聚焦提交框 / 刷新权威状态）。
+	useCommands(
+		[
+			{
+				id: "awd-focus-flag",
+				label: t("shell.commands.focusFlag"),
+				keywords: "flag submit 提交",
+				run: () => {
+					// 命令面板关闭时 Radix 会把焦点还给触发元素：延后一帧再聚焦目标输入框。
+					window.setTimeout(() => document.getElementById("awd-flag")?.focus(), 80);
+				},
+			},
+			{
+				id: "awd-refresh",
+				label: t("shell.commands.refresh"),
+				keywords: "refresh reload 刷新",
+				run: () => {
+					void statusQuery.refetch();
+					void eventQuery.refetch();
+				},
+			},
+		],
+		[eventId],
+	);
 
 	const status = statusQuery.data;
 	const eventInfo = eventQuery.data;

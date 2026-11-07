@@ -9,6 +9,10 @@ export default {
 	notSignedIn: "未登录",
 	goPlayer: "前往选手端",
 	commandPanel: "命令面板",
+	commands: {
+		focusFlag: "定位到「提交 flag」",
+		refresh: "刷新当前页面数据",
+	},
 	command: {
 		adminNav: "管理端导航",
 		playerNav: "选手端导航",

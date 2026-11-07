@@ -54,6 +54,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { formatBytes, formatDateTime, formatDuration, formatInt, formatPoints } from "~/lib/format";
+import { useCommands } from "~/app/command-palette";
 import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
 
 import {
@@ -474,6 +475,22 @@ export function TrainingRunPage(): ReactNode {
 		instanceQuery.dataUpdatedAt >= runQuery.dataUpdatedAt
 			? (instanceQuery.data ?? null)
 			: instanceFromRun;
+
+	useCommands(
+		[
+			{
+				id: "training-run-refresh",
+				label: t("shell.commands.refresh"),
+				keywords: "refresh reload 刷新",
+				run: () => {
+					for (const key of [qk.runs.run(runId), qk.runs.instance(runId), qk.runs.scores(runId)]) {
+						void queryClient.invalidateQueries({ queryKey: key });
+					}
+				},
+			},
+		],
+		[runId],
+	);
 
 	const refreshAll = useCallback(() => {
 		for (const key of [

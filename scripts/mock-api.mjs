@@ -11,6 +11,9 @@
  * - 截图/演示必须标注「mock」；
  * - 不实现写操作的真实语义（mutation 返回成功但内存里不留痕），避免被误当作可用的后端。
  *
+ * 覆盖：认证 / 赛事 / 题库 / 题解 / 训练场（Practice Run）/ AWD 选手端 / AWDP 选手端 /
+ * 管理端 AWD·AWDP 运维 / SSE（含 POST /api/__sse/close 主动断开以测试重连）。
+ *
  * 用法：
  *   node scripts/mock-api.mjs [--port 7780] [--host 127.0.0.1] [--host 10.66.66.2]
  *   默认只监听回环；Vite 的 `/api` 代理走 127.0.0.1，因此从 WireGuard 访问 UI 无需放行本端口。
@@ -889,10 +892,54 @@ const awdpScores = [
 	{ subject_id: "s-3", subject_name: "SegFault Club", break_score: 0, fix_score: 100, total_score: 100, rank: 3 },
 ];
 
+
+/** 记录活跃 SSE 连接，便于 `POST /__sse/close` 主动断开以测试重连。 */
+const sseClients = new Set();
+
+/** SSE：保持连接并心跳；首个事件用于让前端进入 connected 状态。 */
+const sse = (res, req) => {
+	res.writeHead(200, {
+		"content-type": "text/event-stream; charset=utf-8",
+		"cache-control": "no-cache, no-transform",
+		connection: "keep-alive",
+		"x-accel-buffering": "no",
+	});
+	res.write("retry: 3000\n\n");
+	const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+	send({ type: "connected", sequence: 1, occurred_at: iso(now) });
+	const timer = setInterval(() => {
+		if (res.writableEnded) return;
+		res.write(": ping\n\n");
+	}, 15000);
+	sseClients.add(res);
+	console.log("[sse] open ->", sseClients.size);
+	const drop = () => {
+		clearInterval(timer);
+		sseClients.delete(res);
+	};
+	// 用 response 的 close（客户端断开）而不是 req 的 close（请求体结束就会触发）。
+	res.on("close", drop);
+	return undefined;
+};
+
 const routes = [
 
 
 
+
+	// dev-only：主动断开全部 SSE，用于验证「断线 → 轮询 → 重连」表现
+	["POST", /^\/api\/__sse\/close$/, (_m, res, req) => {
+		for (const client of sseClients) {
+			try { client.end(); } catch { /* 已断开 */ }
+		}
+		sseClients.clear();
+		console.log("[sse] close all");
+		return ok(res, 0, req);
+	}],
+	// SSE（mock：建立连接后保持心跳；事件类型与真实后端一致）
+	["GET", /^\/api\/(?:admin\/)?events\/[^/]+\/awd\/stream$/, (_m, res, req) => sse(res, req)],
+	["GET", /^\/api\/events\/[^/]+\/awdp\/stream$/, (_m, res, req) => sse(res, req)],
+	["GET", /^\/api\/service\/awdp\/runs\/[^/]+\/stream$/, (_m, res, req) => sse(res, req)],
 	// 管理端 AWD 运维（状态机 / 网络 / 赛事靶机 / 预检 / 积分）
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd$/, (m, res) => ok(res, awdAdminState(m[1]))],
 	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awd$/, (m, res) => ok(res, awdAdminState(m[1]))],

@@ -9,6 +9,10 @@ export default {
 	notSignedIn: "Not signed in",
 	goPlayer: "Go to player view",
 	commandPanel: "Command palette",
+	commands: {
+		focusFlag: "Focus the flag field",
+		refresh: "Refresh this page",
+	},
 	command: {
 		adminNav: "Admin navigation",
 		playerNav: "Player navigation",

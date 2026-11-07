@@ -57,6 +57,15 @@ mise exec -- pnpm --filter @floatctf/frontend-shadcn dev
 mise exec -- pnpm --filter @floatctf/frontend-shadcn mock:api -- --host 127.0.0.1 --host 10.66.66.2
 ```
 
+mock 覆盖到「能点通」的程度（赛事 / 题库 / 题解 / 训练场 / AWD / AWDP / 管理端运维），
+并包含 **SSE**：`/events/{id}/awd/stream`、`/events/{id}/awdp/stream`、
+`/service/awdp/runs/{id}/stream` 会保持连接并心跳，因此 UI 的实时通道显示「已连接」。
+想验「断线 → 轮询 → 重连」可以：
+
+```bash
+curl -X POST http://127.0.0.1:7780/api/__sse/close   # 主动断开全部 SSE，前端会立刻转 reconnecting 再自动连回
+```
+
 打开 **http://127.0.0.1:13400**（或局域网地址）。
 
 > **dev 路径说明**：`index.html → src/dev.tsx → mount(context)` 直接挂载，与生产
