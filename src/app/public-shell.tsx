@@ -39,9 +39,9 @@ export function PublicShell({ children }: { children?: ReactNode }) {
 					<span className="text-base font-semibold tracking-tight">FloatCTF</span>
 				</div>
 
-				<div className="relative max-w-md space-y-6">
+				<div className="relative max-w-lg space-y-6">
 					<div className="space-y-3">
-						<h1 className="text-3xl font-semibold tracking-tight">
+						<h1 className="text-3xl font-semibold tracking-tight text-balance">
 							{t("auth.brand.headline")}
 						</h1>
 						<p className="text-sm leading-relaxed text-muted-foreground">
