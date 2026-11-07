@@ -106,7 +106,7 @@ export const adminNav: NavGroup[] = [
 		label: "平台",
 		items: [
 			{ to: "/admin/platform/users", label: "用户", icon: Users },
-			{ to: "/admin/platform/super-admins", label: "超管", icon: UserCog },
+			{ to: "/admin/platform/roles", label: "角色", icon: UserCog },
 			{ to: "/admin/platform/logs", label: "日志", icon: ScrollText },
 			{ to: "/admin/platform/settings", label: "设置", icon: Settings },
 			{ to: "/admin/platform/frontends", label: "前端", icon: PanelsTopLeft },

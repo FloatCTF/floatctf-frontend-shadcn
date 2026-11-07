@@ -3,7 +3,7 @@
  *
  * 真实接口：`client.admin.logs.fetch({ page, limit, filter })`。
  * 后端语义（`apps/api/src/modules/platform/operations/logs.rs`）：
- * - `filter` 支持精确/包含映射：`id`、`user_id`、`superadmin_id`、`ip_address`(contains)、
+ * - `filter` 支持精确/包含映射：`id`、`actor_user_id`（Wave 6 起合并了 v1 的 user_id/superadmin_id）、`ip_address`(contains)、
  *   `category`(eq)、`action`(contains)、`level`(eq)；
  * - `filter` 语法是 `key:value`，多个条件用 ` & ` 连接（`|` 是 OR 分组）；
  * - 实体里**没有** `target` 字段：日志维度是 `category` + `action`（以实体为准）。
@@ -74,14 +74,14 @@ const LEVEL_TONE: Record<string, PillTone> = {
 	debug: "muted",
 };
 
-type SearchField = "action" | "category" | "ip_address" | "user_id" | "superadmin_id";
+type SearchField = "action" | "category" | "ip_address" | "actor_user_id" | "level";
 
 const SEARCH_FIELDS: Array<{ value: SearchField; label: string; hint: string }> = [
 	{ value: "action", label: "操作", hint: "包含匹配" },
 	{ value: "category", label: "分类", hint: "精确匹配" },
 	{ value: "ip_address", label: "IP", hint: "包含匹配" },
-	{ value: "user_id", label: "用户 ID", hint: "精确匹配（UUID）" },
-	{ value: "superadmin_id", label: "管理员 ID", hint: "精确匹配（UUID）" },
+	{ value: "actor_user_id", label: "操作者 ID", hint: "精确匹配（UUID）" },
+	{ value: "level", label: "级别", hint: "精确匹配" },
 ];
 
 function levelTone(level: string): PillTone {
@@ -314,12 +314,8 @@ export function AdminLogsPage(): ReactNode {
 										value: <MonoText>{openLog.ip_address ?? "—"}</MonoText>,
 									},
 									{
-										key: "用户 ID",
-										value: <MonoText>{openLog.user_id ?? "—"}</MonoText>,
-									},
-									{
-										key: "管理员 ID",
-										value: <MonoText>{openLog.superadmin_id ?? "—"}</MonoText>,
+										key: "操作者 ID",
+										value: <MonoText>{openLog.actor_user_id ?? "—"}</MonoText>,
 									},
 								]}
 								columns={2}

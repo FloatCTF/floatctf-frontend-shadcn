@@ -264,7 +264,7 @@ PARTICIPANT_MODE_LABEL / EVENT_PURPOSE_LABEL / eventCapabilities(event)
 3. **位置参数顺序相反**：`instances.launchSingle(challenge_id, event_id)` ↔
    `events.launchSingleInstance(event_id, challenge_id)`。
 4. `admin.event_users.add` 运行时返回 AxiosResponse（我的 `unwrap` 已兼容，直接用 `call`）。
-5. `admin.super_admin.patch(id, data)` 实际发 **POST**；`uploads.upload_avatar` 实际发 **PATCH**。
+5. `uploads.upload_avatar` 实际发 **PATCH**（Wave 10 已删除 `admin.super_admin`，相关陷阱随之消失）。
 6. `patch(Partial<X>)` 系列**必须带 `.id`**（URL 用它拼接）。
 7. 批量删除是 `DELETE` + body：`remove(id_list: string[])`。
 8. `QueryParams` 只有 `offset/limit/page/total/filter` 五个键 —— `{ search }`、`{ pageSize }` 是**类型错误**。

@@ -7,7 +7,7 @@
 	"author": "FloatCTF",
 	"compatibility": {
 		"frontendRuntime": "1",
-		"apiContract": "1"
+		"apiContract": "2"
 	},
 	"entry": "assets/frontend.js",
 	"styles": ["assets/frontend.css"],

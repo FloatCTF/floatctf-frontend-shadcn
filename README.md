@@ -221,7 +221,7 @@ export const feature: FeatureModule = {
 | 4 | `awd.admin.precheck` 声明 `string`，实际返回对象（`run_id/status/error_msg/failed_checks/checks`） | 预检结果无法展示 | 按真实对象解析 |
 | 5 | `AwdEventConfigInput/AwdEventStatus` 缺 `judge_grace_period_secs` | 该字段无法编辑 | 只读展示 |
 | 6 | `AwdpAdminInstanceDto` 缺 `reset_count` | — | 类型保护读取展示 |
-| 7 | `settings.fetch` 无参数；`weapons.fetch` 忽略参数且无 meta；`super_admin.fetch` 无 filter；Docker 实为 `offset/limit` 且无 filter | 这些列表无法服务端搜索/分页 | 客户端搜索分页，并在页面上写明 |
+| 7 | `settings.fetch` 无参数；`weapons.fetch` 忽略参数且无 meta；Docker 实为 `offset/limit` 且无 filter | 这些列表无法服务端搜索/分页 | 客户端搜索分页，并在页面上写明 |
 | 8 | `scheduled_tasks.payload` 声明 `string` 实为 JSON 值；`timeout_secs` 声明 `string` 实为 number | 无法在不使用 `any` 的前提下提交对象 payload | payload 只读展示 |
 | 9 | `AWD_ADMIN_QUERY_KEYS` 不含 event-gameboxes / event-network；管理端无 AWDP SSE（矩阵第 204 行「可用管理端 AWD 流」不成立） | 这两块不随 SSE 刷新 | 手动刷新时补失效；AWDP 管理页用 30s 轮询 |
 | 10 | `updateEventGamebox` 的可空判题字段后端缺 `deserialize_nullable`：显式 `null` 被静默忽略 | 「清空」语义不成立 | 表单禁止清空并写明 |
