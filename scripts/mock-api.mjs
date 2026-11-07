@@ -907,6 +907,10 @@ const sse = (res, req) => {
 	res.write("retry: 3000\n\n");
 	const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 	send({ type: "connected", sequence: 1, occurred_at: iso(now) });
+	// 2 秒后推一条计分事件：验证前端按 SSE 事件失效查询（会重新拉取 awd-scores 等）。
+	setTimeout(() => {
+		if (!res.writableEnded) send({ type: "score.updated", sequence: 2, occurred_at: iso(now) });
+	}, 2000);
 	const timer = setInterval(() => {
 		if (res.writableEnded) return;
 		res.write(": ping\n\n");

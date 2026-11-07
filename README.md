@@ -207,10 +207,9 @@ export const feature: FeatureModule = {
    `family=awd` 只允许 `participant_mode=team`；`family=awdp` 只允许 `individual`；
    `purpose=practice` 的 AWDP 赛事**不支持** `join/team`（`UnsupportedForPurpose`），
    练习入口走 `/training`（`awdp.runs`），赛事工作台只对 competition 赛事的参赛者开放。
-5. **SSE 失效 key 不一致（PUBLIC SDK GAP）**：`@floatctf/react` 的 `useAwdpEventStream`
-   失效 `["awdp-evals", eventId]`，而本前端的 `qk.awdp.evaluations` 是
-   `["awdp-evaluations", eventId]`；评测面板暂时依靠「回合刷新完成」的级联失效兜底。
-   建议平台侧统一 key 名或在失效列表补齐。
+5. ~~SSE 失效 key 不一致~~：已对齐 —— `qk.awdp.evaluations` 现为 `["awdp-evals", eventId]`，
+   与 `@floatctf/react` 的 `useAwdpEventStream` 失效列表一致（评测面板随事件刷新）。
+   `qk.runs.evaluations` 对应 `["awdp-run-evals", runId]`，同样与 `useAwdpRunStream` 对齐。
 6. **AWDP 实例缺少 SSH 凭据字段（PUBLIC SDK GAP）**：`AwdpRunDto` / `AwdpInstance` /
    `AwdpEndpoint` 只有 http/tcp 的 host/port 与 flag server URL，没有 user/password，
    因此训练/工作台无法渲染 SSH 凭据（不造假数据）。
