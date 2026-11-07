@@ -495,7 +495,7 @@ export function AdminFrontendsPage(): ReactNode {
 							onRetry={() => void activeQuery.refetch()}
 						/>
 					) : !activeRow ? (
-						<div className="flex items-start gap-2 rounded-md border border-[var(--warning)]/40 bg-[var(--warning)]/10 px-3 py-2 text-sm">
+						<div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm">
 							<ShieldAlert className="mt-0.5 size-4 shrink-0" />
 							<span>
 								平台设置里没有 <span className="font-mono">{FRONTEND_ACTIVE_KEY}</span>

@@ -287,7 +287,7 @@ export function AdminNetworkPage(): ReactNode {
 								))}
 							</div>
 							{data.notes.length > 0 ? (
-								<div className="space-y-1 rounded-lg border border-[var(--warning)]/40 bg-[var(--warning)]/10 p-3">
+								<div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
 									<p className="flex items-center gap-1.5 text-sm font-medium">
 										<ShieldAlert className="size-4" /> 后端观测备注
 									</p>

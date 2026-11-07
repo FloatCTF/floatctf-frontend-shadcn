@@ -124,9 +124,9 @@ export function StatCard({
 }) {
 	const toneClass =
 		tone === "success"
-			? "text-[var(--success)]"
+			? "text-emerald-600 dark:text-emerald-400"
 			: tone === "warning"
-				? "text-[var(--warning)]"
+				? "text-amber-700 dark:text-amber-400"
 				: tone === "danger"
 					? "text-destructive"
 					: "text-foreground";
@@ -232,7 +232,7 @@ export function CopyText({
 				aria-label={copied ? (label ? `${label}已复制` : "已复制") : label ? `复制${label}` : "复制"}
 				title={label ? `复制${label}` : "复制"}
 			>
-				{copied ? <Check className="text-[var(--success)]" /> : <Copy />}
+				{copied ? <Check className="text-emerald-600 dark:text-emerald-400" /> : <Copy />}
 			</Button>
 		</span>
 	);
@@ -277,7 +277,7 @@ export function SecretValue({ value, label }: { value: string; label?: string })
 				aria-label={copied ? `${name}已复制` : `复制${name}`}
 				title={copied ? "已复制" : `复制${name}`}
 			>
-				{copied ? <Check className="text-[var(--success)]" /> : <Copy />}
+				{copied ? <Check className="text-emerald-600 dark:text-emerald-400" /> : <Copy />}
 			</Button>
 		</span>
 	);

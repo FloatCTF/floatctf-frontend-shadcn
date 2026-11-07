@@ -129,10 +129,10 @@ export function AwdpPhaseSteps({
 			</div>
 			{phase === "preparing_fix" ? (
 				<div
-					className="flex items-start gap-2 rounded-md border border-[var(--warning)]/40 bg-[var(--warning)]/10 px-3 py-2 text-xs"
+					className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs"
 					role="status"
 				>
-					<TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-[var(--warning)]" />
+					<TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
 					<span>{AWDP_PREPARING_FIX_NOTE}</span>
 				</div>
 			) : null}
@@ -600,7 +600,7 @@ export function AwdpActionPanel({
 							<ul className="space-y-1">
 								<li className="flex items-center gap-2">
 									{checkResult.healthcheck_ok ? (
-										<CheckCircle2 className="size-3.5 text-[var(--success)]" />
+										<CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
 									) : (
 										<XCircle className="size-3.5 text-destructive" />
 									)}
@@ -610,7 +610,7 @@ export function AwdpActionPanel({
 								</li>
 								<li className="flex items-center gap-2">
 									{checkResult.judge_ok ? (
-										<CheckCircle2 className="size-3.5 text-[var(--success)]" />
+										<CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
 									) : (
 										<XCircle className="size-3.5 text-destructive" />
 									)}
@@ -622,7 +622,7 @@ export function AwdpActionPanel({
 									) : checkResult.exploit_ok ? (
 										<XCircle className="size-3.5 text-destructive" />
 									) : (
-										<CheckCircle2 className="size-3.5 text-[var(--success)]" />
+										<CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
 									)}
 									<span>
 										Exploit：

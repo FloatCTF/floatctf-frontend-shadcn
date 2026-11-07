@@ -356,7 +356,7 @@ function AttentionSection({
 							className={
 								item.tone === "danger"
 									? "flex items-start gap-2 text-sm text-destructive"
-									: "flex items-start gap-2 text-sm text-[var(--warning)]"
+									: "flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400"
 							}
 						>
 							<AlertTriangle className="mt-0.5 size-4 shrink-0" />

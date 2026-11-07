@@ -256,7 +256,7 @@ export function ScoreboardTab({ info }: { info: EventInfo }) {
 							title={cell.solved ? `${cell.name}：第 ${cell.solved_no} 解` : `${cell.name}：未解出`}
 							className={
 								cell.solved
-									? "inline-block size-2.5 rounded-sm bg-[var(--success)]"
+									? "inline-block size-2.5 rounded-sm bg-emerald-500"
 									: "inline-block size-2.5 rounded-sm bg-muted"
 							}
 						/>

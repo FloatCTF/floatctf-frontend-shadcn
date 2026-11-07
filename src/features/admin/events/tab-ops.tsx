@@ -180,7 +180,7 @@ export function EventAwdTab({ eventId }: { eventId: string }): ReactNode {
 							</p>
 						) : null}
 						{status.final_settlement ? (
-							<p className="rounded-md border border-[var(--warning)]/40 bg-[var(--warning)]/10 px-3 py-2 text-sm">
+							<p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm">
 								最终结算中（final_settlement）：Judge 正在结算最后一轮，比赛动作已关闭。
 							</p>
 						) : null}

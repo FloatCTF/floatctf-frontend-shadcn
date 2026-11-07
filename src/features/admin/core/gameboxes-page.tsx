@@ -705,7 +705,7 @@ export function AdminGameboxesPage(): ReactNode {
 				) : null}
 
 				{imported ? (
-					<div className="flex flex-wrap items-center gap-3 border-b bg-[var(--success)]/10 px-4 py-2 text-sm">
+					<div className="flex flex-wrap items-center gap-3 border-b bg-emerald-500/10 px-4 py-2 text-sm">
 						<span className="font-medium">导入成功：</span>
 						<span>{imported.name}</span>
 						<MonoText>{imported.safe_name}</MonoText>

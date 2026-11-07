@@ -7,7 +7,7 @@
 
 import type { ReactNode } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun, UserCircle } from "lucide-react";
+import { ChevronsUpDown, LogOut, Moon, Sun, UserCircle } from "lucide-react";
 
 import { useAuthStore, useMe } from "~/auth/store";
 import { CommandTrigger } from "~/app/command-palette";
@@ -155,20 +155,23 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button variant="ghost" size="icon-sm" aria-label="切换主题">
-								{theme === "dark" ? <Moon /> : theme === "light" ? <Sun /> : <Monitor />}
+							<Button
+								variant="outline"
+								size="icon-sm"
+								className="bg-background/80 backdrop-blur"
+								aria-label={theme === "dark" ? "切换到亮色" : "切换到暗色"}
+								title={theme === "dark" ? "切换到亮色" : "切换到暗色"}
+							>
+								{theme === "dark" ? <Sun /> : <Moon />}
 							</Button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">
 							<DropdownMenuLabel>外观</DropdownMenuLabel>
-							<DropdownMenuItem onClick={() => setThemePreference("dark")}>
-								<Moon /> 暗色
-							</DropdownMenuItem>
 							<DropdownMenuItem onClick={() => setThemePreference("light")}>
 								<Sun /> 亮色
 							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => setThemePreference("system")}>
-								<Monitor /> 跟随系统
+							<DropdownMenuItem onClick={() => setThemePreference("dark")}>
+								<Moon /> 暗色
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>

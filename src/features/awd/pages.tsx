@@ -147,10 +147,10 @@ export function ArenaPage(): ReactNode {
 
 						{status.final_settlement ? (
 							<div
-								className="flex items-start gap-2 rounded-lg border border-[var(--warning)]/40 bg-[var(--warning)]/10 px-4 py-3 text-sm"
+								className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm"
 								role="status"
 							>
-								<AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--warning)]" />
+								<AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
 								<div>
 									<p className="font-medium">最终结算中</p>
 									<p className="text-muted-foreground">

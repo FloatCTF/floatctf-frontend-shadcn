@@ -423,7 +423,7 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 /** 未参赛且赛事已开始时的门禁提示（与后端权限一致）。 */
 export function MemberGateNotice() {
 	return (
-		<div className="rounded-lg border border-[var(--warning)]/40 bg-[var(--warning)]/10 p-4">
+		<div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
 			<p className="flex items-center gap-2 text-sm font-medium">
 				<ShieldAlert className="size-4" /> 你尚未加入本赛事
 			</p>
