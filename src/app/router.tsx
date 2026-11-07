@@ -51,7 +51,9 @@ export function createAppRouter() {
 							<AdminShell />
 						</RequireAdmin>
 					),
-					children: [...collectRoutes("admin"), { path: "*", element: <NotFoundPage /> }],
+					// 管理端的兜底必须写成 `admin/*`：若也用 `*`，会与选手端的 `*` 同级，
+					// 排序上选手端先命中 —— /admin/xxx 会渲染成「选手壳 + 404」。
+					children: [...collectRoutes("admin"), { path: "admin/*", element: <NotFoundPage /> }],
 				},
 				{ path: "*", element: <NotFoundPage /> },
 			],
