@@ -43,7 +43,7 @@ import {
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { formatDateTime, formatDuration, formatInt, formatScore } from "~/lib/format";
+import { formatDateTime, formatDuration, formatInt, formatPoints } from "~/lib/format";
 import { useDocumentTitle } from "~/lib/hooks";
 
 import {
@@ -279,7 +279,7 @@ export function LabPage(): ReactNode {
 						<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 							<StatCard
 								label={t("awdp.stats.myScore")}
-								value={formatScore(overview.my_score)}
+								value={formatPoints(overview.my_score)}
 								hint={t("awdp.stats.myScoreHint")}
 								icon={<Trophy className="size-4" aria-hidden="true" />}
 								tone="success"
@@ -328,7 +328,7 @@ export function LabPage(): ReactNode {
 									key: t("awdp.stats.breakScore"),
 									value: (
 										<span className="tnum">
-											{formatScore(overview.break_score)}
+											{formatPoints(overview.break_score)}
 										</span>
 									),
 								},
@@ -336,7 +336,7 @@ export function LabPage(): ReactNode {
 									key: t("awdp.stats.fixRoundScore"),
 									value: (
 										<span className="tnum">
-											{formatScore(overview.fix_round_score)}
+											{formatPoints(overview.fix_round_score)}
 										</span>
 									),
 								},
@@ -386,7 +386,8 @@ export function LabPage(): ReactNode {
 						/>
 					</SectionCard>
 
-					<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.2fr)]">
+					{/* 1280 下三列会把「实例 / 评测」压到 300px 左右：宽屏才三列，其余两列 + 评测整行。 */}
+					<div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.2fr)]">
 						<div className="space-y-5">
 							<SectionCard
 								title={t("awdp.gameboxes.sectionTitle")}
@@ -424,7 +425,9 @@ export function LabPage(): ReactNode {
 							onChanged={refreshAll}
 						/>
 
-						<AwdpRoundsEvaluationsPanel eventId={eventId} enabled={hasRun} />
+						<div className="lg:col-span-2 2xl:col-span-1">
+							<AwdpRoundsEvaluationsPanel eventId={eventId} enabled={hasRun} />
+						</div>
 					</div>
 
 					<SectionCard

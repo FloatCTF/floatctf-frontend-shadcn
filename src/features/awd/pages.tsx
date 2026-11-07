@@ -14,7 +14,7 @@ import type { ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Trans, useTranslation } from "react-i18next";
-import { AlertTriangle, CalendarDays, Flag, Swords, Trophy } from "lucide-react";
+import { Activity, AlertTriangle, CalendarDays, Flag, Swords, Trophy } from "lucide-react";
 
 import type { AwdPlayerStatus, EventInfo } from "@floatctf/sdk";
 
@@ -208,38 +208,52 @@ export function ArenaPage(): ReactNode {
 						/>
 					) : null}
 
-					<div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+					{/* 总览指标放顶部一行：窄侧栏里塞表格会横向溢出，也浪费左列高度。 */}
+					<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+						<StatCard
+							label={t("awd.arena.stats.score")}
+							value={formatPoints(status.score)}
+							hint={t("awd.arena.stats.scoreHint")}
+							icon={<Trophy className="size-4" aria-hidden="true" />}
+						/>
+						<StatCard
+							label={t("awd.arena.stats.round")}
+							value={formatInt(status.current_round)}
+							hint={
+								status.round_count === null ? (
+									t("awd.arena.stats.roundHintUnknown")
+								) : (
+									<span className="tnum">
+										{t("awd.arena.stats.roundHint", {
+											rounds: formatInt(status.round_count),
+										})}
+									</span>
+								)
+							}
+							icon={<Flag className="size-4" aria-hidden="true" />}
+						/>
+						<StatCard
+							label={t("awd.arena.fields.status")}
+							value={t(awdStatusKey(status.status))}
+							hint={<MonoText className="text-muted-foreground">{status.status}</MonoText>}
+							icon={<Activity className="size-4" aria-hidden="true" />}
+						/>
+						<StatCard
+							label={t("awd.arena.fields.phase")}
+							value={t(awdPhaseKey(status.phase))}
+							hint={<MonoText className="text-muted-foreground">{status.phase}</MonoText>}
+							icon={<Swords className="size-4" aria-hidden="true" />}
+						/>
+					</div>
+
+					<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
 						<div className="min-w-0 space-y-4">
 							<AwdFlagPanel eventId={eventId} status={status} />
 							<AwdGameboxPanel eventId={eventId} status={status} />
+							<AwdScoreboardPanel eventId={eventId} myTeamId={myTeamId} />
 						</div>
 
 						<div className="min-w-0 space-y-4">
-							<div className="grid gap-3">
-								<StatCard
-									label={t("awd.arena.stats.score")}
-									value={formatPoints(status.score)}
-									hint={t("awd.arena.stats.scoreHint")}
-									icon={<Trophy className="size-4" aria-hidden="true" />}
-								/>
-								<StatCard
-									label={t("awd.arena.stats.round")}
-									value={formatInt(status.current_round)}
-									hint={
-										status.round_count === null ? (
-											t("awd.arena.stats.roundHintUnknown")
-										) : (
-											<span className="tnum">
-												{t("awd.arena.stats.roundHint", {
-													rounds: formatInt(status.round_count),
-												})}
-											</span>
-										)
-									}
-									icon={<Flag className="size-4" aria-hidden="true" />}
-								/>
-							</div>
-
 							<SectionCard
 								title={t("awd.arena.sections.state.title")}
 								description={t("awd.arena.sections.state.description")}
@@ -318,35 +332,34 @@ export function ArenaPage(): ReactNode {
 								</div>
 							</SectionCard>
 
-							<AwdScoreboardPanel eventId={eventId} myTeamId={myTeamId} />
+							<SectionCard
+								title={t("awd.arena.sections.tips.title")}
+								description={t("awd.arena.sections.tips.description")}
+							>
+								<ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+									<li>{t("awd.arena.tips.wireguard")}</li>
+									<li>
+										<Trans
+											i18nKey="awd.arena.tips.phases"
+											components={{ strong: <strong className="text-foreground" /> }}
+										/>
+									</li>
+									<li>{t("awd.arena.tips.reset")}</li>
+								</ul>
+								<div className="mt-3 flex flex-wrap gap-2">
+									<Button variant="outline" size="sm" asChild>
+										<Link to={`/events/${eventId}`}>
+											<Swords className="size-4" aria-hidden="true" />
+											{t("awd.arena.tips.back")}
+										</Link>
+									</Button>
+								</div>
+							</SectionCard>
 						</div>
 					</div>
 
 					<AwdNetworkPanel eventId={eventId} />
 
-					<SectionCard
-						title={t("awd.arena.sections.tips.title")}
-						description={t("awd.arena.sections.tips.description")}
-					>
-						<ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-							<li>{t("awd.arena.tips.wireguard")}</li>
-							<li>
-								<Trans
-									i18nKey="awd.arena.tips.phases"
-									components={{ strong: <strong className="text-foreground" /> }}
-								/>
-							</li>
-							<li>{t("awd.arena.tips.reset")}</li>
-						</ul>
-						<div className="mt-3 flex flex-wrap gap-2">
-							<Button variant="outline" size="sm" asChild>
-								<Link to={`/events/${eventId}`}>
-									<Swords className="size-4" aria-hidden="true" />
-									{t("awd.arena.tips.back")}
-								</Link>
-							</Button>
-						</div>
-					</SectionCard>
 				</div>
 			) : (
 				<EmptyBlock

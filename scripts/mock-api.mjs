@@ -491,7 +491,195 @@ const ok = (res, data, req) => {
 	json(res, 200, { code: 0, message: "OK", data, meta: Array.isArray(data) ? meta : null });
 };
 
+// ── AWD 选手端 ──────────────────────────────────────────────────────────
+const awdStatus = (eventId) => ({
+	event_id: eventId,
+	status: "running",
+	phase: "attack",
+	current_round: 3,
+	round_count: 8,
+	banned: false,
+	score: 1240,
+	final_settlement: false,
+});
+const awdGameboxes = [
+	{
+		id: "gb-1",
+		team_id: "team-1",
+		event_gamebox_id: "egb-1",
+		gamebox_name: "web-01",
+		status: "running",
+		gamebox_ip: "10.42.16.11",
+		container_name: "awd-team1-web01",
+		health_status: "healthy",
+	},
+	{
+		id: "gb-2",
+		team_id: "team-1",
+		event_gamebox_id: "egb-2",
+		gamebox_name: "pwn-02",
+		status: "running",
+		gamebox_ip: "10.42.16.12",
+		container_name: "awd-team1-pwn02",
+		health_status: "unhealthy",
+	},
+];
+const awdScores = [
+	{ team_id: "team-1", team_name: "Byte Me", attack_score: 620, defense_score: 620, total_score: 1240, rank: 1 },
+	{ team_id: "team-2", team_name: "NOP Sled", attack_score: 540, defense_score: 610, total_score: 1150, rank: 2 },
+	{ team_id: "team-3", team_name: "SegFault Club", attack_score: 500, defense_score: 520, total_score: 1020, rank: 3 },
+	{ team_id: "team-4", team_name: "Stack Smashers", attack_score: 420, defense_score: 380, total_score: 800, rank: 4 },
+];
+const wireguardConfig = `[Interface]
+PrivateKey = MOCK-PRIVATE-KEY-DO-NOT-USE
+Address = 10.66.3.2/24
+DNS = 10.66.0.1
+
+[Peer]
+PublicKey = MOCK-SERVER-PUBLIC-KEY
+Endpoint = vpn.example.edu:51820
+AllowedIPs = 10.42.16.0/24
+PersistentKeepalive = 25`;
+
+// ── AWDP 选手端 ─────────────────────────────────────────────────────────
+const awdpGameboxId = "egb-awdp-1";
+const awdpInstance = {
+	instance_id: "inst-awdp-1",
+	runtime_state: "running",
+	runtime_generation: 2,
+	reset_count: 0,
+	endpoints: [
+		{ protocol: "http", container_port: 8080, public_host: "10.42.20.11", public_port: 18080 },
+		{ protocol: "tcp", container_port: 22, public_host: "10.42.20.11", public_port: 22022 },
+	],
+};
+const awdpOverview = (eventId) => ({
+	event_id: eventId,
+	phase: process.env.MOCK_AWDP_PHASE ?? "break",
+	break_duration_secs: 5400,
+	fix_duration_secs: 3600,
+	fix_round_interval_secs: 600,
+	total_rounds: 3,
+	break_score: 200,
+	fix_round_score: 100,
+	started_at: iso(now - 40 * 60000),
+	break_ends_at: iso(now + 50 * 60000),
+	fix_started_at: null,
+	fix_ends_at: null,
+	finished_at: null,
+	current_round: 0,
+	next_action_at: iso(now + 50 * 60000),
+	my_score: 200,
+	gameboxes: [
+		{
+			id: awdpGameboxId,
+			gamebox_id: "gb-lib-1",
+			name: "web-shop",
+			category: "Web",
+			enabled: true,
+			hidden: false,
+			exposed: [["http", 8080]],
+			broken: true,
+			instance: awdpInstance,
+			source_code_dir: "src/web-shop",
+		},
+	],
+});
+const awdpRounds = [
+	{ id: "r-1", sequence: 1, starts_at: iso(now - 20 * 60000), cutoff_at: iso(now + 10 * 60000), status: "completed" },
+	{ id: "r-2", sequence: 2, starts_at: iso(now + 10 * 60000), cutoff_at: iso(now + 40 * 60000), status: "pending" },
+];
+const awdpEvaluations = [
+	{
+		id: "ev-1",
+		instance_id: "inst-awdp-1",
+		event_gamebox_id: awdpGameboxId,
+		fix_round_id: null,
+		round_sequence: null,
+		kind: "manual",
+		status: "patched",
+		healthcheck_result: "ok",
+		judge_result: "ok",
+		finished_at: iso(now - 15 * 60000),
+	},
+];
+const awdpScores = [
+	{ subject_id: "s-1", subject_name: "Byte Me", break_score: 200, fix_score: 100, total_score: 300, rank: 1 },
+	{ subject_id: "s-2", subject_name: "NOP Sled", break_score: 200, fix_score: 0, total_score: 200, rank: 2 },
+	{ subject_id: "s-3", subject_name: "SegFault Club", break_score: 0, fix_score: 100, total_score: 100, rank: 3 },
+];
+
 const routes = [
+
+	// AWD 选手端（mock：赛事状态 / 靶机 / 积分 / 下发凭据）
+	["GET", /^\/api\/events\/([^/]+)\/awd\/status$/, (m, res) => ok(res, awdStatus(m[1]))],
+	["GET", /^\/api\/events\/([^/]+)\/awd\/gameboxes$/, (_m, res) => ok(res, awdGameboxes)],
+	["POST", /^\/api\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)\/reset$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/events\/([^/]+)\/awd\/submissions$/, (_m, res) => ok(res, null)],
+	["GET", /^\/api\/events\/([^/]+)\/awd\/scores$/, (_m, res) => ok(res, awdScores)],
+	["GET", /^\/api\/events\/([^/]+)\/awd\/wireguard\/config$/, (_m, res) => ok(res, { config: wireguardConfig })],
+	["GET", /^\/api\/events\/([^/]+)\/awd\/ssh-config$/, (_m, res) =>
+		ok(res, {
+			port: 2222,
+			password: "mock-ssh-password",
+			instances: awdGameboxes.map((box) => ({
+				id: box.id,
+				gamebox_ip: box.gamebox_ip,
+				username: "root",
+				container_name: box.container_name,
+				health_status: box.health_status,
+			})),
+		})],
+
+	// AWDP 选手端（mock：总览 / 轮次 / 评估 / 积分 / 趋势 / 单实例）
+	["GET", /^\/api\/events\/([^/]+)\/awdp$/, (m, res) => ok(res, awdpOverview(m[1]))],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/rounds$/, (_m, res) => ok(res, awdpRounds)],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/evaluations$/, (_m, res) => ok(res, awdpEvaluations)],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/scores$/, (_m, res) => ok(res, awdpScores)],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/scoreboard$/, (_m, res) =>
+		ok(res, {
+			participant_mode: "individual",
+			gameboxes: [{ id: awdpGameboxId, name: "web-shop", category: "Web" }],
+			rounds: awdpRounds.map((r) => ({ sequence: r.sequence, status: r.status, cutoff_at: r.cutoff_at })),
+			rows: awdpScores.map((row) => ({
+				subject_id: row.subject_id,
+				subject_name: row.subject_name,
+				rank: row.rank,
+				break_score: row.break_score,
+				fix_score: row.fix_score,
+				total_score: row.total_score,
+				is_me: row.subject_id === "s-1",
+				break_status: [row.break_score > 0],
+				fix_gamebox_score: [row.fix_score],
+				fix_round_status: [[row.fix_score > 0 ? "patched" : null, null]],
+			})),
+		})],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/trend$/, (_m, res) =>
+		ok(res, [
+			{ name: "Byte Me", points: [{ name: "Byte Me", score: 200, time: iso(now - 30 * 60000) }, { name: "Byte Me", score: 300, time: iso(now - 10 * 60000) }] },
+			{ name: "NOP Sled", points: [{ name: "NOP Sled", score: 200, time: iso(now - 30 * 60000) }, { name: "NOP Sled", score: 200, time: iso(now - 10 * 60000) }] },
+		])],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, awdpInstance)],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => ok(res, awdpInstance)],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/break$/, (_m, res) =>
+		ok(res, { accepted: true, scored: true, already_broken: false })],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/patch$/, (_m, res) =>
+		ok(res, { status: "applied", error_message: null })],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/test-check$/, (_m, res) =>
+		ok(res, {
+			evaluation_id: "ev-manual-1",
+			status: "completed",
+			healthcheck_ok: true,
+			healthcheck_detail: ["mock: 服务可用"],
+			judge_ok: true,
+			judge_detail: "mock: 官方 judge 通过",
+			exploit_ok: false,
+			exploit_detail: "mock: 未执行到 exploit 阶段",
+		})],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/source$/, (_m, res) =>
+		ok(res, "// mock：源码包只对已参赛选手开放，这里仅返回占位说明。\n")],
+
 	// 认证 / 账号
 	["POST", /^\/api\/session$/, (_m, res) => ok(res, "mock-token-0001")],
 	["POST", /^\/api\/users$/, (_m, res) => ok(res, "mock-token-0001")],

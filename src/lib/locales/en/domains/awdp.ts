@@ -110,6 +110,7 @@ export default {
 		patchLabel: "patch.sh",
 		patchHint:
 			"Uploaded as the multipart field patch_file; do not set Content-Type, the SDK adds the boundary automatically.",
+		patchAcceptHint: ".sh / .patch / .diff / .zip",
 		chooseAndUpload: "Choose and upload",
 		patchResult: "Patch result:",
 		patchApplied: "Applied",

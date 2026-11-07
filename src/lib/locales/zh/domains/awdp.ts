@@ -105,6 +105,7 @@ export default {
 		patchLabel: "patch.sh",
 		patchHint:
 			"以 multipart 字段 patch_file 上传；不要设置 Content-Type，SDK 会自动带 boundary。",
+		patchAcceptHint: ".sh / .patch / .diff / .zip",
 		chooseAndUpload: "选择并上传",
 		patchResult: "补丁结果：",
 		patchApplied: "已应用",

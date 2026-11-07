@@ -57,7 +57,7 @@ import {
 	formatDateTime,
 	formatDuration,
 	formatInt,
-	formatScore,
+	formatPoints,
 	formatTime,
 } from "~/lib/format";
 import { useNow } from "~/lib/hooks";
@@ -759,32 +759,38 @@ export function AwdpActionPanel({
 					<div className="space-y-2">
 						<Field
 							label={t("awdp.actions.patchLabel")}
-							htmlFor="awdp-patch"
 							hint={patchGate.allowed ? t("awdp.actions.patchHint") : undefined}
 						>
+							{/* 原生 file input 会漏出 "Choose File / No file chosen"（英文、且不可主题化）。 */}
+							<input
+								id="awdp-patch"
+								ref={fileRef}
+								type="file"
+								accept=".sh,.patch,.diff,.txt,.zip"
+								className="sr-only"
+								tabIndex={-1}
+								aria-label={t("awdp.actions.patchLabel")}
+								disabled={!patchGate.allowed || patchMutation.isPending}
+								onChange={(event) => {
+									const file = event.target.files?.[0];
+									event.target.value = "";
+									if (file) patchMutation.mutate(file);
+								}}
+							/>
 							<div className="flex flex-wrap items-center gap-2">
-								<Input
-									id="awdp-patch"
-									ref={fileRef}
-									type="file"
-									className="max-w-sm"
-									aria-label={t("awdp.actions.patchLabel")}
-									disabled={!patchGate.allowed || patchMutation.isPending}
-									title={!patchGate.allowed ? patchGate.reason : undefined}
-									onChange={(event) => {
-										const file = event.target.files?.[0];
-										if (file) patchMutation.mutate(file);
-									}}
-								/>
 								<Button
 									variant="outline"
 									size="sm"
 									disabled={!patchGate.allowed || patchMutation.isPending}
+									title={!patchGate.allowed ? patchGate.reason : undefined}
 									onClick={() => fileRef.current?.click()}
 								>
 									<FileUp />
 									{t("awdp.actions.chooseAndUpload")}
 								</Button>
+								<span className="text-xs text-muted-foreground">
+									{t("awdp.actions.patchAcceptHint")}
+								</span>
 							</div>
 						</Field>
 						{patchResult ? (
@@ -1142,7 +1148,7 @@ export function AwdpScoreboardPanel({ eventId }: { eventId: string }): ReactNode
 						header: t("awdp.scoreboard.columnFixScore"),
 						align: "right",
 						sortValue: (item) => item.fixScore,
-						cell: (item) => <MonoText>{formatScore(item.fixScore)}</MonoText>,
+						cell: (item) => <MonoText>{formatPoints(item.fixScore)}</MonoText>,
 					},
 				];
 				return (
@@ -1161,9 +1167,9 @@ export function AwdpScoreboardPanel({ eventId }: { eventId: string }): ReactNode
 							) : null}
 							<span className="tnum ml-auto text-xs text-muted-foreground">
 								{t("awdp.scoreboard.totals", {
-									breakScore: formatScore(row.break_score),
-									fixScore: formatScore(row.fix_score),
-									total: formatScore(row.total_score),
+									breakScore: formatPoints(row.break_score),
+									fixScore: formatPoints(row.fix_score),
+									total: formatPoints(row.total_score),
 								})}
 							</span>
 						</div>
@@ -1231,14 +1237,14 @@ export function AwdpMyScoresPanel({ eventId }: { eventId: string }): ReactNode {
 					header: t("awdp.scoreboard.columnBreak"),
 					align: "right",
 					sortValue: (row) => row.break_score,
-					cell: (row) => <MonoText>{formatScore(row.break_score)}</MonoText>,
+					cell: (row) => <MonoText>{formatPoints(row.break_score)}</MonoText>,
 				},
 				{
 					id: "fix",
 					header: t("awdp.scoreboard.columnFix"),
 					align: "right",
 					sortValue: (row) => row.fix_score,
-					cell: (row) => <MonoText>{formatScore(row.fix_score)}</MonoText>,
+					cell: (row) => <MonoText>{formatPoints(row.fix_score)}</MonoText>,
 				},
 				{
 					id: "total",
@@ -1247,7 +1253,7 @@ export function AwdpMyScoresPanel({ eventId }: { eventId: string }): ReactNode {
 					sortValue: (row) => row.total_score,
 					cell: (row) => (
 						<MonoText className="font-semibold">
-							{formatScore(row.total_score)}
+							{formatPoints(row.total_score)}
 						</MonoText>
 					),
 				},
@@ -1299,7 +1305,7 @@ export function AwdpTrendPanel({ eventId }: { eventId: string }): ReactNode {
 	return (
 		<TrendChart
 			series={series}
-			formatY={(value) => formatScore(value)}
+			formatY={(value) => formatPoints(value)}
 			formatX={(x) => formatTime(x)}
 		/>
 	);
