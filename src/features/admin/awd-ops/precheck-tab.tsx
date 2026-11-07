@@ -177,7 +177,7 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 			cell: (row) => {
 				const parsed = parsePrecheckReport(row.error_msg);
 				if (parsed.errors.length === 0) return <span className="text-muted-foreground">—</span>;
-				return <TonePill tone="danger">{parsed.errors.length}</TonePill>;
+				return <TonePill tone="danger"><span className="tnum">{parsed.errors.length}</span></TonePill>;
 			},
 		},
 	];
@@ -216,10 +216,20 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 				<div className="space-y-3">
 					{statusQuery.isError ? <InlineError error={statusQuery.error} /> : null}
 					<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-						<TonePill tone={gates.precheck.enabled ? "success" : "warning"}>
-							{gates.precheck.enabled
-								? t("adminAwdOps.precheck.available")
-								: t("adminAwdOps.precheck.unavailable")}
+						<TonePill
+							tone={
+								statusQuery.isError
+									? "muted"
+									: gates.precheck.enabled
+										? "success"
+										: "warning"
+							}
+						>
+							{statusQuery.isError
+								? t("common.unknown")
+								: gates.precheck.enabled
+									? t("adminAwdOps.precheck.available")
+									: t("adminAwdOps.precheck.unavailable")}
 						</TonePill>
 						{gates.precheck.reason ? (
 							<span>
@@ -345,7 +355,7 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 												>
 													·
 												</span>
-												<span className="text-xs text-muted-foreground">
+												<span className="tnum text-xs text-muted-foreground">
 													{t("adminAwdOps.precheck.revision", {
 														revision: selected.revision,
 													})}
@@ -382,7 +392,7 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 
 									{report.notes.length > 0 ? (
 										<details className="text-sm">
-											<summary className="cursor-pointer text-muted-foreground">
+											<summary className="tnum cursor-pointer text-muted-foreground">
 												{t("adminAwdOps.precheck.notesSummary", {
 													count: report.notes.length,
 												})}

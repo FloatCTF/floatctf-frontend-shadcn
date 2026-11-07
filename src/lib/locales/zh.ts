@@ -15,7 +15,6 @@ import training from "./zh/domains/training";
 import instances from "./zh/domains/instances";
 import community from "./zh/domains/community";
 import profile from "./zh/domains/profile";
-import admin from "./zh/domains/admin";
 import adminCore from "./zh/domains/adminCore";
 import adminEvents from "./zh/domains/adminEvents";
 import adminCommunity from "./zh/domains/adminCommunity";
@@ -39,7 +38,6 @@ export default {
 	instances,
 	community,
 	profile,
-	admin,
 	adminCore,
 	adminEvents,
 	adminCommunity,

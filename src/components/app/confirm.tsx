@@ -127,7 +127,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 					{pending?.confirmPhrase ? (
 						<div className="space-y-1.5">
 							<Label htmlFor="confirm-phrase">
-								{t("common.confirmPhrase", { phrase: pending.confirmPhrase })}
+								{t("common.confirm.confirmPhrase", { phrase: pending.confirmPhrase })}
 							</Label>
 							<Input
 								id="confirm-phrase"

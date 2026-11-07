@@ -272,7 +272,7 @@ export function AwdOpsPage() {
 
 					{!statusPending && !statusError && status !== null && unavailableActions.length > 0 ? (
 						<details className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
-							<summary className="cursor-pointer text-foreground">
+							<summary className="tnum cursor-pointer text-foreground">
 								{t("adminAwdOps.lifecycle.unavailableSummary", {
 									count: unavailableActions.length,
 								})}

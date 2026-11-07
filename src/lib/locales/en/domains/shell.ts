@@ -8,6 +8,7 @@ export default {
 	adminLabel: "Administrator",
 	notSignedIn: "Not signed in",
 	goPlayer: "Go to player view",
+	commandPanel: "Command palette",
 	command: {
 		adminNav: "Admin navigation",
 		playerNav: "Player navigation",

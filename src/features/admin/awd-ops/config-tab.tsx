@@ -466,7 +466,7 @@ export function AwdConfigTab({ eventId }: { eventId: string }) {
 												? t("adminAwdOps.config.editable")
 												: t("adminAwdOps.config.locked")}
 										</TonePill>
-										<span className="text-xs text-muted-foreground">
+										<span className="tnum text-xs text-muted-foreground">
 											{t("adminAwdOps.config.updatedAt", {
 												time: formatDateTime(data.updated_at, { seconds: true }),
 											})}

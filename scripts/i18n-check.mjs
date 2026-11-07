@@ -79,6 +79,27 @@ for (const key of zh.keys()) {
 	if (a !== b) problems.push(`placeholder mismatch: ${key} (zh: {${a}} / en: {${b}})`);
 }
 
+// ── 3. 代码里用到的静态 key 必须存在（防止拼错 key 后静默显示原文） ─────────────
+try {
+	const { readFileSync } = await import("node:fs");
+	const { execSync } = await import("node:child_process");
+	const files = execSync("grep -rlE 't\\(\\s*[\"\`]' src --include='*.tsx' --include='*.ts' || true")
+		.toString()
+		.trim()
+		.split("\n")
+		.filter(Boolean);
+	const used = new Set();
+	for (const file of files) {
+		const text = readFileSync(file, "utf8");
+		for (const m of text.matchAll(/\bt\(\s*"([\w.]+)"/g)) used.add(m[1]);
+	}
+	for (const key of used) {
+		if (!zh.has(key) && !en.has(key)) problems.push(`missing key used in code: ${key}`);
+	}
+} catch (error) {
+	console.warn(`[i18n] 跳过 key 使用检查：${error instanceof Error ? error.message : error}`);
+}
+
 const json = process.argv.includes("--json");
 if (json) {
 	console.log(JSON.stringify({ ok: problems.length === 0, problems, zhKeys: zh.size, enKeys: en.size }, null, 2));

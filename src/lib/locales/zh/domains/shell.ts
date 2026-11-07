@@ -8,6 +8,7 @@ export default {
 	adminLabel: "管理员",
 	notSignedIn: "未登录",
 	goPlayer: "前往选手端",
+	commandPanel: "命令面板",
 	command: {
 		adminNav: "管理端导航",
 		playerNav: "选手端导航",

@@ -321,7 +321,7 @@ export function AwdScoresTab({ eventId }: { eventId: string }) {
 							mobileCard={(row) => (
 								<div className="flex items-center justify-between gap-2">
 									<div className="min-w-0 space-y-1">
-										<p className="truncate text-sm font-medium">
+										<p className="tnum truncate text-sm font-medium">
 											#{row.rank} {row.team_name}
 										</p>
 										<p className="tnum text-xs text-muted-foreground">

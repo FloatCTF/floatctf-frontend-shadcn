@@ -16,7 +16,6 @@ import training from "./en/domains/training";
 import instances from "./en/domains/instances";
 import community from "./en/domains/community";
 import profile from "./en/domains/profile";
-import admin from "./en/domains/admin";
 import adminCore from "./en/domains/adminCore";
 import adminEvents from "./en/domains/adminEvents";
 import adminCommunity from "./en/domains/adminCommunity";
@@ -40,7 +39,6 @@ export default {
 	instances,
 	community,
 	profile,
-	admin,
 	adminCore,
 	adminEvents,
 	adminCommunity,

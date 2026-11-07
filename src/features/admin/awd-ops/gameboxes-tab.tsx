@@ -823,7 +823,7 @@ export function AwdGameboxesTab({ eventId }: { eventId: string }) {
 							rowActions={renderActions}
 						/>
 						{data.items.length < data.total ? (
-							<p className="text-xs text-muted-foreground">
+							<p className="tnum text-xs text-muted-foreground">
 								{t("adminAwdOps.gameboxes.partial", {
 									shown: data.items.length,
 									total: data.total,

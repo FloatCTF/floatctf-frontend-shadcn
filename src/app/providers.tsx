@@ -49,7 +49,7 @@ export function SessionBootstrap() {
 
 	const query = useQuery({
 		queryKey: qk.auth.me(),
-		queryFn: () => call(client.service.users.getMe(), "当前用户信息"),
+		queryFn: () => call(client.service.users.getMe(), "users.getMe"),
 		enabled: userToken !== null,
 		retry: false,
 		staleTime: 60_000,
