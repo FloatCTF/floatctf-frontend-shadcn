@@ -997,6 +997,55 @@ const routes = [
 	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/source$/, (_m, res) =>
 		ok(res, "// mock：源码包只对已参赛选手开放，这里仅返回占位说明。\n")],
 
+	// AWDP 选手端（总览 / 轮次 / 评估 / 积分 / 趋势 / 实例动作）
+	["GET", /^\/api\/events\/([^/]+)\/awdp$/, (m, res) => ok(res, awdpOverview(m[1]))],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/rounds$/, (_m, res) => ok(res, awdpRounds)],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/evaluations$/, (_m, res) => ok(res, awdpEvaluations)],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/scores$/, (_m, res) => ok(res, awdpScores)],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/scoreboard$/, (_m, res) =>
+		ok(res, {
+			participant_mode: "individual",
+			gameboxes: [{ id: awdpGameboxId, name: "web-shop", category: "Web" }],
+			rounds: awdpRounds.map((r) => ({ sequence: r.sequence, status: r.status, cutoff_at: r.cutoff_at })),
+			rows: awdpScores.map((row) => ({
+				subject_id: row.subject_id,
+				subject_name: row.subject_name,
+				rank: row.rank,
+				break_score: row.break_score,
+				fix_score: row.fix_score,
+				total_score: row.total_score,
+				is_me: row.subject_id === "s-1",
+				break_status: [row.break_score > 0],
+				fix_gamebox_score: [row.fix_score],
+				fix_round_status: [[row.fix_score > 0 ? "patched" : null, null]],
+			})),
+		})],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/trend$/, (_m, res) =>
+		ok(res, [
+			{ name: "Byte Me", points: [{ name: "Byte Me", score: 200, time: iso(now - 30 * 60000) }, { name: "Byte Me", score: 300, time: iso(now - 10 * 60000) }] },
+			{ name: "NOP Sled", points: [{ name: "NOP Sled", score: 200, time: iso(now - 30 * 60000) }, { name: "NOP Sled", score: 200, time: iso(now - 10 * 60000) }] },
+		])],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, awdpInstance)],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => ok(res, awdpInstance)],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/break$/, (_m, res) =>
+		ok(res, { accepted: true, scored: true, already_broken: false })],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/patch$/, (_m, res) =>
+		ok(res, { status: "applied", error_message: null })],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/test-check$/, (_m, res) =>
+		ok(res, {
+			evaluation_id: "ev-manual-1",
+			status: "completed",
+			healthcheck_ok: true,
+			healthcheck_detail: ["mock: 服务可用"],
+			judge_ok: true,
+			judge_detail: "mock: 官方 judge 通过",
+			exploit_ok: false,
+			exploit_detail: "mock: 未执行到 exploit 阶段",
+		})],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/source$/, (_m, res) =>
+		ok(res, "// mock：源码包只对已参赛选手开放，这里仅返回占位说明。\n")],
+
 	// 认证 / 账号
 	["POST", /^\/api\/session$/, (_m, res) => ok(res, "mock-token-0001")],
 	["POST", /^\/api\/users$/, (_m, res) => ok(res, "mock-token-0001")],
