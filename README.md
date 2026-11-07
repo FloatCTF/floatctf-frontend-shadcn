@@ -189,10 +189,20 @@ export const feature: FeatureModule = {
    `family=awd` 只允许 `participant_mode=team`；`family=awdp` 只允许 `individual`；
    `purpose=practice` 的 AWDP 赛事**不支持** `join/team`（`UnsupportedForPurpose`），
    练习入口走 `/training`（`awdp.runs`），赛事工作台只对 competition 赛事的参赛者开放。
-5. 后台刷新语义沿用平台已核实值：积分榜 / 趋势 / 解题流水 / 实例 30s，赛事公告与管理端 dashboard 60s，
+5. **SSE 失效 key 不一致（PUBLIC SDK GAP）**：`@floatctf/react` 的 `useAwdpEventStream`
+   失效 `["awdp-evals", eventId]`，而本前端的 `qk.awdp.evaluations` 是
+   `["awdp-evaluations", eventId]`；评测面板暂时依靠「回合刷新完成」的级联失效兜底。
+   建议平台侧统一 key 名或在失效列表补齐。
+6. **AWDP 实例缺少 SSH 凭据字段（PUBLIC SDK GAP）**：`AwdpRunDto` / `AwdpInstance` /
+   `AwdpEndpoint` 只有 http/tcp 的 host/port 与 flag server URL，没有 user/password，
+   因此训练/工作台无法渲染 SSH 凭据（不造假数据）。
+7. 后台刷新语义沿用平台已核实值：积分榜 / 趋势 / 解题流水 / 实例 30s，赛事公告与管理端 dashboard 60s，
    AWD/AWDP 面板由 SSE 驱动（非连接态由 `@floatctf/react` 自动降级轮询）。
 
 ## 8. 界面截图
+
+> **注意**：以下截图采自 **v0.1 主题**。v0.2 已按 [docs/theme.md](../../docs/theme.md)
+> 全面重做（中性黑白、亮色默认、Geist、中英双语），截图待重采。
 
 全部截图在**真实 API + 真实播种数据**下采集（见 [docs/E2E-ACCEPTANCE.md](./docs/E2E-ACCEPTANCE.md)），
 原图在 [`docs/images/`](./docs/images/)。
