@@ -12,13 +12,24 @@
  * - 不实现写操作的真实语义（mutation 返回成功但内存里不留痕），避免被误当作可用的后端。
  *
  * 用法：
- *   node scripts/mock-api.mjs [--port 7780]
+ *   node scripts/mock-api.mjs [--port 7780] [--host 127.0.0.1] [--host 10.66.66.2]
+ *   默认只监听回环；Vite 的 `/api` 代理走 127.0.0.1，因此从 WireGuard 访问 UI 无需放行本端口。
  *   # 另开一个终端：pnpm dev（Vite 会把 /api 代理到这里）
  */
 
 import http from "node:http";
 
-const PORT = Number(process.argv.includes("--port") ? process.argv[process.argv.indexOf("--port") + 1] : 7780);
+const argValue = (flag, fallback) => {
+	const index = process.argv.indexOf(flag);
+	return index >= 0 ? process.argv[index + 1] : fallback;
+};
+const PORT = Number(argValue("--port", 7780));
+/** 监听地址：默认只回环；`--host 0.0.0.0` 或 `--host 10.66.66.2` 可显式放行（dev 预览用）。 */
+const HOSTS = process.argv.reduce((hosts, arg, index, argv) => {
+	if (arg === "--host" && argv[index + 1]) hosts.push(argv[index + 1]);
+	return hosts;
+}, []);
+const LISTEN_HOSTS = HOSTS.length > 0 ? HOSTS : ["127.0.0.1"];
 const now = Date.now();
 const H = 3600 * 1000;
 const D = 24 * H;
@@ -634,6 +645,15 @@ const server = http.createServer((req, res) => {
 	json(res, 404, { code: 404, message: "not found", data: null });
 });
 
-server.listen(PORT, "127.0.0.1", () => {
-	console.log(`[mock-api] http://127.0.0.1:${PORT}  (仅本地预览；数据为 mock，不是真实平台数据)`);
-});
+for (const host of LISTEN_HOSTS) {
+	const listener = http.createServer(server.listeners("request")[0]);
+	listener.listen(PORT, host, () => {
+		console.log(
+			`[mock-api] http://${host}:${PORT}  (仅本地预览；数据为 mock，不是真实平台数据)`,
+		);
+	});
+	listener.on("error", (error) => {
+		console.error(`[mock-api] 监听 ${host}:${PORT} 失败：${error.message}`);
+		process.exitCode = 1;
+	});
+}

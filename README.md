@@ -53,7 +53,8 @@ mise exec -- pnpm --filter @floatctf/frontend-shadcn dev
 
 # 只想看 UI（本机没有后端时）：起一个 dev-only 的 mock API 占住 :7780
 #   ⚠️ 数据是假的，仅用于视觉预览，绝不进制品；任意账号密码即可“登录”。
-mise exec -- pnpm --filter @floatctf/frontend-shadcn mock:api
+#   默认只监听 127.0.0.1；需要从 WireGuard / 局域网访问时显式放行：
+mise exec -- pnpm --filter @floatctf/frontend-shadcn mock:api -- --host 127.0.0.1 --host 10.66.66.2
 ```
 
 打开 **http://127.0.0.1:13400**（或局域网地址）。
