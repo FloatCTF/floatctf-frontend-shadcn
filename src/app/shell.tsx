@@ -13,6 +13,7 @@ import { ChevronsUpDown, Languages, LogOut, Moon, Sun, UserCircle } from "lucide
 
 import { useAuthStore, useMe } from "~/auth/store";
 import { CommandTrigger } from "~/app/command-palette";
+import { BrandMark } from "~/components/app/brand";
 import { UserAvatar } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
 import {
@@ -109,9 +110,7 @@ export function AppShell({ navGroups, mobileNav, scope }: AppShellProps) {
 			<Sidebar collapsible="icon">
 				<SidebarHeader>
 					<div className="flex items-center gap-2 px-1 py-1.5">
-						<div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-foreground ring-1 ring-border/60">
-							{brand.slice(0, 1)}
-						</div>
+						<BrandMark />
 						<div className="grid min-w-0 flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
 							<span className="truncate text-sm font-semibold tracking-tight">{brand}</span>
 							<span className="truncate text-xs text-muted-foreground">{brandSubtitle}</span>

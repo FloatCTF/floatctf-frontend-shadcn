@@ -13,6 +13,7 @@ import { Moon, Sun } from "lucide-react";
 import { Link, Outlet } from "react-router";
 
 import { useIsAdminAuthenticated } from "~/auth/store";
+import { BrandMark } from "~/components/app/brand";
 import { Button } from "~/components/ui/button";
 import {
 	DropdownMenu,
@@ -34,9 +35,7 @@ export function PublicShell({ children }: { children?: ReactNode }) {
 			<aside className="relative hidden flex-col justify-between overflow-hidden border-r bg-card p-10 md:flex">
 				<div className="grid-backdrop pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
 				<div className="relative flex items-center gap-2">
-					<span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground ring-1 ring-border/60">
-						F
-					</span>
+					<BrandMark size="lg" />
 					<span className="text-base font-semibold tracking-tight">FloatCTF</span>
 				</div>
 
@@ -74,9 +73,7 @@ export function PublicShell({ children }: { children?: ReactNode }) {
 			<div className="relative flex min-h-svh flex-col md:min-h-0">
 				<div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 px-4 py-4 lg:px-6">
 					<Link to="/" className="flex items-center gap-2 md:invisible" aria-hidden="false">
-						<span className="flex size-7 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-foreground">
-							F
-						</span>
+						<BrandMark size="sm" />
 						<span className="text-sm font-semibold tracking-tight">FloatCTF</span>
 					</Link>
 					<div className="flex items-center gap-2">

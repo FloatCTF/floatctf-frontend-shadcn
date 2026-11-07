@@ -51,6 +51,7 @@ import { useDebouncedValue, useDocumentTitle, useNow } from "~/lib/hooks";
 
 import {
 	EventStatusPill,
+	EventFactsCard,
 	JoinLeaveControl,
 	MemberGateNotice,
 	TeamPanel,
@@ -472,6 +473,8 @@ export function EventWorkspacePage() {
 								</div>
 
 								<div className="flex flex-col gap-4">
+									{/* 右侧栏：赛事事实 → 参赛状态。标签页已经承担跳转，不再重复放「快速跳转」卡片。 */}
+									<EventFactsCard event={data.event} />
 									<SectionCard
 										title={
 											isTeam
@@ -486,41 +489,6 @@ export function EventWorkspacePage() {
 									>
 										{isTeam ? <TeamPanel info={data} /> : <JoinLeaveControl info={data} />}
 									</SectionCard>
-
-									{!gated ? (
-										<SectionCard title={t("events.workspace.quickLinks")}>
-											<div className="flex flex-col gap-2">
-												{caps.challenges ? (
-													<Button variant="outline" asChild className="justify-start">
-														<Link to={`/events/${resolvedEventId}?tab=challenges`}>
-															{t("events.workspace.linkChallenges")}
-														</Link>
-													</Button>
-												) : null}
-												{caps.scoreboard ? (
-													<Button variant="outline" asChild className="justify-start">
-														<Link to={`/events/${resolvedEventId}?tab=scoreboard`}>
-															{t("events.workspace.linkScoreboard")}
-														</Link>
-													</Button>
-												) : null}
-												{caps.arena ? (
-													<Button variant="outline" asChild className="justify-start">
-														<Link to={`/arena/${resolvedEventId}`}>
-															{t("events.workspace.linkArena")}
-														</Link>
-													</Button>
-												) : null}
-												{caps.lab ? (
-													<Button variant="outline" asChild className="justify-start">
-														<Link to={`/lab/${resolvedEventId}`}>
-															{t("events.workspace.linkLab")}
-														</Link>
-													</Button>
-												) : null}
-											</div>
-										</SectionCard>
-									) : null}
 								</div>
 							</div>
 						</>

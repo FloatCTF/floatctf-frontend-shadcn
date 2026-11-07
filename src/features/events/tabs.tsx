@@ -44,7 +44,7 @@ import { formatDateTime, formatRelative, formatScore } from "~/lib/format";
 import { getLocale } from "~/lib/i18n";
 import { useNow } from "~/lib/hooks";
 
-import { EventFactsCard, EventWriteupPanel } from "./components";
+import { EventWriteupPanel } from "./components";
 
 const AWD_STATUS_KEYS: Record<string, string> = {
 	draft: "events.awd.status.draft",
@@ -106,32 +106,29 @@ function useEnumLabel(keys: Record<string, string>) {
 export function OverviewTab({ info }: { info: EventInfo }) {
 	const { t } = useTranslation();
 	return (
-		<div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-			<div className="space-y-4">
-				<SectionCard
-					title={t("events.overview.descriptionTitle")}
-					description={t("events.overview.descriptionSubtitle")}
-				>
-					<MarkdownView emptyText={t("events.overview.descriptionEmpty")}>
-						{info.event.description}
-					</MarkdownView>
-				</SectionCard>
-				<SectionCard
-					title={t("events.overview.rulesTitle")}
-					description={t("events.overview.rulesSubtitle")}
-				>
-					<MarkdownView emptyText={t("events.overview.rulesEmpty")}>{info.event.rules}</MarkdownView>
-				</SectionCard>
-			</div>
-			<div className="space-y-4">
-				<EventFactsCard event={info.event} />
-				<SectionCard
-					title={t("events.writeup.title")}
-					description={t("events.writeup.description")}
-				>
-					<EventWriteupPanel info={info} />
-				</SectionCard>
-			</div>
+		// 工作区本身已是「主内容 + 右栏」两栏：总览内部不再二次分栏，
+		// 赛事事实卡放在页面右栏，这里只保留纵向阅读流（说明 → 规则 → 赛后材料）。
+		<div className="space-y-4">
+			<SectionCard
+				title={t("events.overview.descriptionTitle")}
+				description={t("events.overview.descriptionSubtitle")}
+			>
+				<MarkdownView emptyText={t("events.overview.descriptionEmpty")}>
+					{info.event.description}
+				</MarkdownView>
+			</SectionCard>
+			<SectionCard
+				title={t("events.overview.rulesTitle")}
+				description={t("events.overview.rulesSubtitle")}
+			>
+				<MarkdownView emptyText={t("events.overview.rulesEmpty")}>{info.event.rules}</MarkdownView>
+			</SectionCard>
+			<SectionCard
+				title={t("events.writeup.title")}
+				description={t("events.writeup.description")}
+			>
+				<EventWriteupPanel info={info} />
+			</SectionCard>
 		</div>
 	);
 }
