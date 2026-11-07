@@ -22,11 +22,13 @@ export function UserAvatar({
 	size?: "sm" | "default" | "lg";
 	className?: string;
 }) {
-	const initials = name.trim().slice(0, 2).toUpperCase() || "?";
+	// 契约漂移（例如 DTO 字段改名）不应把整页打崩：缺名字时退化为占位符。
+	const safeName = (name ?? "").trim();
+	const initials = safeName.slice(0, 2).toUpperCase() || "?";
 	const sizeClass = size === "sm" ? "size-6" : size === "lg" ? "size-10" : "size-8";
 	return (
 		<Avatar className={cn(sizeClass, className)}>
-			{avatar ? <AvatarImage src={avatar} alt={name} /> : null}
+			{avatar ? <AvatarImage src={avatar} alt={safeName} /> : null}
 			<AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
 		</Avatar>
 	);

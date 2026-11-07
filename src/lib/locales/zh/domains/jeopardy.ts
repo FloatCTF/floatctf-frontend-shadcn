@@ -20,6 +20,7 @@ export default {
 		setsAction: "题集",
 		cardTitle: "全部题目",
 		countSummary: "共 {{total}} 道 · 当前筛选后 {{filtered}} 道",
+		countAll: "共 {{total}} 道",
 		searchPlaceholder: "搜索题名 / 分类 / 描述",
 		searchLabel: "搜索题目",
 		categoryFilterLabel: "分类筛选",

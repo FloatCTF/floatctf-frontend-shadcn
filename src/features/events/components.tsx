@@ -37,6 +37,7 @@ import { formatRange, formatRelative } from "~/lib/format";
 import {
 	EVENT_STATUS_TONE,
 	computeEventStatus,
+	participationGate,
 	type EventStatus,
 } from "~/lib/event-status";
 import { useNow } from "~/lib/hooks";
@@ -109,9 +110,15 @@ export function EventFactsCard({ event }: { event: Events }) {
 					{ key: t("events.facts.window"), value: formatRange(event.start_time, event.end_time ?? null) },
 					{
 						key: t("events.facts.allowJoin"),
-						value: event.allow_join
-							? t("events.facts.joinAllowed")
-							: t("events.facts.joinDisallowed"),
+						// 对齐后端：练习赛/系统赛事不支持自助报名；正式赛开赛后也会锁定。
+						value:
+							participationGate(event).kind === "open"
+								? t("events.facts.joinAllowed")
+								: participationGate(event).kind === "started"
+									? t("events.facts.joinLocked")
+									: participationGate(event).kind === "closed"
+										? t("events.facts.joinDisallowed")
+										: "—",
 					},
 					{
 						key: t("events.facts.flagPrefix"),
@@ -148,8 +155,8 @@ export function JoinLeaveControl({ info }: { info: EventInfo }) {
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const now = useNow(30_000);
-	const status = computeEventStatus(info.event.start_time, info.event.end_time ?? null, now.getTime());
-	const canJoin = status === "upcoming";
+	const gate = participationGate(info.event, now.getTime());
+	const canJoin = gate.kind === "open";
 
 	const invalidate = () => {
 		void queryClient.invalidateQueries({ queryKey: qk.events.detail(info.event.id) });
@@ -176,13 +183,29 @@ export function JoinLeaveControl({ info }: { info: EventInfo }) {
 		onError: (error) => toast.apiError(t("events.participation.leaveFailed"), error),
 	});
 
+	const gateReason =
+		gate.kind === "closed"
+			? t("events.participation.notOpenHint")
+			: t("events.participation.lockedHint");
+
+	// 练习赛 / 系统托管赛事：后端明确拒绝自助报名，这里不显示按钮，避免「点了必失败」。
+	if (gate.kind === "not-competition" || gate.kind === "system-managed") {
+		return (
+			<p className="text-sm text-muted-foreground">
+				{gate.kind === "not-competition"
+					? t("events.participation.practiceHint")
+					: t("events.participation.systemManagedHint")}
+			</p>
+		);
+	}
+
 	return (
 		<div className="space-y-2">
 			{info.joined ? (
 				<Button
 					variant="destructive"
 					disabled={!canJoin || leave.isPending}
-					title={canJoin ? undefined : t("events.participation.cannotLeaveStarted")}
+					title={canJoin ? undefined : gateReason}
 					onClick={async () => {
 						const ok = await confirm({
 							title: t("events.participation.leaveTitle"),
@@ -202,15 +225,13 @@ export function JoinLeaveControl({ info }: { info: EventInfo }) {
 			) : (
 				<Button
 					disabled={!canJoin || join.isPending}
-					title={canJoin ? undefined : t("events.participation.cannotJoinStarted")}
+					title={canJoin ? undefined : gateReason}
 					onClick={() => join.mutate()}
 				>
 					<LogIn aria-hidden="true" /> {t("events.participation.join")}
 				</Button>
 			)}
-			{!canJoin ? (
-				<p className="text-xs text-muted-foreground">{t("events.participation.lockedHint")}</p>
-			) : null}
+			{!canJoin ? <p className="text-xs text-muted-foreground">{gateReason}</p> : null}
 			{join.isError ? <InlineError error={join.error} /> : null}
 			{leave.isError ? <InlineError error={leave.error} /> : null}
 		</div>
@@ -224,8 +245,8 @@ export function TeamPanel({ info }: { info: EventInfo }) {
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const now = useNow(30_000);
-	const status = computeEventStatus(info.event.start_time, info.event.end_time ?? null, now.getTime());
-	const canChange = status === "upcoming";
+	const gate = participationGate(info.event, now.getTime());
+	const canChange = gate.kind === "open";
 	const [teamName, setTeamName] = useState("");
 	const [teamId, setTeamId] = useState("");
 
@@ -340,7 +361,11 @@ export function TeamPanel({ info }: { info: EventInfo }) {
 		return (
 			<EmptyBlock
 				title={t("events.team.noTeamTitle")}
-				description={t("events.team.noTeamDescription")}
+				description={
+					canChange
+						? t("events.team.noTeamDescription")
+						: t("events.team.noTeamLockedDescription")
+				}
 			/>
 		);
 	}
@@ -522,8 +547,25 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 }
 
 /** 未参赛且赛事已开始时的门禁提示（与后端权限一致）。 */
-export function MemberGateNotice() {
+export function MemberGateNotice({ event }: { event: Events }) {
 	const { t } = useTranslation();
+	const gate = participationGate(event);
+	const title =
+		gate.kind === "not-competition"
+			? t("events.gate.practiceTitle")
+			: gate.kind === "system-managed"
+				? t("events.gate.systemTitle")
+				: gate.kind === "closed"
+					? t("events.gate.closedTitle")
+					: t("events.gate.title");
+	const description =
+		gate.kind === "not-competition"
+			? t("events.gate.practiceDescription")
+			: gate.kind === "system-managed"
+				? t("events.gate.systemDescription")
+				: gate.kind === "closed"
+					? t("events.gate.closedDescription")
+					: t("events.gate.description");
 	return (
 		<div
 			role="status"
@@ -531,9 +573,9 @@ export function MemberGateNotice() {
 		>
 			<p className="flex items-center gap-2 text-sm font-medium">
 				<ShieldAlert className="size-4 shrink-0" aria-hidden="true" />
-				{t("events.gate.title")}
+				{title}
 			</p>
-			<p className="mt-1 text-sm text-muted-foreground">{t("events.gate.description")}</p>
+			<p className="mt-1 text-sm text-muted-foreground">{description}</p>
 		</div>
 	);
 }

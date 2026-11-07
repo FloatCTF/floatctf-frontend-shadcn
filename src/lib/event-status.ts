@@ -6,7 +6,7 @@
  * 不替代后端判定：任何写操作仍由后端拒绝越界的请求。
  */
 
-import type { Events } from "@floatctf/sdk/entity";
+import { EventPurpose, type Events } from "@floatctf/sdk/entity";
 
 export type EventStatus = "upcoming" | "ongoing" | "ended" | "unknown";
 
@@ -69,6 +69,26 @@ export const EVENT_STATUS_TONE: Record<EventStatus, StatusTone> = {
 	ended: "muted",
 	unknown: "warning",
 };
+
+/**
+ * 参赛闸门 —— 与后端 `join_event` / `leave_event` / `submit_writeup` 的判定逐条对齐：
+ * 只有**正式赛**（purpose=competition）、非系统托管、`allow_join=true`、且**尚未开始**时
+ * 才允许自助加入 / 退出。练习赛走题库 / 训练场，不通过赛事报名。
+ */
+export type ParticipationGate =
+	| { kind: "open" }
+	| { kind: "not-competition" }
+	| { kind: "system-managed" }
+	| { kind: "closed" }
+	| { kind: "started" };
+
+export function participationGate(event: Events, nowMs: number = Date.now()): ParticipationGate {
+	if (event.purpose !== EventPurpose.Competition) return { kind: "not-competition" };
+	if (event.system_key) return { kind: "system-managed" };
+	if (!event.allow_join) return { kind: "closed" };
+	if (eventStatusOf(event, nowMs) !== "upcoming") return { kind: "started" };
+	return { kind: "open" };
+}
 
 export interface EventCapabilities {
 	/** 是否有题目集合（Jeopardy / AWDP）。 */

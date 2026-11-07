@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronRight, Search } from "lucide-react";
+import { CalendarDays, ChevronRight, FlaskConical, Search, Swords } from "lucide-react";
 
 import { call, callList } from "~/api/call";
 import { useClient } from "~/api/client";
@@ -46,6 +46,7 @@ import {
 	computeEventStatus,
 	eventCapabilities,
 	eventIdOf,
+	participationGate,
 } from "~/lib/event-status";
 import { useDebouncedValue, useDocumentTitle, useNow } from "~/lib/hooks";
 
@@ -162,24 +163,42 @@ export function EventsListPage() {
 		{
 			id: "joined",
 			header: t("events.list.columns.joined"),
-			cell: (row) =>
-				row.joined ? (
-					<TonePill tone="success">{t("events.list.joined")}</TonePill>
+			cell: (row) => {
+				if (row.joined) return <TonePill tone="success">{t("events.list.joined")}</TonePill>;
+				const gate = participationGate(row.event, now.getTime());
+				// 练习赛 / 系统赛事没有「报名」概念，显示「—」比「未加入」诚实。
+				return gate.kind === "not-competition" || gate.kind === "system-managed" ? (
+					<span className="text-xs text-muted-foreground">—</span>
 				) : (
 					<TonePill tone="muted">{t("events.list.notJoined")}</TonePill>
-				),
+				);
+			},
 		},
 		{
 			id: "action",
 			header: "",
 			align: "right",
-			cell: (row) => (
-				<Button variant="ghost" size="sm" asChild>
-					<Link to={`/events/${eventIdOf(row)}`}>
-						{t("events.list.open")} <ChevronRight aria-hidden="true" />
-					</Link>
-				</Button>
-			),
+			cell: (row) => {
+				const gate = participationGate(row.event, now.getTime());
+				// 练习赛不进赛事工作区（后端拒绝报名/取题），直接去对应练习入口。
+				if (!row.joined && gate.kind === "not-competition") {
+					const to = row.event.family === "awdp" ? "/training" : "/challenges";
+					return (
+						<Button variant="ghost" size="sm" asChild>
+							<Link to={to}>
+								{t("events.list.practiceEntry")} <ChevronRight aria-hidden="true" />
+							</Link>
+						</Button>
+					);
+				}
+				return (
+					<Button variant="ghost" size="sm" asChild>
+						<Link to={`/events/${eventIdOf(row)}`}>
+							{t("events.list.open")} <ChevronRight aria-hidden="true" />
+						</Link>
+					</Button>
+				);
+			},
 		},
 	];
 
@@ -195,7 +214,9 @@ export function EventsListPage() {
 				description={
 					query.isSuccess ? (
 						<span className="tnum">
-							{t("events.list.count", { total: items.length, filtered: filtered.length })}
+							{filtered.length === items.length
+								? t("events.list.countAll", { total: items.length })
+								: t("events.list.count", { total: items.length, filtered: filtered.length })}
 						</span>
 					) : undefined
 				}
@@ -375,16 +396,34 @@ export function EventWorkspacePage() {
 									</div>
 								}
 								actions={
-									<Button variant="outline" asChild>
-										<Link to="/events">{t("events.workspace.backToList")}</Link>
-									</Button>
+									<div className="flex flex-wrap items-center gap-2">
+										{caps.arena && data.joined ? (
+											<Button asChild>
+												<Link to={`/arena/${resolvedEventId}`}>
+													<Swords aria-hidden="true" />
+													{t("events.workspace.linkArena")}
+												</Link>
+											</Button>
+										) : null}
+										{caps.lab && data.joined ? (
+											<Button asChild>
+												<Link to={`/lab/${resolvedEventId}`}>
+													<FlaskConical aria-hidden="true" />
+													{t("events.workspace.linkLab")}
+												</Link>
+											</Button>
+										) : null}
+										<Button variant="outline" asChild>
+											<Link to="/events">{t("events.workspace.backToList")}</Link>
+										</Button>
+									</div>
 								}
 							/>
 
 							<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
 								<div className="min-w-0 space-y-4">
 									{gated ? (
-										<MemberGateNotice />
+										<MemberGateNotice event={data.event} />
 									) : (
 										<Tabs
 											value={tab}
@@ -437,7 +476,7 @@ export function EventWorkspacePage() {
 											</TabsContent>
 											{caps.challenges ? (
 												<TabsContent value="challenges" className="mt-4">
-													<ChallengesTab eventId={resolvedEventId} />
+													<ChallengesTab eventId={resolvedEventId} participantMode={data.event.participant_mode} />
 												</TabsContent>
 											) : null}
 											{caps.arena ? (
@@ -475,20 +514,30 @@ export function EventWorkspacePage() {
 								<div className="flex flex-col gap-4">
 									{/* 右侧栏：赛事事实 → 参赛状态。标签页已经承担跳转，不再重复放「快速跳转」卡片。 */}
 									<EventFactsCard event={data.event} />
-									<SectionCard
-										title={
-											isTeam
-												? t("events.workspace.teamCardTitle")
-												: t("events.workspace.participationCardTitle")
-										}
-										description={
-											status === "upcoming"
-												? t("events.workspace.participationOpen")
-												: t("events.workspace.participationLocked")
-										}
-									>
-										{isTeam ? <TeamPanel info={data} /> : <JoinLeaveControl info={data} />}
-									</SectionCard>
+									{/* 只有正式赛才有「参赛」语义；练习赛 / 系统托管赛事在门禁提示里已经解释过。 */}
+									{participationGate(data.event, now.getTime()).kind === "not-competition" ||
+									participationGate(data.event, now.getTime()).kind === "system-managed" ? null : (
+										<SectionCard
+											title={
+												isTeam
+													? t("events.workspace.teamCardTitle")
+													: t("events.workspace.participationCardTitle")
+											}
+											description={
+												isTeam
+													? data.joined
+														? t("events.workspace.teamCardDescriptionJoined")
+														: t("events.workspace.teamCardDescription")
+													: participationGate(data.event, now.getTime()).kind === "open"
+														? t("events.workspace.participationOpen")
+														: participationGate(data.event, now.getTime()).kind === "closed"
+															? t("events.participation.notOpenHint")
+															: t("events.workspace.participationLocked")
+											}
+										>
+											{isTeam ? <TeamPanel info={data} /> : <JoinLeaveControl info={data} />}
+										</SectionCard>
+									)}
 								</div>
 							</div>
 						</>
@@ -550,7 +599,12 @@ export function EventChallengePage() {
 											})}
 										</TonePill>
 										<TonePill tone="neutral" className="tnum">
-											{t("events.challengePage.solvedTeams", { count: item.solved_count })}
+											{t(
+												eventQuery.data?.event.participant_mode === "team"
+													? "events.challengePage.solvedTeams"
+													: "events.challengePage.solvedSolvers",
+												{ count: item.solved_count },
+											)}
 										</TonePill>
 										{item.solved ? (
 											<TonePill tone="success">

@@ -188,10 +188,12 @@ export function ChallengesCatalogPage() {
 				description={
 					query.isSuccess ? (
 						<span className="tnum">
-							{t("jeopardy.list.countSummary", {
-								total: items.length,
-								filtered: filtered.length,
-							})}
+							{filtered.length === items.length
+								? t("jeopardy.list.countAll", { total: items.length })
+								: t("jeopardy.list.countSummary", {
+										total: items.length,
+										filtered: filtered.length,
+									})}
 						</span>
 					) : undefined
 				}

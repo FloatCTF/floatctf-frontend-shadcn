@@ -27,6 +27,7 @@
 | `player-events.png` | 赛事列表 |
 | `player-event-workspace.png` | 赛事工作区 |
 | `player-challenges.png` | 题库 |
+| `player-practice-gate.png` | 练习赛门禁（不显示报名，引导去题库/训练场） |
 | `player-rank.png` | 排行榜 |
 | `player-solves.png` | 解题流水 |
 | `player-discussions.png` | 讨论区 |

@@ -34,6 +34,7 @@ import {
 	EVENT_STATUS_TONE,
 	eventIdOf,
 	eventStatusOf,
+	participationGate,
 	type EventStatus,
 } from "~/lib/event-status";
 import { useDocumentTitle, useNow } from "~/lib/hooks";
@@ -88,7 +89,10 @@ export function DashboardPage(): ReactNode {
 	});
 
 	const myEvents = (events.data?.items ?? []).filter((item) => item.joined);
-	const openEvents = (events.data?.items ?? []).filter((item) => !item.joined);
+	// 「可加入」必须与后端 join 判定一致：练习赛 / 系统赛事 / 未开放 / 已开赛都不算。
+	const openEvents = (events.data?.items ?? []).filter(
+		(item) => !item.joined && participationGate(item.event, now.getTime()).kind === "open",
+	);
 	const ongoingCount = myEvents.filter(
 		(item) => eventStatusOf(item.event, now.getTime()) === "ongoing",
 	).length;

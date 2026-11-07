@@ -53,7 +53,7 @@ import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { formatScore } from "~/lib/format";
+import { formatPoints } from "~/lib/format";
 import { useCopyToClipboard } from "~/lib/hooks";
 
 import {
@@ -499,7 +499,7 @@ export function AwdScoreboardPanel({
 								align: "right",
 								hideBelow: "sm",
 								sortValue: (row) => row.attack_score,
-								cell: (row) => <MonoText>{formatScore(row.attack_score)}</MonoText>,
+								cell: (row) => <MonoText>{formatPoints(row.attack_score)}</MonoText>,
 							},
 							{
 								id: "defense",
@@ -507,7 +507,7 @@ export function AwdScoreboardPanel({
 								align: "right",
 								hideBelow: "sm",
 								sortValue: (row) => row.defense_score,
-								cell: (row) => <MonoText>{formatScore(row.defense_score)}</MonoText>,
+								cell: (row) => <MonoText>{formatPoints(row.defense_score)}</MonoText>,
 							},
 							{
 								id: "total",
@@ -516,7 +516,7 @@ export function AwdScoreboardPanel({
 								sortValue: (row) => row.total_score,
 								cell: (row) => (
 									<MonoText className="font-semibold">
-										{formatScore(row.total_score)}
+										{formatPoints(row.total_score)}
 									</MonoText>
 								),
 							},
@@ -540,13 +540,13 @@ export function AwdScoreboardPanel({
 									</p>
 									<p className="tnum text-xs text-muted-foreground">
 										{t("awd.board.mobileSummary", {
-											attack: formatScore(row.attack_score),
-											defense: formatScore(row.defense_score),
+											attack: formatPoints(row.attack_score),
+											defense: formatPoints(row.defense_score),
 										})}
 									</p>
 								</div>
 								<MonoText className="shrink-0 font-semibold">
-									{formatScore(row.total_score)}
+									{formatPoints(row.total_score)}
 								</MonoText>
 							</div>
 						)}

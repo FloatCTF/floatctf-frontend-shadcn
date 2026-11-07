@@ -328,18 +328,64 @@ const discussions = [
 	},
 ];
 
-const writeups = [
+/** 题目页的题库 writeup（ChallengeWriteupResult：含作者 + 题目 + 正文实体）。 */
+const challengeWriteups = [
 	{
 		id: "w-1",
-		challenge_id: "c-0002",
-		challenge_name: "Notes 越权读取",
-		author: "李明",
-		author_id: me.id,
-		content: "## 思路\n\n接口只校验了登录态，没有校验 note 的归属。\n\n```bash\ncurl -H 'Authorization: Bearer <token>' /api/notes/2\n```",
-		created_at: iso(now - 26 * H),
-		updated_at: iso(now - 26 * H),
+		nickname: "Byte Me",
+		avatar: undefined,
+		email: "byte@example.edu",
+		challenge: challenges[1],
+		writeup: {
+			id: "cw-1",
+			challenge_id: "c-0002",
+			user_id: me.id,
+			content:
+				"## 思路\n\n接口只校验了登录态，没有校验 note 的归属。\n\n```bash\ncurl -H 'Authorization: Bearer <token>' /api/notes/2\n```",
+			created_at: iso(now - 26 * H),
+			updated_at: iso(now - 26 * H),
+		},
 	},
 ];
+
+/** 全站题解列表（UnifiedWriteupResult：challenge + gamebox 合并）。 */
+const unifiedWriteups = [
+	{
+		id: "w-1",
+		writeup_type: "challenge",
+		nickname: "李明",
+		avatar: null,
+		email: "liming@example.edu",
+		content_id: "c-0002",
+		content_name: "Notes 越权读取",
+		updated_at: iso(now - 26 * H),
+	},
+	{
+		id: "w-2",
+		writeup_type: "gamebox",
+		nickname: "Byte Me",
+		avatar: null,
+		email: "byte@example.edu",
+		content_id: "run-1",
+		content_name: "web-01 修复记录",
+		updated_at: iso(now - 3 * H),
+	},
+];
+
+const unifiedWriteupDetail = {
+	id: "w-1",
+	writeup_type: "challenge",
+	content_id: "c-0002",
+	content_name: "Notes 越权读取",
+	category: "Web",
+	nickname: "李明",
+	avatar: null,
+	email: "liming@example.edu",
+	content:
+		"## 思路\n\n接口只校验了登录态，没有校验 note 的归属。\n\n```bash\ncurl -H 'Authorization: Bearer <token>' /api/notes/2\n```",
+	created_at: iso(now - 26 * H),
+	updated_at: iso(now - 26 * H),
+};
 
 const adminEvents = events.map((event, index) => ({
 	...event,
@@ -437,10 +483,14 @@ const routes = [
 
 	// 赛事
 	["GET", /^\/api\/events$/, (_m, res, req) =>
-		ok(res, events.map((event) => ({ id: event.id, event, joined: true })), req)],
+		ok(
+			res,
+			events.map((event) => ({ id: event.id, event, joined: event.family !== "awdp" })),
+			req,
+		)],
 	["GET", /^\/api\/events\/([^/]+)$/, (m, res) => {
 		const event = events.find((item) => item.id === m[1]) ?? events[0];
-		ok(res, { id: event.id, event, joined: true });
+		ok(res, { id: event.id, event, joined: event.family !== "awdp" });
 	}],
 	["GET", /^\/api\/events\/([^/]+)\/challenges$/, (_m, res, req) => ok(res, eventChallenges, req)],
 	["GET", /^\/api\/events\/([^/]+)\/scoreboard$/, (_m, res) => ok(res, scoreboard)],
@@ -457,7 +507,7 @@ const routes = [
 		ok(res, challenges.find((item) => item.id === m[1]) ?? challenges[0]);
 	}],
 	["GET", /^\/api\/challenges\/([^/]+)\/instance$/, (_m, res) => ok(res, null)],
-	["GET", /^\/api\/challenges\/([^/]+)\/writeups$/, (_m, res, req) => ok(res, writeups, req)],
+	["GET", /^\/api\/challenges\/([^/]+)\/writeups$/, (_m, res, req) => ok(res, challengeWriteups, req)],
 	["GET", /^\/api\/challenges\/([^/]+)\/my_writeup$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/challenges\/([^/]+)\/submit$/, (_m, res) => ok(res, { correct: true, points: 500 })],
 	["GET", /^\/api\/challenge_sets$/, (_m, res, req) => ok(res, [], req)],
@@ -467,7 +517,8 @@ const routes = [
 	["GET", /^\/api\/announcements$/, (_m, res, req) => ok(res, announcements, req)],
 	["GET", /^\/api\/solves$/, (_m, res, req) => ok(res, solves, req)],
 	["GET", /^\/api\/solves\/top15users$/, (_m, res) => ok(res, topUsers)],
-	["GET", /^\/api\/writeups$/, (_m, res, req) => ok(res, writeups, req)],
+	["GET", /^\/api\/writeups$/, (_m, res, req) => ok(res, unifiedWriteups, req)],
+	["GET", /^\/api\/writeups\/([^/]+)$/, (_m, res) => ok(res, unifiedWriteupDetail)],
 	["GET", /^\/api\/discussions$/, (_m, res, req) => ok(res, discussions, req)],
 	["GET", /^\/api\/discussions\/([^/]+)$/, (m, res) => {
 		ok(res, discussions.find((item) => item.id === m[1]) ?? discussions[0]);
@@ -523,13 +574,85 @@ const routes = [
 	["POST", /^\/api\/events\/([^/]+)\/awd\/submissions$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)\/reset$/, (_m, res) => ok(res, null)],
 
+	// 平台网络（AWD 地址池 + 宿主观测 + 分配账本）
+	["GET", /^\/api\/admin\/awd\/network$/, (_m, res) =>
+		ok(res, {
+			gamebox_pool: "10.42.16.0/20",
+			gamebox_event_prefix: 16,
+			gamebox_team_prefix: 8,
+			wireguard_pool: "10.66.0.0/16",
+			wireguard_event_prefix: 21,
+			wireguard_team_prefix: 24,
+			wireguard_port_min: 51820,
+			wireguard_port_max: 51900,
+			wireguard_public_endpoint: "vpn.example.edu:51820",
+			updated_at: iso(now - 12 * D),
+			gamebox_event_capacity: 15,
+			gamebox_team_capacity_per_event: 256,
+			gamebox_hosts_per_team: 6,
+			wireguard_event_capacity: 31,
+			wireguard_team_capacity_per_event: 256,
+			wireguard_port_capacity: 81,
+		})],
+	["GET", /^\/api\/admin\/awd\/network\/health$/, (_m, res) =>
+		ok(res, {
+			nftables: "ok",
+			wireguard: "ok",
+			docker: "ok",
+			firewall_runtime: "nftables",
+			floatctf_table: "present",
+			docker_firewall_backend: "iptables",
+			firewalld: "inactive",
+			ipv4_forwarding: "1",
+			ipv6_policy: "disabled",
+			capability_supported: true,
+			notes: [],
+		})],
+	["GET", /^\/api\/admin\/awd\/network\/allocations$/, (_m, res, req) =>
+		ok(
+			res,
+			[
+				{
+					event_id: events[1].id,
+					event_title: events[1].title,
+					kind: "awd",
+					cidr: "10.42.16.0/24",
+					allocated_at: iso(now - 6 * D),
+					released_at: null,
+					active: true,
+				},
+			],
+			req,
+		)],
+
 	// 管理端
 	["GET", /^\/api\/admin\/dashboard\/summary$/, (_m, res) => ok(res, dashboardSummary)],
 	["GET", /^\/api\/admin\/events$/, (_m, res, req) => ok(res, adminEvents, req)],
 	["GET", /^\/api\/admin\/events\/([^/]+)$/, (m, res) => {
 		ok(res, adminEvents.find((item) => item.id === m[1]) ?? adminEvents[0]);
 	}],
-	["GET", /^\/api\/admin\/events\/([^/]+)\/data$/, (_m, res) => ok(res, {})],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/data$/, (_m, res) =>
+		ok(res, {
+			event: events[0],
+			user_count: 42,
+			team_count: 0,
+			solved_recent_15: solves.map((solve) => ({
+				user_nickname: solve.nickname,
+				challenge_name: solve.challenge_name,
+				challenge_category: "Misc",
+				created_at: solve.created_at,
+				bonus_points: 0,
+			})),
+			event_challenges: eventChallenges.map((item) => ({
+				name: item.challenge.name,
+				category: item.challenge.category,
+				points: item.current_points,
+				solved_count: item.solved_count,
+				solved_percent: Math.round((item.solved_count / 42) * 1000) / 10,
+			})),
+			scoreboard_top10: scoreboard.slice(0, 10),
+			trend,
+		})],
 	["GET", /^\/api\/admin\/challenges$/, (_m, res, req) => ok(res, challenges, req)],
 	["GET", /^\/api\/admin\/challenge_sets$/, (_m, res, req) => ok(res, [], req)],
 	["GET", /^\/api\/admin\/users$/, (_m, res, req) =>

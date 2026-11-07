@@ -52,6 +52,11 @@ export function EventDataTab({ eventId }: { eventId: string }): ReactNode {
 
 function DataPresentView({ data, now }: { data: DataPresent; now: Date }): ReactNode {
 	const { t } = useTranslation();
+	// 防御：后端偶发缺字段 / 旧版本响应不应把整个控制台打成白屏（theme.md §7.11）。
+	const trend = data.trend ?? [];
+	const challenges = data.event_challenges ?? [];
+	const recentSolves = data.solved_recent_15 ?? [];
+	const scoreboard = data.scoreboard_top10 ?? [];
 	const challengeColumns: DataTableColumn<DataEventChallenge>[] = [
 		{
 			id: "name",
@@ -161,38 +166,38 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 		},
 	];
 
-	const trendSeries = data.trend.map((item) => ({
+	const trendSeries = trend.map((item) => ({
 		name: item.name,
 		points: item.points.map((point) => ({ x: Date.parse(point.time), y: point.score })),
 	}));
 
-	const solvedTotal = data.event_challenges.reduce((sum, item) => sum + item.solved_count, 0);
+	const solvedTotal = challenges.reduce((sum, item) => sum + (item.solved_count ?? 0), 0);
 
 	return (
 		<div className="space-y-5">
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<StatCard
 					label={t("adminEvents.data.stats.users.label")}
-					value={data.user_count}
+					value={data.user_count ?? 0}
 					hint={t("adminEvents.data.stats.users.hint")}
 					icon={<Users className="size-4" />}
 				/>
 				<StatCard
 					label={t("adminEvents.data.stats.teams.label")}
-					value={data.team_count}
+					value={data.team_count ?? 0}
 					hint={t("adminEvents.data.stats.teams.hint")}
 					icon={<Users className="size-4" />}
 					tone="success"
 				/>
 				<StatCard
 					label={t("adminEvents.data.stats.challenges.label")}
-					value={data.event_challenges.length}
+					value={challenges.length}
 					hint={t("adminEvents.data.stats.challenges.hint", { count: solvedTotal })}
 					icon={<Puzzle className="size-4" />}
 				/>
 				<StatCard
 					label={t("adminEvents.data.stats.recent.label")}
-					value={data.solved_recent_15.length}
+					value={recentSolves.length}
 					hint={t("adminEvents.data.stats.recent.hint")}
 					icon={<Activity className="size-4" />}
 					tone="warning"
@@ -215,14 +220,14 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 					title={t("adminEvents.data.scoreboard.title")}
 					description={t("adminEvents.data.scoreboard.description")}
 				>
-					{data.scoreboard_top10.length === 0 ? (
+					{scoreboard.length === 0 ? (
 						<EmptyBlock
 							title={t("adminEvents.data.scoreboard.emptyTitle")}
 							description={t("adminEvents.data.scoreboard.emptyDescription")}
 						/>
 					) : (
 						<DataTable
-							data={data.scoreboard_top10}
+							data={scoreboard}
 							columns={scoreboardColumns}
 							getRowId={(row) => row.id}
 							mobileCard={(row) => (
@@ -248,14 +253,14 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 					title={t("adminEvents.data.challenges.title")}
 					description={t("adminEvents.data.challenges.description")}
 				>
-					{data.event_challenges.length === 0 ? (
+					{challenges.length === 0 ? (
 						<EmptyBlock
 							title={t("adminEvents.data.challenges.emptyTitle")}
 							description={t("adminEvents.data.challenges.emptyDescription")}
 						/>
 					) : (
 						<DataTable
-							data={data.event_challenges}
+							data={challenges}
 							columns={challengeColumns}
 							getRowId={(row) => `${row.category}-${row.name}`}
 							mobileCard={(row) => (

@@ -39,7 +39,7 @@ import {
 } from "~/components/app/states";
 import { Button } from "~/components/ui/button";
 import { computeEventStatus, EVENT_STATUS_TONE } from "~/lib/event-status";
-import { formatInt, formatScore } from "~/lib/format";
+import { formatInt, formatPoints } from "~/lib/format";
 import { useDocumentTitle } from "~/lib/hooks";
 
 import {
@@ -218,7 +218,7 @@ export function ArenaPage(): ReactNode {
 							<div className="grid gap-3">
 								<StatCard
 									label={t("awd.arena.stats.score")}
-									value={formatScore(status.score)}
+									value={formatPoints(status.score)}
 									hint={t("awd.arena.stats.scoreHint")}
 									icon={<Trophy className="size-4" aria-hidden="true" />}
 								/>

@@ -21,6 +21,7 @@ export default {
 		setsAction: "Sets",
 		cardTitle: "All challenges",
 		countSummary: "{{total}} total · {{filtered}} after filters",
+		countAll: "{{total}} challenges",
 		searchPlaceholder: "Search name / category / description",
 		searchLabel: "Search challenges",
 		categoryFilterLabel: "Filter by category",

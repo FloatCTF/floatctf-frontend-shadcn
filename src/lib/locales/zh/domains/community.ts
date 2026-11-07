@@ -19,15 +19,14 @@ export default {
 	rank: {
 		documentTitle: "排行榜 · FloatCTF",
 		title: "排行榜",
-		subtitle:
-			"练习赛事按解题数排名的 Top15 选手（30 秒自动刷新）。后端固定返回 15 条，分页为视图内分页。",
+		subtitle: "按解题数排名的练习赛选手（30 秒自动刷新），最多展示前 15 名。",
 		badge: "Top15",
 		actions: {
 			solves: "解题流水",
 		},
 		stats: {
 			usersLabel: "上榜选手",
-			usersHint: "后端返回的 Top15 条目数",
+			usersHint: "当前榜单人数",
 			leaderLabel: "榜首",
 			leaderHint: "解出 {{count}} 题",
 			leaderEmptyHint: "暂无数据",
@@ -35,8 +34,8 @@ export default {
 			latestHint: "榜单中最后一次解题时间",
 		},
 		section: {
-			title: "Top15",
-			description: "按解出题数降序，题数相同者以最近解题时间排序。",
+			title: "榜单",
+			description: "按解出题数降序；题数相同者以最近解题时间排序。",
 		},
 		columns: {
 			rank: "排名",

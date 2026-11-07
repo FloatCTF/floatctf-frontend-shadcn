@@ -83,8 +83,8 @@ export function EventConfigTab({ event }: { event: Events }): ReactNode {
 							value: (
 								<BooleanPill
 									value={event.is_virtual}
-									trueText={t("adminEvents.config.values.virtual")}
-									falseText={t("adminEvents.config.values.formal")}
+									trueText={t("common.yes")}
+									falseText={t("common.no")}
 									trueTone="warning"
 									falseTone="muted"
 								/>

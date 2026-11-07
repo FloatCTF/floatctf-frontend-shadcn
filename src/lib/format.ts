@@ -133,6 +133,15 @@ export function formatScore(value: number | null | undefined, digits = 2): strin
 	return value.toFixed(digits);
 }
 
+/**
+ * 积分展示：整数不补小数位（AWD 攻防分就是整数），小数保留 2 位（Jeopardy 动态分值）。
+ * 与 `formatScore` 的区别只在于「不必强行凑两位」，避免 1240.00 这种噪声。
+ */
+export function formatPoints(value: number | null | undefined, digits = 2): string {
+	if (value === null || value === undefined || Number.isNaN(value)) return "—";
+	return Number.isInteger(value) ? String(value) : value.toFixed(digits);
+}
+
 /** 带正负号的分数变动（管理员调分 / 罚分展示）。 */
 export function formatDelta(value: number | null | undefined, digits = 2): string {
 	if (value === null || value === undefined || Number.isNaN(value)) return "—";

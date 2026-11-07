@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ChevronRight, ExternalLink, Swords, Trash2, Trophy } from "lucide-react";
+import { EventPurpose } from "@floatctf/sdk/entity";
 
 import { call, callList, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
@@ -123,19 +124,29 @@ export function OverviewTab({ info }: { info: EventInfo }) {
 			>
 				<MarkdownView emptyText={t("events.overview.rulesEmpty")}>{info.event.rules}</MarkdownView>
 			</SectionCard>
-			<SectionCard
-				title={t("events.writeup.title")}
-				description={t("events.writeup.description")}
-			>
-				<EventWriteupPanel info={info} />
-			</SectionCard>
+			{/* 后端只接受正式赛的 writeup（练习赛返回 400）：不满足条件就不渲染入口。 */}
+			{info.event.purpose === EventPurpose.Competition ? (
+				<SectionCard
+					title={t("events.writeup.title")}
+					description={t("events.writeup.description")}
+				>
+					<EventWriteupPanel info={info} />
+				</SectionCard>
+			) : null}
 		</div>
 	);
 }
 
 /* ── 赛事题目 ───────────────────────────────────────────────────────────── */
 
-export function ChallengesTab({ eventId }: { eventId: string }) {
+export function ChallengesTab({
+	eventId,
+	participantMode,
+}: {
+	eventId: string;
+	participantMode?: string;
+}) {
+	const isTeamEvent = participantMode === "team";
 	const { t } = useTranslation();
 	const client = useClient();
 	const [page, setPage] = useState(1);
@@ -256,10 +267,15 @@ export function ChallengesTab({ eventId }: { eventId: string }) {
 								<div className="min-w-0">
 									<p className="truncate text-sm font-medium">{row.challenge.name}</p>
 									<p className="text-xs text-muted-foreground">
-										{t("events.challenges.mobileSummary", {
-											score: formatScore(row.current_points),
-											count: row.solved_count,
-										})}
+										{t(
+											isTeamEvent
+												? "events.challenges.mobileSummary"
+												: "events.challenges.mobileSummarySolvers",
+											{
+												score: formatScore(row.current_points),
+												count: row.solved_count,
+											},
+										)}
 									</p>
 								</div>
 								<Link
