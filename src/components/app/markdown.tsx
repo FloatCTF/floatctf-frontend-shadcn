@@ -156,7 +156,7 @@ export function MarkdownEditor({
 								) : (
 									<ImagePlus className="size-4" />
 								)}
-								插入图片
+								{t("common.markdown.insertImage")}
 							</span>
 						</Button>
 					</label>

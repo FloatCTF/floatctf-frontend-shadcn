@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CornerDownRight, Pencil, Search, Trash2 } from "lucide-react";
 
@@ -34,7 +35,7 @@ import { cn } from "~/lib/utils";
 export function SearchField({
 	value,
 	onChange,
-	placeholder = "搜索…",
+	placeholder,
 	className,
 }: {
 	value: string;
@@ -42,13 +43,15 @@ export function SearchField({
 	placeholder?: string;
 	className?: string;
 }) {
+	const { t } = useTranslation();
+	const label = placeholder ?? t("common.search");
 	return (
 		<div className={cn("relative w-full sm:w-64", className)}>
-			<Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+			<Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
 			<Input
 				value={value}
-				placeholder={placeholder}
-				aria-label={placeholder}
+				placeholder={label}
+				aria-label={label}
 				className="pl-8"
 				onChange={(event) => onChange(event.target.value)}
 			/>
@@ -76,6 +79,7 @@ export function DiscussionFormSheet({
 	discussion?: { id: string; title: string; content: string };
 	onSaved?: (discussionId: string, mode: "create" | "edit") => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const editing = discussion !== undefined;
@@ -100,23 +104,33 @@ export function DiscussionFormSheet({
 							title: input.title,
 							content: input.content,
 						}),
-						"更新讨论",
+						t("community.requests.discussionUpdate"),
 					)
 				: call<Discussions>(
 						client.service.discussions.create({
 							title: input.title,
 							content: input.content,
 						}),
-						"发布讨论",
+						t("community.requests.discussionCreate"),
 					),
 		onSuccess: (saved, input) => {
-			toast.success(input.id ? "讨论已更新" : "讨论已发布");
+			toast.success(
+				input.id
+					? t("community.discussions.toasts.discussionUpdated")
+					: t("community.discussions.toasts.discussionCreated"),
+			);
 			// `qk.discussions.all` 是列表 / 我的 / 详情 / 评论键的前缀，一次失效即可覆盖。
 			void queryClient.invalidateQueries({ queryKey: qk.discussions.all });
 			onOpenChange(false);
 			onSaved?.(saved.id, input.id ? "edit" : "create");
 		},
-		onError: (error) => toast.apiError(editing ? "更新讨论失败" : "发布讨论失败", error),
+		onError: (error) =>
+			toast.apiError(
+				editing
+					? t("community.discussions.toasts.discussionUpdateFailed")
+					: t("community.discussions.toasts.discussionCreateFailed"),
+				error,
+			),
 	});
 
 	return (
@@ -124,15 +138,27 @@ export function DiscussionFormSheet({
 			open={open}
 			onOpenChange={onOpenChange}
 			width="xl"
-			title={editing ? "编辑讨论" : "新建讨论"}
-			description="标题与正文都会公开给其他选手；正文支持 Markdown（GFM）。"
+			title={
+				editing
+					? t("community.discussions.form.editTitle")
+					: t("community.discussions.form.createTitle")
+			}
+			description={t("community.discussions.form.description")}
 			footer={
 				<FormFooter
 					formId="discussion-form"
-					submitLabel={editing ? "保存修改" : "发布讨论"}
+					submitLabel={
+						editing
+							? t("community.discussions.form.submitSave")
+							: t("community.discussions.form.submitCreate")
+					}
 					isPending={mutation.isPending}
 					onCancel={() => onOpenChange(false)}
-					hint={editing ? "仅作者本人可以修改自己的讨论。" : "发布后可随时编辑或删除。"}
+					hint={
+						editing
+							? t("community.discussions.form.hintEdit")
+							: t("community.discussions.form.hintCreate")
+					}
 				/>
 			}
 		>
@@ -144,7 +170,7 @@ export function DiscussionFormSheet({
 					const nextTitle = title.trim();
 					const nextContent = content.trim();
 					if (nextTitle === "" || nextContent === "") {
-						setValidationError("标题与正文都不能为空。");
+						setValidationError(t("community.discussions.form.validationEmpty"));
 						return;
 					}
 					setValidationError(null);
@@ -156,10 +182,10 @@ export function DiscussionFormSheet({
 				}}
 			>
 				<Field
-					label="标题"
+					label={t("community.discussions.form.titleLabel")}
 					htmlFor="discussion-title"
 					required
-					hint="一句话说清主题，便于他人检索。"
+					hint={t("community.discussions.form.titleHint")}
 					error={validationError && title.trim() === "" ? validationError : undefined}
 				>
 					<Input
@@ -167,14 +193,14 @@ export function DiscussionFormSheet({
 						value={title}
 						maxLength={200}
 						disabled={mutation.isPending}
-						placeholder="例如：如何稳定复现某道题的越界？"
+						placeholder={t("community.discussions.form.titlePlaceholder")}
 						onChange={(event) => setTitle(event.target.value)}
 					/>
 				</Field>
 				<Field
-					label="正文（Markdown）"
+					label={t("community.discussions.form.contentLabel")}
 					required
-					hint="支持 Markdown / GFM；插图会上传到平台图床。"
+					hint={t("community.discussions.form.contentHint")}
 					error={validationError && content.trim() === "" ? validationError : undefined}
 				>
 					<MarkdownEditor
@@ -182,7 +208,7 @@ export function DiscussionFormSheet({
 						onChange={setContent}
 						minHeight={320}
 						disabled={mutation.isPending}
-						placeholder="描述背景、复现步骤与你的结论…"
+						placeholder={t("community.discussions.form.contentPlaceholder")}
 					/>
 				</Field>
 			</form>
@@ -231,7 +257,7 @@ export function CommentComposer({
 	onChange,
 	onSubmit,
 	isPending,
-	placeholder = "写下你的看法（支持 Markdown）…",
+	placeholder,
 }: {
 	value: string;
 	onChange: (value: string) => void;
@@ -239,6 +265,7 @@ export function CommentComposer({
 	isPending: boolean;
 	placeholder?: string;
 }): ReactNode {
+	const { t } = useTranslation();
 	return (
 		<div className="space-y-2">
 			<MarkdownEditor
@@ -247,18 +274,20 @@ export function CommentComposer({
 				minHeight={140}
 				allowUpload={false}
 				disabled={isPending}
-				placeholder={placeholder}
+				placeholder={placeholder ?? t("community.discussions.comment.commentPlaceholder")}
 			/>
 			<div className="flex justify-end">
 				<Button type="button" size="sm" disabled={isPending} onClick={onSubmit}>
-					{isPending ? "提交中…" : "发表评论"}
+					{isPending
+						? t("community.discussions.comment.submitting")
+						: t("community.discussions.comment.submit")}
 				</Button>
 			</div>
 		</div>
 	);
 }
 
-/** 单条评论（递归渲染回复）。 */
+/** 单条评论（§7.13 行式消息流，不使用气泡）。 */
 export function CommentCard({
 	comment,
 	depth,
@@ -274,6 +303,7 @@ export function CommentCard({
 	onUpdate: (commentId: string, content: string) => Promise<void>;
 	onDelete: (commentId: string) => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const [replyOpen, setReplyOpen] = useState(false);
 	const [replyText, setReplyText] = useState("");
 	const [editing, setEditing] = useState(false);
@@ -284,11 +314,11 @@ export function CommentCard({
 	const authorName = comment.author_nickname ?? comment.author_id;
 	const mine = currentUserId !== undefined && currentUserId === comment.author_id;
 	const edited = comment.updated_at !== comment.created_at;
-	const nestedClass = depth > 0 && depth < 4 ? "ml-3 border-l pl-3" : "";
+	const nestedClass = depth > 0 && depth < 4 ? "ml-3 border-l-2 border-border/60 pl-3" : "";
 
 	async function submitReply() {
 		if (replyText.trim() === "") {
-			toast.warning("回复内容不能为空");
+			toast.warning(t("community.discussions.comment.replyMustNotBeEmpty"));
 			return;
 		}
 		setBusy(true);
@@ -307,7 +337,7 @@ export function CommentCard({
 
 	async function submitEdit() {
 		if (editText.trim() === "") {
-			toast.warning("评论内容不能为空");
+			toast.warning(t("community.discussions.comment.mustNotBeEmpty"));
 			return;
 		}
 		setBusy(true);
@@ -323,124 +353,147 @@ export function CommentCard({
 	}
 
 	return (
-		<div className="space-y-2">
-			<div className={cn("rounded-lg border p-3", mine && "border-primary/30")}>
-				<div className="flex items-start gap-2">
+		<div className="space-y-1">
+			<article className="group rounded-lg px-2 py-3 transition-colors hover:bg-muted/40 focus-within:bg-muted/40">
+				<header className="flex flex-wrap items-start gap-x-2 gap-y-1">
 					<UserAvatar
 						name={authorName}
 						avatar={comment.author_avatar ?? null}
 						size="sm"
 						className="mt-0.5"
 					/>
-					<div className="min-w-0 flex-1 space-y-1.5">
-						<div className="flex flex-wrap items-center gap-2">
-							<span className="truncate text-sm font-medium">{authorName}</span>
-							<RelativeTime value={comment.created_at} />
-							{edited ? <TonePill tone="muted">已编辑</TonePill> : null}
-							{mine ? <TonePill tone="info">我</TonePill> : null}
-						</div>
-
-						{editing ? (
-							<div className="space-y-2">
-								<MarkdownEditor
-									value={editText}
-									onChange={setEditText}
-									minHeight={140}
-									allowUpload={false}
-									disabled={busy}
-								/>
-								<div className="flex items-center gap-2">
-									<Button
-										type="button"
-										size="sm"
-										disabled={busy}
-										onClick={() => void submitEdit()}
-									>
-										{busy ? "保存中…" : "保存"}
-									</Button>
-									<Button
-										type="button"
-										size="sm"
-										variant="outline"
-										disabled={busy}
-										onClick={() => {
-											setEditText(comment.content);
-											setEditing(false);
-											setLocalError(null);
-										}}
-									>
-										取消
-									</Button>
-								</div>
-							</div>
-						) : (
-							<MarkdownView className="text-sm">{comment.content}</MarkdownView>
-						)}
-					</div>
-				</div>
-
-				{!editing ? (
-					<div className="mt-2 flex flex-wrap items-center gap-1 pl-6">
-						<Button
-							type="button"
-							variant="ghost"
-							size="xs"
-							onClick={() => {
-								setReplyOpen((prev) => !prev);
-								setLocalError(null);
-							}}
-						>
-							<CornerDownRight /> 回复
-						</Button>
+					<div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+						<span className="truncate text-sm font-medium">{authorName}</span>
 						{mine ? (
+							<TonePill tone="info">{t("community.discussions.comment.mine")}</TonePill>
+						) : null}
+						{edited ? (
+							<TonePill tone="muted">{t("community.discussions.comment.edited")}</TonePill>
+						) : null}
+						<RelativeTime value={comment.created_at} />
+					</div>
+
+					{!editing ? (
+						<div className="flex shrink-0 items-center gap-1 rounded-md bg-card/90 p-0.5 shadow-xs transition-opacity opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100">
 							<Button
 								type="button"
 								variant="ghost"
-								size="xs"
+								size="icon-xs"
+								aria-label={t("community.discussions.comment.reply")}
+								title={t("community.discussions.comment.reply")}
 								onClick={() => {
-									setEditText(comment.content);
-									setEditing(true);
+									setReplyOpen((prev) => !prev);
 									setLocalError(null);
 								}}
 							>
-								<Pencil /> 编辑
+								<CornerDownRight aria-hidden="true" />
 							</Button>
-						) : null}
-						{mine ? (
-							<Button
-								type="button"
-								variant="ghost"
-								size="xs"
-								className="text-destructive hover:text-destructive"
-								aria-label="删除评论"
-								onClick={() => onDelete(comment.id)}
-							>
-								<Trash2 /> 删除
-							</Button>
-						) : null}
-						{comment.replies.length > 0 ? (
-							<span className="text-xs text-muted-foreground">
-								{comment.replies.length} 条回复
-							</span>
-						) : null}
-					</div>
+							{mine ? (
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon-xs"
+									aria-label={t("community.discussions.comment.edit")}
+									title={t("community.discussions.comment.edit")}
+									onClick={() => {
+										setEditText(comment.content);
+										setEditing(true);
+										setLocalError(null);
+									}}
+								>
+									<Pencil aria-hidden="true" />
+								</Button>
+							) : null}
+							{mine ? (
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon-xs"
+									className="text-destructive hover:text-destructive"
+									aria-label={t("community.discussions.comment.deleteAria")}
+									title={t("community.discussions.comment.deleteAria")}
+									onClick={() => onDelete(comment.id)}
+								>
+									<Trash2 aria-hidden="true" />
+								</Button>
+							) : null}
+						</div>
+					) : null}
+				</header>
+
+				<div className="mt-2 pl-8">
+					{editing ? (
+						<div className="space-y-2">
+							<MarkdownEditor
+								value={editText}
+								onChange={setEditText}
+								minHeight={140}
+								allowUpload={false}
+								disabled={busy}
+							/>
+							<div className="flex items-center gap-2">
+								<Button
+									type="button"
+									size="sm"
+									disabled={busy}
+									onClick={() => void submitEdit()}
+								>
+									{busy
+										? t("community.discussions.comment.saving")
+										: t("community.discussions.comment.save")}
+								</Button>
+								<Button
+									type="button"
+									size="sm"
+									variant="outline"
+									disabled={busy}
+									onClick={() => {
+										setEditText(comment.content);
+										setEditing(false);
+										setLocalError(null);
+									}}
+								>
+									{t("community.discussions.comment.cancel")}
+								</Button>
+							</div>
+						</div>
+					) : (
+						<MarkdownView className="text-sm">{comment.content}</MarkdownView>
+					)}
+				</div>
+
+				{comment.replies.length > 0 && !editing ? (
+					<p className="mt-2 pl-8 text-xs text-muted-foreground">
+						{t("community.discussions.comment.repliesCount", {
+							count: comment.replies.length,
+						})}
+					</p>
 				) : null}
 
-				{localError ? <InlineError error={localError} className="mt-2 pl-6" /> : null}
+				{localError ? <InlineError error={localError} className="mt-2 pl-8" /> : null}
 
 				{replyOpen ? (
-					<div className="mt-3 space-y-2 pl-6">
+					<div className="mt-3 space-y-2 pl-8">
 						<MarkdownEditor
 							value={replyText}
 							onChange={setReplyText}
 							minHeight={120}
 							allowUpload={false}
 							disabled={busy}
-							placeholder={`回复 ${authorName}…`}
+							placeholder={t("community.discussions.comment.replyPlaceholder", {
+								name: authorName,
+							})}
 						/>
 						<div className="flex items-center gap-2">
-							<Button type="button" size="sm" disabled={busy} onClick={() => void submitReply()}>
-								{busy ? "提交中…" : "回复"}
+							<Button
+								type="button"
+								size="sm"
+								disabled={busy}
+								onClick={() => void submitReply()}
+							>
+								{busy
+									? t("community.discussions.comment.submitting")
+									: t("community.discussions.comment.replySubmit")}
 							</Button>
 							<Button
 								type="button"
@@ -453,15 +506,15 @@ export function CommentCard({
 									setLocalError(null);
 								}}
 							>
-								取消
+								{t("community.discussions.comment.cancel")}
 							</Button>
 						</div>
 					</div>
 				) : null}
-			</div>
+			</article>
 
 			{comment.replies.length > 0 ? (
-				<div className={cn("space-y-2", nestedClass)}>
+				<div className={cn("space-y-1", nestedClass)}>
 					{comment.replies.map((reply) => (
 						<CommentCard
 							key={reply.id}

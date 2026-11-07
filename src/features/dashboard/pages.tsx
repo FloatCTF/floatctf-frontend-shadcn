@@ -1,44 +1,59 @@
 /**
  * 选手总览（Field 首页）—— 用**真实接口**回答四个问题：
  * 我在哪些赛事里？平台在发生什么？我的下一步是什么？公告有哪些？
+ *
+ * 版式遵循 docs/theme.md §6.4.B（仪表盘）：标题 + 更新时间 + 刷新、KPI 网格、
+ * 两列数据区块。所有列表都是 DataTable，文案全部走 dashboard 命名空间的 i18n。
  */
 
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, CalendarDays, Megaphone, Puzzle, Trophy } from "lucide-react";
+import { ArrowRight, CalendarDays, Megaphone, Puzzle, RefreshCw, Trophy } from "lucide-react";
+
+import type { EventInfo, SolveResult, TopUser } from "@floatctf/sdk";
+import type { Announcements } from "@floatctf/sdk/entity";
 
 import { call, callList } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { useAuthStore, useMe } from "~/auth/store";
 import { TonePill } from "~/components/app/badges";
-import { UserAvatar } from "~/components/app/user-cell";
-import {
-	PageBody,
-	PageHeader,
-	SectionCard,
-	StatCard,
-	Toolbar,
-} from "~/components/app/page";
+import { DataTable, type DataTableColumn } from "~/components/app/data-table";
+import { PageBody, PageHeader, SectionCard, StatCard, Toolbar } from "~/components/app/page";
 import {
 	EmptyBlock,
-	ErrorBlock,
-	LoadingBlock,
 	QueryState,
+	TableSkeleton,
 } from "~/components/app/states";
+import { UserAvatar } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
-import { formatInt, formatRelative, formatScore } from "~/lib/format";
+import { formatDateTime, formatInt, formatRelative, formatScore } from "~/lib/format";
 import {
-	EVENT_FAMILY_LABEL,
-	EVENT_STATUS_LABEL,
 	EVENT_STATUS_TONE,
+	eventIdOf,
 	eventStatusOf,
+	type EventStatus,
 } from "~/lib/event-status";
 import { useDocumentTitle, useNow } from "~/lib/hooks";
 
+const EVENT_STATUS_KEY: Record<EventStatus, string> = {
+	upcoming: "dashboard.status.upcoming",
+	ongoing: "dashboard.status.ongoing",
+	ended: "dashboard.status.ended",
+	unknown: "dashboard.status.unknown",
+};
+
+const EVENT_FAMILY_KEY: Record<string, string> = {
+	jeopardy: "dashboard.family.jeopardy",
+	awd: "dashboard.family.awd",
+	awdp: "dashboard.family.awdp",
+};
+
 export function DashboardPage(): ReactNode {
-	useDocumentTitle("总览 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("dashboard.page.documentTitle"));
 	const client = useClient();
 	const me = useMe();
 	const userToken = useAuthStore((state) => state.userToken);
@@ -55,230 +70,565 @@ export function DashboardPage(): ReactNode {
 		queryKey: qk.announcements.list({ limit: 5 }),
 		queryFn: () => callList(client.service.announcements.fetch({ limit: 5 })),
 		refetchInterval: 60_000,
+		refetchIntervalInBackground: false,
 	});
 
 	const solves = useQuery({
 		queryKey: qk.solves.list({ limit: 8 }),
 		queryFn: () => callList(client.service.solves.fetch({ limit: 8 })),
 		refetchInterval: 30_000,
+		refetchIntervalInBackground: false,
 	});
 
 	const top = useQuery({
 		queryKey: qk.solves.top15(),
-		queryFn: () => call(client.service.solves.getTop15Users(), "Top15 排行"),
+		queryFn: () => call(client.service.solves.getTop15Users(), "Top15"),
 		refetchInterval: 30_000,
+		refetchIntervalInBackground: false,
 	});
 
 	const myEvents = (events.data?.items ?? []).filter((item) => item.joined);
 	const openEvents = (events.data?.items ?? []).filter((item) => !item.joined);
+	const ongoingCount = myEvents.filter(
+		(item) => eventStatusOf(item.event, now.getTime()) === "ongoing",
+	).length;
+	const solveTotal = solves.data?.meta?.total ?? solves.data?.items.length ?? 0;
+	const announcementTotal =
+		announcements.data?.meta?.total ?? announcements.data?.items.length ?? 0;
+
+	const refreshing =
+		events.isFetching || announcements.isFetching || solves.isFetching || top.isFetching;
+	const updatedAt = Math.max(
+		events.dataUpdatedAt,
+		announcements.dataUpdatedAt,
+		solves.dataUpdatedAt,
+		top.dataUpdatedAt,
+	);
+	const updatedLabel = updatedAt > 0 ? formatRelative(new Date(updatedAt), now) : "—";
+	const displayName = me?.nickname || me?.username;
+
+	const metricValue = (pending: boolean, error: boolean, value: number): string =>
+		pending ? "…" : error ? "—" : formatInt(value);
+	const statusLabel = (status: EventStatus): string => t(EVENT_STATUS_KEY[status]);
+	const familyLabel = (family: string): string => {
+		const key = EVENT_FAMILY_KEY[family];
+		return key ? t(key) : family;
+	};
+
+	const refreshAll = (): void => {
+		void Promise.all([
+			events.refetch(),
+			announcements.refetch(),
+			solves.refetch(),
+			top.refetch(),
+		]);
+	};
+
+	const eventColumns: DataTableColumn<EventInfo>[] = [
+		{
+			id: "event",
+			header: t("dashboard.myEvents.columns.event"),
+			sortValue: (row) => row.event.title,
+			cell: (row) => (
+				<Link
+					to={`/events/${eventIdOf(row)}`}
+					onClick={(event) => event.stopPropagation()}
+					title={row.event.title}
+					className="block max-w-72 truncate font-medium hover:underline"
+				>
+					{row.event.title}
+				</Link>
+			),
+		},
+		{
+			id: "family",
+			header: t("dashboard.myEvents.columns.family"),
+			cell: (row) => <span className="text-muted-foreground">{familyLabel(row.event.family)}</span>,
+			sortValue: (row) => row.event.family,
+		},
+		{
+			id: "start",
+			header: t("dashboard.myEvents.columns.start"),
+			hideBelow: "sm",
+			cell: (row) => (
+				<span
+					className="tnum text-xs whitespace-nowrap text-muted-foreground"
+					title={formatDateTime(row.event.start_time, { seconds: true })}
+				>
+					{formatDateTime(row.event.start_time)}
+				</span>
+			),
+			sortValue: (row) => row.event.start_time,
+		},
+		{
+			id: "status",
+			header: t("dashboard.myEvents.columns.status"),
+			align: "right",
+			cell: (row) => {
+				const status = eventStatusOf(row.event, now.getTime());
+				return <TonePill tone={EVENT_STATUS_TONE[status]}>{statusLabel(status)}</TonePill>;
+			},
+			sortValue: (row) => eventStatusOf(row.event, now.getTime()),
+		},
+	];
+
+	const announcementColumns: DataTableColumn<Announcements>[] = [
+		{
+			id: "announcement",
+			header: t("dashboard.announcements.columns.announcement"),
+			sortValue: (row) => row.title,
+			cell: (row) => (
+				<div className="min-w-0 max-w-96">
+					<p className="truncate font-medium" title={row.title}>{row.title}</p>
+					{row.content ? (
+						<p className="line-clamp-2 text-xs whitespace-normal text-muted-foreground">
+							{row.content}
+						</p>
+					) : null}
+				</div>
+			),
+		},
+		{
+			id: "publisher",
+			header: t("dashboard.announcements.columns.publisher"),
+			hideBelow: "sm",
+			cell: (row) => (
+				<span className="text-sm text-muted-foreground">{row.publisher || "—"}</span>
+			),
+			sortValue: (row) => row.publisher,
+		},
+		{
+			id: "publishedAt",
+			header: t("dashboard.announcements.columns.publishedAt"),
+			align: "right",
+			cell: (row) => (
+				<span
+					className="tnum text-xs whitespace-nowrap text-muted-foreground"
+					title={formatDateTime(row.created_at, { seconds: true })}
+				>
+					{formatRelative(row.created_at, now)}
+				</span>
+			),
+			sortValue: (row) => row.created_at,
+		},
+	];
+
+	const solveColumns: DataTableColumn<SolveResult>[] = [
+		{
+			id: "user",
+			header: t("dashboard.solves.columns.user"),
+			sortValue: (row) => row.nickname,
+			cell: (row) => (
+				<div className="flex min-w-0 items-center gap-2">
+					<UserAvatar name={row.nickname} avatar={row.avatar} size="sm" />
+					<span className="max-w-40 truncate text-sm" title={row.nickname}>{row.nickname}</span>
+				</div>
+			),
+		},
+		{
+			id: "challenge",
+			header: t("dashboard.solves.columns.challenge"),
+			sortValue: (row) => row.challenge_name,
+			cell: (row) => (
+				<span className="block max-w-64 truncate text-sm" title={row.challenge_name}>{row.challenge_name}</span>
+			),
+		},
+		{
+			id: "points",
+			header: t("dashboard.solves.columns.points"),
+			align: "right",
+			cell: (row) => (
+				<span className="tnum font-mono text-xs">
+					{t("dashboard.solves.points", { score: formatScore(row.obtained_points) })}
+				</span>
+			),
+			sortValue: (row) => row.obtained_points,
+		},
+		{
+			id: "time",
+			header: t("dashboard.solves.columns.time"),
+			align: "right",
+			hideBelow: "sm",
+			cell: (row) => (
+				<span
+					className="tnum text-xs whitespace-nowrap text-muted-foreground"
+					title={formatDateTime(row.created_at, { seconds: true })}
+				>
+					{formatRelative(row.created_at, now)}
+				</span>
+			),
+			sortValue: (row) => row.created_at,
+		},
+	];
+
+	const topColumns: DataTableColumn<TopUser>[] = [
+		{
+			id: "rank",
+			header: t("dashboard.top.columns.rank"),
+			align: "center",
+			cell: (row) => (
+				<span className="tnum font-mono text-xs text-muted-foreground">#{row.no}</span>
+			),
+			sortValue: (row) => row.no,
+		},
+		{
+			id: "user",
+			header: t("dashboard.top.columns.user"),
+			sortValue: (row) => row.nickname,
+			cell: (row) => (
+				<div className="flex min-w-0 items-center gap-2">
+					<UserAvatar name={row.nickname} avatar={row.avatar} size="sm" />
+					<span className="max-w-40 truncate text-sm" title={row.nickname}>{row.nickname}</span>
+				</div>
+			),
+		},
+		{
+			id: "solved",
+			header: t("dashboard.top.columns.solved"),
+			align: "right",
+			cell: (row) => (
+				<span className="tnum font-mono text-xs">
+					{t("dashboard.top.solvedCount", { count: formatInt(row.solved_count) })}
+				</span>
+			),
+			sortValue: (row) => row.solved_count,
+		},
+	];
 
 	return (
-		<PageBody>
+		<PageBody className="max-w-[1180px] space-y-4">
 			<PageHeader
-				title={me ? `你好，${me.nickname || me.username}` : "总览"}
-				description="你的赛事进度、平台动态与下一步动作。"
+				title={
+					displayName
+						? t("dashboard.page.greeting", { name: displayName })
+						: t("dashboard.page.title")
+				}
+				description={t("dashboard.page.description")}
 				actions={
 					<Toolbar>
-						<Button variant="outline" asChild>
-							<Link to="/events">
-								<CalendarDays /> 全部赛事
-							</Link>
+						<span className="tnum text-xs text-muted-foreground" aria-live="polite">
+							{t("dashboard.page.updatedAt", { time: updatedLabel })}
+						</span>
+						<Button
+							variant="outline"
+							size="icon"
+							onClick={refreshAll}
+							disabled={refreshing}
+							aria-label={t("dashboard.page.refresh")}
+							title={t("dashboard.page.refresh")}
+						>
+							<RefreshCw className={refreshing ? "animate-spin" : undefined} />
 						</Button>
 						<Button asChild>
 							<Link to="/challenges">
-								<Puzzle /> 去解题
+								<Puzzle />
+								{t("dashboard.page.goSolve")}
 							</Link>
 						</Button>
 					</Toolbar>
 				}
 			/>
 
-			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				<StatCard
-					label="我参加的赛事"
-					value={events.isPending ? "…" : formatInt(myEvents.length)}
-					hint={openEvents.length > 0 ? `另有 ${openEvents.length} 场可加入` : "暂无新的可加入赛事"}
-					icon={<CalendarDays className="size-5" />}
+					label={t("dashboard.stats.myEvents.label")}
+					value={metricValue(events.isPending, events.isError, myEvents.length)}
+					hint={
+						events.isError
+							? t("dashboard.stats.unavailable")
+							: openEvents.length > 0
+								? t("dashboard.stats.myEvents.hintMore", { count: formatInt(openEvents.length) })
+								: t("dashboard.stats.myEvents.hintNone")
+					}
+					icon={<CalendarDays className="size-4" />}
 				/>
 				<StatCard
-					label="进行中的赛事"
-					value={events.isPending ? "…" : formatInt(myEvents.filter((item) => eventStatusOf(item.event, now.getTime()) === "ongoing").length)}
-					hint="按赛事时间窗判定"
-					icon={<Trophy className="size-5" />}
-					tone="success"
+					label={t("dashboard.stats.ongoing.label")}
+					value={metricValue(events.isPending, events.isError, ongoingCount)}
+					hint={
+						events.isError
+							? t("dashboard.stats.unavailable")
+							: t("dashboard.stats.ongoing.hint")
+					}
+					icon={<Trophy className="size-4" />}
+					tone={events.isError ? "default" : "success"}
 				/>
 				<StatCard
-					label="我的练习解题"
-					value={solves.isPending ? "…" : formatInt(solves.data?.meta?.total ?? solves.data?.items.length ?? 0)}
-					hint="题库练习记录（后端按当前账号返回，不含赛事）"
-					icon={<Puzzle className="size-5" />}
+					label={t("dashboard.stats.solves.label")}
+					value={metricValue(solves.isPending, solves.isError, solveTotal)}
+					hint={
+						solves.isError
+							? t("dashboard.stats.unavailable")
+							: t("dashboard.stats.solves.hint")
+					}
+					icon={<Puzzle className="size-4" />}
 				/>
 				<StatCard
-					label="公告"
-					value={announcements.isPending ? "…" : formatInt(announcements.data?.meta?.total ?? announcements.data?.items.length ?? 0)}
-					hint="全站级通知"
-					icon={<Megaphone className="size-5" />}
+					label={t("dashboard.stats.announcements.label")}
+					value={metricValue(announcements.isPending, announcements.isError, announcementTotal)}
+					hint={
+						announcements.isError
+							? t("dashboard.stats.unavailable")
+							: t("dashboard.stats.announcements.hint")
+					}
+					icon={<Megaphone className="size-4" />}
 				/>
 			</div>
 
-			<div className="grid gap-5 lg:grid-cols-2">
+			<div className="grid gap-4 lg:grid-cols-2">
 				<SectionCard
-					title="我的赛事"
-					description="已加入的赛事，点开进入赛事工作区。"
+					title={<h2>{t("dashboard.myEvents.title")}</h2>}
+					description={t("dashboard.myEvents.description")}
 					actions={
 						<Button variant="ghost" size="sm" asChild>
 							<Link to="/events">
-								全部 <ArrowRight />
+								{t("dashboard.myEvents.viewAll")}
+								<ArrowRight />
 							</Link>
 						</Button>
 					}
+					contentClassName="px-0"
 				>
 					<QueryState
 						query={events}
-						skeleton={<LoadingBlock label="加载赛事…" />}
+						skeleton={<TableSkeleton rows={4} columns={4} />}
+						errorTitle={t("dashboard.myEvents.errorTitle")}
 						isEmpty={() => myEvents.length === 0}
 						empty={
 							<EmptyBlock
-								title="还没有加入任何赛事"
-								description="在赛事列表里加入一场比赛后，这里会显示你的进度。"
+								title={t("dashboard.myEvents.emptyTitle")}
+								description={t("dashboard.myEvents.emptyDescription")}
+								icon={<CalendarDays className="size-6" />}
 								action={
 									<Button size="sm" asChild>
-										<Link to="/events">浏览赛事</Link>
+										<Link to="/events">{t("dashboard.myEvents.emptyAction")}</Link>
 									</Button>
 								}
 							/>
 						}
 					>
 						{() => (
-							<ul className="divide-y">
-								{myEvents.map((item) => {
-									const status = eventStatusOf(item.event, now.getTime());
+							<DataTable
+								data={myEvents}
+								getRowId={(row) => eventIdOf(row)}
+								columns={eventColumns}
+								onRowClick={(row) => void navigate(`/events/${eventIdOf(row)}`)}
+								mobileCard={(row) => {
+									const status = eventStatusOf(row.event, now.getTime());
 									return (
-										<li key={item.id}>
-											<button
-												type="button"
-												className="flex w-full items-center justify-between gap-3 py-3 text-left hover:bg-muted/40"
-												onClick={() => void navigate(`/events/${item.id}`)}
-											>
-												<div className="min-w-0">
-													<p className="truncate text-sm font-medium">{item.event.title}</p>
-													<p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-														<span>{EVENT_FAMILY_LABEL[item.event.family] ?? item.event.family}</span>
-														<span>·</span>
-														<span>{formatRelative(item.event.start_time, now)}开始</span>
-													</p>
-												</div>
+										<Link
+											to={`/events/${eventIdOf(row)}`}
+											className="block space-y-1.5"
+										>
+											<div className="flex items-center justify-between gap-2">
+												<span
+													className="min-w-0 truncate text-sm font-medium"
+													title={row.event.title}
+												>
+													{row.event.title}
+												</span>
 												<TonePill tone={EVENT_STATUS_TONE[status]}>
-													{EVENT_STATUS_LABEL[status]}
+													{statusLabel(status)}
 												</TonePill>
-											</button>
-										</li>
+											</div>
+											<p className="text-xs text-muted-foreground">
+												{familyLabel(row.event.family)} ·{" "}
+												<span className="tnum">
+													{formatDateTime(row.event.start_time)}
+												</span>
+											</p>
+										</Link>
 									);
-								})}
-							</ul>
-						)}
-					</QueryState>
-				</SectionCard>
-
-				<SectionCard title="全站公告" description="平台与赛事通知。">
-					<QueryState
-						query={announcements}
-						skeleton={<LoadingBlock label="加载公告…" />}
-						isEmpty={(result) => result.items.length === 0}
-						empty={<EmptyBlock title="暂无公告" />}
-					>
-						{(result) => (
-							<ul className="space-y-3">
-								{result.items.map((item) => (
-									<li key={item.id} className="rounded-md border p-3">
-										<p className="text-sm font-medium">{item.title}</p>
-										<p className="mt-1 line-clamp-3 text-sm text-muted-foreground">
-											{item.content}
-										</p>
-										<p className="mt-1 text-xs text-muted-foreground">
-											{formatRelative(item.created_at, now)}
-										</p>
-									</li>
-								))}
-							</ul>
+								}}
+							/>
 						)}
 					</QueryState>
 				</SectionCard>
 
 				<SectionCard
-					title="最近练习解题"
-					description="你在题库练习中的解题记录（30s 轮询；赛事解题不计入此接口）。"
+					title={<h2>{t("dashboard.announcements.title")}</h2>}
+					description={t("dashboard.announcements.description")}
+					actions={
+						<Button variant="ghost" size="sm" asChild>
+							<Link to="/community/announcements">
+								{t("dashboard.announcements.viewAll")}
+								<ArrowRight />
+							</Link>
+						</Button>
+					}
+					contentClassName="px-0"
+				>
+					<QueryState
+						query={announcements}
+						skeleton={<TableSkeleton rows={4} columns={3} />}
+						errorTitle={t("dashboard.announcements.errorTitle")}
+						isEmpty={(result) => result.items.length === 0}
+						empty={
+							<EmptyBlock
+								title={t("dashboard.announcements.emptyTitle")}
+								description={t("dashboard.announcements.emptyDescription")}
+								icon={<Megaphone className="size-6" />}
+								action={
+									<Button size="sm" variant="outline" asChild>
+										<Link to="/community/announcements">
+											{t("dashboard.announcements.emptyAction")}
+										</Link>
+									</Button>
+								}
+							/>
+						}
+					>
+						{(result) => (
+							<DataTable
+								data={result.items}
+								getRowId={(row) => row.id}
+								columns={announcementColumns}
+								mobileCard={(row) => (
+									<div className="space-y-1.5">
+										<p className="text-sm font-medium">{row.title}</p>
+										{row.content ? (
+											<p className="line-clamp-2 text-xs text-muted-foreground">
+												{row.content}
+											</p>
+										) : null}
+										<div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+											<span className="truncate">{row.publisher || "—"}</span>
+											<span className="tnum shrink-0">
+												{formatRelative(row.created_at, now)}
+											</span>
+										</div>
+									</div>
+								)}
+							/>
+						)}
+					</QueryState>
+				</SectionCard>
+
+				<SectionCard
+					title={<h2>{t("dashboard.solves.title")}</h2>}
+					description={t("dashboard.solves.description")}
 					actions={
 						<Button variant="ghost" size="sm" asChild>
 							<Link to="/solves">
-								全部 <ArrowRight />
+								{t("dashboard.solves.viewAll")}
+								<ArrowRight />
 							</Link>
 						</Button>
 					}
+					contentClassName="px-0"
 				>
 					<QueryState
 						query={solves}
-						skeleton={<LoadingBlock label="加载解题记录…" />}
-						errorTitle="加载解题记录失败"
+						skeleton={<TableSkeleton rows={4} columns={4} />}
+						errorTitle={t("dashboard.solves.errorTitle")}
 						isEmpty={(result) => result.items.length === 0}
-						empty={<EmptyBlock title="还没有解题记录" />}
+						empty={
+							<EmptyBlock
+								title={t("dashboard.solves.emptyTitle")}
+								description={t("dashboard.solves.emptyDescription")}
+								icon={<Puzzle className="size-6" />}
+								action={
+									<Button size="sm" asChild>
+										<Link to="/challenges">{t("dashboard.solves.emptyAction")}</Link>
+									</Button>
+								}
+							/>
+						}
 					>
 						{(result) => (
-							<ul className="divide-y">
-								{result.items.map((solve) => (
-									<li key={solve.id} className="flex items-center gap-3 py-2.5">
-										<UserAvatar name={solve.nickname} avatar={solve.avatar} size="sm" />
+							<DataTable
+								data={result.items}
+								getRowId={(row) => row.id}
+								columns={solveColumns}
+								mobileCard={(row) => (
+									<div className="flex items-center gap-3">
+										<UserAvatar
+											name={row.nickname}
+											avatar={row.avatar}
+											size="sm"
+										/>
 										<div className="min-w-0 flex-1">
-											<p className="truncate text-sm">
-												<span className="font-medium">{solve.nickname}</span>
-												<span className="text-muted-foreground"> 解出 </span>
-												<span>{solve.challenge_name}</span>
+											<p className="truncate text-sm font-medium">
+												{row.nickname}
 											</p>
 											<p className="text-xs text-muted-foreground">
-												{formatRelative(solve.created_at, now)}
+												<span className="block truncate">{row.challenge_name}</span>
+												<span className="tnum">
+													{formatRelative(row.created_at, now)}
+												</span>
 											</p>
 										</div>
-										<span className="tnum font-mono text-xs text-muted-foreground">
-											+{formatScore(solve.obtained_points)}
+										<span className="tnum shrink-0 font-mono text-xs">
+											{t("dashboard.solves.points", {
+												score: formatScore(row.obtained_points),
+											})}
 										</span>
-									</li>
-								))}
-							</ul>
+									</div>
+								)}
+							/>
 						)}
 					</QueryState>
 				</SectionCard>
 
 				<SectionCard
-					title="Top15 排行"
-					description="系统练习赛事的解题数排名（后端固定返回最多 15 条）。"
+					title={<h2>{t("dashboard.top.title")}</h2>}
+					description={t("dashboard.top.description")}
 					actions={
 						<Button variant="ghost" size="sm" asChild>
 							<Link to="/rank">
-								完整榜单 <ArrowRight />
+								{t("dashboard.top.viewAll")}
+								<ArrowRight />
 							</Link>
 						</Button>
 					}
+					contentClassName="px-0"
 				>
-					{top.isPending ? (
-						<LoadingBlock label="加载排行…" />
-					) : top.isError ? (
-						<ErrorBlock error={top.error} title="加载排行失败" onRetry={() => top.refetch()} />
-					) : (top.data ?? []).length === 0 ? (
-						<EmptyBlock title="暂无排行数据" />
-					) : (
-						<ol className="divide-y">
-							{(top.data ?? []).slice(0, 8).map((user) => (
-								<li key={`${user.no}-${user.nickname}`} className="flex items-center gap-3 py-2.5">
-									<span className="tnum w-6 text-center font-mono text-xs text-muted-foreground">
-										{user.no}
-									</span>
-									<UserAvatar name={user.nickname} avatar={user.avatar} size="sm" />
-									<span className="min-w-0 flex-1 truncate text-sm">{user.nickname}</span>
-									<span className="tnum font-mono text-xs">{formatInt(user.solved_count)} 题</span>
-								</li>
-							))}
-						</ol>
-					)}
+					<QueryState
+						query={top}
+						skeleton={<TableSkeleton rows={4} columns={3} />}
+						errorTitle={t("dashboard.top.errorTitle")}
+						isEmpty={(rows) => rows.length === 0}
+						empty={
+							<EmptyBlock
+								title={t("dashboard.top.emptyTitle")}
+								description={t("dashboard.top.emptyDescription")}
+								icon={<Trophy className="size-6" />}
+								action={
+									<Button size="sm" variant="outline" asChild>
+										<Link to="/rank">{t("dashboard.top.emptyAction")}</Link>
+									</Button>
+								}
+							/>
+						}
+					>
+						{(rows) => (
+							<DataTable
+								data={rows.slice(0, 8)}
+								getRowId={(row) => String(row.no)}
+								columns={topColumns}
+								mobileCard={(row) => (
+									<div className="flex items-center gap-3">
+										<span className="tnum w-6 shrink-0 text-center font-mono text-xs text-muted-foreground">
+											{row.no}
+										</span>
+										<UserAvatar
+											name={row.nickname}
+											avatar={row.avatar}
+											size="sm"
+										/>
+										<span className="min-w-0 flex-1 truncate text-sm" title={row.nickname}>
+											{row.nickname}
+										</span>
+										<span className="tnum shrink-0 font-mono text-xs">
+											{t("dashboard.top.solvedCount", {
+												count: formatInt(row.solved_count),
+											})}
+										</span>
+									</div>
+								)}
+							/>
+						)}
+					</QueryState>
 				</SectionCard>
 			</div>
 		</PageBody>

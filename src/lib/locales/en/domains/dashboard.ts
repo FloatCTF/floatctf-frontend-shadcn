@@ -1,3 +1,108 @@
 /** dashboard domain copy (English). */
 
-export default {} as Record<string, unknown>;
+export default {
+	page: {
+		documentTitle: "Overview · FloatCTF",
+		title: "Overview",
+		greeting: "Hello, {{name}}",
+		description: "Your event progress, platform activity, and next steps.",
+		updatedAt: "Updated {{time}}",
+		refresh: "Refresh overview",
+		goSolve: "Solve challenges",
+	},
+	stats: {
+		unavailable: "Temporarily unavailable",
+		myEvents: {
+			label: "My events",
+			hintMore: "{{count}} more open to join",
+			hintNone: "No new events to join",
+		},
+		ongoing: {
+			label: "Ongoing events",
+			hint: "Based on each event's time window",
+		},
+		solves: {
+			label: "Practice solves",
+			hint: "Practice records only; event solves excluded",
+		},
+		announcements: {
+			label: "Announcements",
+			hint: "Platform-wide notices",
+		},
+	},
+	family: {
+		jeopardy: "Jeopardy",
+		awd: "AWD",
+		awdp: "AWDP",
+	},
+	status: {
+		upcoming: "Upcoming",
+		ongoing: "Ongoing",
+		ended: "Ended",
+		unknown: "Time unknown",
+	},
+	myEvents: {
+		title: "My events",
+		description: "Events you have joined. Open one to enter its workspace.",
+		viewAll: "All",
+		loading: "Loading events…",
+		errorTitle: "Failed to load events",
+		emptyTitle: "No events joined yet",
+		emptyDescription: "Join an event from the events list to see its progress and status here.",
+		emptyAction: "Browse events",
+		columns: {
+			event: "Event",
+			family: "Format",
+			start: "Starts",
+			status: "Status",
+		},
+	},
+	announcements: {
+		title: "Announcements",
+		description: "Platform and event notices.",
+		viewAll: "All announcements",
+		loading: "Loading announcements…",
+		errorTitle: "Failed to load announcements",
+		emptyTitle: "No announcements",
+		emptyDescription: "Platform announcements appear here once published.",
+		emptyAction: "Announcement center",
+		columns: {
+			announcement: "Announcement",
+			publisher: "Publisher",
+			publishedAt: "Published",
+		},
+	},
+	solves: {
+		title: "Recent practice solves",
+		description: "Your practice solve history (polled every 30s; event solves are excluded).",
+		viewAll: "All",
+		loading: "Loading solves…",
+		errorTitle: "Failed to load solves",
+		emptyTitle: "No practice solves yet",
+		emptyDescription: "Solve a challenge in the practice catalog to start tracking progress here.",
+		emptyAction: "Go to challenges",
+		columns: {
+			user: "Player",
+			challenge: "Challenge",
+			points: "Points",
+			time: "Time",
+		},
+		points: "+{{score}}",
+	},
+	top: {
+		title: "Practice ranking",
+		description: "Practice events ranked by solves; top 8 shown.",
+		viewAll: "Full leaderboard",
+		loading: "Loading ranking…",
+		errorTitle: "Failed to load ranking",
+		emptyTitle: "No ranking data",
+		emptyDescription: "The top 8 appears once practice events record solves.",
+		emptyAction: "View leaderboard",
+		columns: {
+			rank: "Rank",
+			user: "Player",
+			solved: "Solved",
+		},
+		solvedCount: "{{count}} solved",
+	},
+} as const;

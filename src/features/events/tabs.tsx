@@ -1,9 +1,13 @@
 /**
  * 赛事工作区的标签内容。每个标签只做「真实接口 → 展示 / 操作」，
  * 状态文案统一走 `~/lib/event-status.ts` 与后端返回字段，不前端自造。
+ *
+ * 全部用户可见文案走 `events` 命名空间；后端枚举值只做「已知值 → 文案」映射，
+ * 未知值原样展示（技术标识保持原文）。
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ChevronRight, ExternalLink, Swords, Trash2, Trophy } from "lucide-react";
@@ -23,7 +27,7 @@ import {
 	StatCard,
 } from "~/components/app/page";
 import { EmptyBlock, LoadingBlock, QueryState, TableSkeleton } from "~/components/app/states";
-import { TonePill } from "~/components/app/badges";
+import { TonePill, type PillTone } from "~/components/app/badges";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import type {
@@ -37,26 +41,94 @@ import type {
 } from "@floatctf/sdk";
 import type { EventAnnouncements } from "@floatctf/sdk/entity";
 import { formatDateTime, formatRelative, formatScore } from "~/lib/format";
+import { getLocale } from "~/lib/i18n";
 import { useNow } from "~/lib/hooks";
 
 import { EventFactsCard, EventWriteupPanel } from "./components";
 
+const AWD_STATUS_KEYS: Record<string, string> = {
+	draft: "events.awd.status.draft",
+	configuring: "events.awd.status.configuring",
+	deploying: "events.awd.status.deploying",
+	deployed: "events.awd.status.deployed",
+	prechecking: "events.awd.status.prechecking",
+	verified: "events.awd.status.verified",
+	running: "events.awd.status.running",
+	paused: "events.awd.status.paused",
+	network_error: "events.awd.status.network_error",
+	start_blocked: "events.awd.status.start_blocked",
+	finished: "events.awd.status.finished",
+	archived: "events.awd.status.archived",
+	deploy_failed: "events.awd.status.deploy_failed",
+	verification_failed: "events.awd.status.verification_failed",
+};
+
+const AWD_PHASE_KEYS: Record<string, string> = {
+	hardening: "events.awd.phaseLabel.hardening",
+	attack: "events.awd.phaseLabel.attack",
+	pause: "events.awd.phaseLabel.pause",
+};
+
+const AWDP_PHASE_KEYS: Record<string, string> = {
+	pending: "events.awdp.phaseLabel.pending",
+	break: "events.awdp.phaseLabel.break",
+	preparing_fix: "events.awdp.phaseLabel.preparing_fix",
+	fix: "events.awdp.phaseLabel.fix",
+	ended: "events.awdp.phaseLabel.ended",
+};
+
+const INSTANCE_STATUS_KEYS: Record<string, string> = {
+	pending: "events.instances.status.pending",
+	running: "events.instances.status.running",
+	completed: "events.instances.status.completed",
+	failed: "events.instances.status.failed",
+};
+
+const INSTANCE_STATUS_TONES: Record<string, PillTone> = {
+	pending: "warning",
+	running: "success",
+	completed: "info",
+	failed: "danger",
+};
+
+/** 后端枚举值 → 本地化文案；未知值原样展示，不臆造状态。 */
+function useEnumLabel(keys: Record<string, string>) {
+	const { t } = useTranslation();
+	return (value: string | null | undefined): string => {
+		if (!value) return t("common.unknown");
+		const key = keys[value];
+		return key ? t(key) : value;
+	};
+}
+
 /* ── 总览 ───────────────────────────────────────────────────────────────── */
 
 export function OverviewTab({ info }: { info: EventInfo }) {
+	const { t } = useTranslation();
 	return (
-		<div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-			<div className="space-y-5">
-				<SectionCard title="赛事说明" description="平台与主办方发布的信息。">
-					<MarkdownView emptyText="主办方未填写赛事说明。">{info.event.description}</MarkdownView>
+		<div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+			<div className="space-y-4">
+				<SectionCard
+					title={t("events.overview.descriptionTitle")}
+					description={t("events.overview.descriptionSubtitle")}
+				>
+					<MarkdownView emptyText={t("events.overview.descriptionEmpty")}>
+						{info.event.description}
+					</MarkdownView>
 				</SectionCard>
-				<SectionCard title="规则" description="请务必在解题前阅读。">
-					<MarkdownView emptyText="未填写规则。">{info.event.rules}</MarkdownView>
+				<SectionCard
+					title={t("events.overview.rulesTitle")}
+					description={t("events.overview.rulesSubtitle")}
+				>
+					<MarkdownView emptyText={t("events.overview.rulesEmpty")}>{info.event.rules}</MarkdownView>
 				</SectionCard>
 			</div>
-			<div className="space-y-5">
+			<div className="space-y-4">
 				<EventFactsCard event={info.event} />
-				<SectionCard title="赛后材料" description="比赛结束后提交 writeup（PDF）。">
+				<SectionCard
+					title={t("events.writeup.title")}
+					description={t("events.writeup.description")}
+				>
 					<EventWriteupPanel info={info} />
 				</SectionCard>
 			</div>
@@ -67,6 +139,7 @@ export function OverviewTab({ info }: { info: EventInfo }) {
 /* ── 赛事题目 ───────────────────────────────────────────────────────────── */
 
 export function ChallengesTab({ eventId }: { eventId: string }) {
+	const { t } = useTranslation();
 	const client = useClient();
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
@@ -83,7 +156,7 @@ export function ChallengesTab({ eventId }: { eventId: string }) {
 	const columns: DataTableColumn<EventChallengeResult>[] = [
 		{
 			id: "name",
-			header: "题目",
+			header: t("events.challenges.columns.challenge"),
 			sortValue: (row) => row.challenge.name,
 			cell: (row) => (
 				<div className="min-w-0">
@@ -94,21 +167,21 @@ export function ChallengesTab({ eventId }: { eventId: string }) {
 						{row.challenge.name}
 					</Link>
 					<p className="truncate text-xs text-muted-foreground">
-						{row.challenge.category || "未分类"}
+						{row.challenge.category || t("events.challenges.uncategorized")}
 					</p>
 				</div>
 			),
 		},
 		{
 			id: "points",
-			header: "当前分值",
+			header: t("events.challenges.columns.points"),
 			align: "right",
 			sortValue: (row) => row.current_points,
 			cell: (row) => <span className="tnum font-mono text-xs">{formatScore(row.current_points)}</span>,
 		},
 		{
 			id: "solves",
-			header: "解出队伍",
+			header: t("events.challenges.columns.solves"),
 			align: "right",
 			hideBelow: "sm",
 			sortValue: (row) => row.solved_count,
@@ -116,14 +189,14 @@ export function ChallengesTab({ eventId }: { eventId: string }) {
 		},
 		{
 			id: "solved",
-			header: "我的状态",
+			header: t("events.challenges.columns.status"),
 			cell: (row) =>
 				row.solved ? (
-					<TonePill tone="success" icon={<CheckCircle2 />}>
-						已解出 #{row.solved_no}
+					<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
+						{t("events.challenges.solved", { no: row.solved_no })}
 					</TonePill>
 				) : (
-					<TonePill tone="muted">未解出</TonePill>
+					<TonePill tone="muted">{t("events.challenges.unsolved")}</TonePill>
 				),
 		},
 		{
@@ -133,7 +206,7 @@ export function ChallengesTab({ eventId }: { eventId: string }) {
 			cell: (row) => (
 				<Button variant="ghost" size="sm" asChild>
 					<Link to={`/events/${eventId}/challenges/${row.challenge.id}`}>
-						打开 <ChevronRight />
+						{t("events.challenges.open")} <ChevronRight aria-hidden="true" />
 					</Link>
 				</Button>
 			),
@@ -142,8 +215,12 @@ export function ChallengesTab({ eventId }: { eventId: string }) {
 
 	return (
 		<SectionCard
-			title="赛事题目"
-			description={query.isSuccess ? `共 ${items.length} 道已发布题目` : undefined}
+			title={t("events.challenges.title")}
+			description={
+				query.isSuccess ? (
+					<span className="tnum">{t("events.challenges.count", { count: items.length })}</span>
+				) : undefined
+			}
 			contentClassName="px-0"
 			footer={
 				items.length > pageSize ? (
@@ -163,11 +240,12 @@ export function ChallengesTab({ eventId }: { eventId: string }) {
 			<QueryState
 				query={query}
 				skeleton={<TableSkeleton rows={6} columns={5} />}
+				errorTitle={t("events.challenges.loadError")}
 				isEmpty={() => items.length === 0}
 				empty={
 					<EmptyBlock
-						title="还没有开放题目"
-						description="主办方发布题目后会出现在这里；比赛开始前可能全部隐藏。"
+						title={t("events.challenges.emptyTitle")}
+						description={t("events.challenges.emptyDescription")}
 					/>
 				}
 			>
@@ -181,11 +259,18 @@ export function ChallengesTab({ eventId }: { eventId: string }) {
 								<div className="min-w-0">
 									<p className="truncate text-sm font-medium">{row.challenge.name}</p>
 									<p className="text-xs text-muted-foreground">
-										{formatScore(row.current_points)} 分 · {row.solved_count} 队解出
+										{t("events.challenges.mobileSummary", {
+											score: formatScore(row.current_points),
+											count: row.solved_count,
+										})}
 									</p>
 								</div>
-								<Link to={`/events/${eventId}/challenges/${row.challenge.id}`}>
-									<ChevronRight className="size-4 text-muted-foreground" />
+								<Link
+									to={`/events/${eventId}/challenges/${row.challenge.id}`}
+									aria-label={t("events.challenges.open")}
+									title={t("events.challenges.open")}
+								>
+									<ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
 								</Link>
 							</div>
 						)}
@@ -199,6 +284,7 @@ export function ChallengesTab({ eventId }: { eventId: string }) {
 /* ── 积分榜 ─────────────────────────────────────────────────────────────── */
 
 export function ScoreboardTab({ info }: { info: EventInfo }) {
+	const { t } = useTranslation();
 	const client = useClient();
 	const query = useQuery({
 		queryKey: qk.events.scoreboard(info.event.id),
@@ -214,53 +300,66 @@ export function ScoreboardTab({ info }: { info: EventInfo }) {
 	const columns: DataTableColumn<ScoreboardItem>[] = [
 		{
 			id: "rank",
-			header: "#",
+			header: t("events.scoreboard.columns.rank"),
 			align: "right",
 			sortValue: (row) => row.no,
 			cell: (row) => <span className="tnum font-mono text-xs">{row.no}</span>,
 		},
 		{
 			id: "name",
-			header: "选手 / 战队",
+			header: t("events.scoreboard.columns.name"),
 			sortValue: (row) => row.name,
 			cell: (row) => (
 				<div className="flex min-w-0 items-center gap-2">
 					<span className="truncate text-sm font-medium">{row.name}</span>
-					{myName && row.name === myName ? <TonePill tone="info">我的战队</TonePill> : null}
+					{myName && row.name === myName ? (
+						<TonePill tone="info">{t("events.scoreboard.myTeam")}</TonePill>
+					) : null}
 				</div>
 			),
 		},
 		{
 			id: "solved",
-			header: "解题数",
+			header: t("events.scoreboard.columns.solved"),
 			align: "right",
 			sortValue: (row) => row.solved_count,
 			cell: (row) => <span className="tnum font-mono text-xs">{row.solved_count}</span>,
 		},
 		{
 			id: "score",
-			header: "总分",
+			header: t("events.scoreboard.columns.score"),
 			align: "right",
 			sortValue: (row) => row.score,
 			cell: (row) => <span className="tnum font-mono text-sm">{formatScore(row.score)}</span>,
 		},
 		{
 			id: "grid",
-			header: "题目矩阵",
+			header: t("events.scoreboard.columns.matrix"),
 			hideBelow: "lg",
 			cell: (row) => (
-				<div className="flex flex-wrap gap-1">
-					{row.challenges.map((cell) => (
-						<span
-							key={cell.name}
-							title={cell.solved ? `${cell.name}：第 ${cell.solved_no} 解` : `${cell.name}：未解出`}
-							className={
-								cell.solved
-									? "inline-block size-2.5 rounded-sm bg-emerald-500"
-									: "inline-block size-2.5 rounded-sm bg-muted"
-							}
-						/>
-					))}
+				<div
+					className="flex flex-wrap gap-1"
+					role="group"
+					aria-label={t("events.scoreboard.matrixLabel")}
+				>
+					{row.challenges.map((cell) => {
+						const label = cell.solved
+							? t("events.scoreboard.matrixSolved", { name: cell.name, no: cell.solved_no })
+							: t("events.scoreboard.matrixUnsolved", { name: cell.name });
+						return (
+							<span
+								key={cell.name}
+								role="img"
+								aria-label={label}
+								title={label}
+								className={
+									cell.solved
+										? "inline-block size-2.5 rounded-sm bg-emerald-500 dark:bg-emerald-400"
+										: "inline-block size-2.5 rounded-sm bg-muted-foreground/20"
+								}
+							/>
+						);
+					})}
 				</div>
 			),
 		},
@@ -268,11 +367,11 @@ export function ScoreboardTab({ info }: { info: EventInfo }) {
 
 	return (
 		<SectionCard
-			title="积分榜"
-			description="30s 自动刷新；比赛进行中分数可能仍在变化。"
+			title={t("events.scoreboard.title")}
+			description={t("events.scoreboard.description")}
 			actions={
 				<Button variant="ghost" size="sm" onClick={() => query.refetch()}>
-					立即刷新
+					{t("events.scoreboard.refreshNow")}
 				</Button>
 			}
 			contentClassName="px-0"
@@ -280,9 +379,15 @@ export function ScoreboardTab({ info }: { info: EventInfo }) {
 			<QueryState
 				query={query}
 				skeleton={<TableSkeleton rows={6} columns={4} />}
-				errorTitle="加载积分榜失败"
+				errorTitle={t("events.scoreboard.loadError")}
 				isEmpty={(result) => result.items.length === 0}
-				empty={<EmptyBlock title="还没有计分记录" icon={<Trophy className="size-5" />} />}
+				empty={
+					<EmptyBlock
+						title={t("events.scoreboard.emptyTitle")}
+						description={t("events.scoreboard.emptyDescription")}
+						icon={<Trophy className="size-5" aria-hidden="true" />}
+					/>
+				}
 			>
 				{(result) => (
 					<DataTable
@@ -295,7 +400,9 @@ export function ScoreboardTab({ info }: { info: EventInfo }) {
 									<p className="truncate text-sm font-medium">
 										#{row.no} {row.name}
 									</p>
-									<p className="text-xs text-muted-foreground">{row.solved_count} 题</p>
+									<p className="text-xs text-muted-foreground">
+										{t("events.scoreboard.mobileSolved", { count: row.solved_count })}
+									</p>
 								</div>
 								<span className="tnum font-mono text-sm">{formatScore(row.score)}</span>
 							</div>
@@ -310,21 +417,28 @@ export function ScoreboardTab({ info }: { info: EventInfo }) {
 /* ── 趋势 ───────────────────────────────────────────────────────────────── */
 
 export function TrendTab({ eventId }: { eventId: string }) {
+	const { t } = useTranslation();
 	const client = useClient();
+	const locale = getLocale() === "en" ? "en-US" : "zh-CN";
 	const query = useQuery({
 		queryKey: qk.events.trend(eventId),
-		queryFn: () => call<TrendItem[]>(client.service.events.getTrend(eventId), "分数趋势"),
+		queryFn: () => call<TrendItem[]>(client.service.events.getTrend(eventId), t("events.workspace.tabs.trend")),
 		refetchInterval: 30_000,
 	});
 
 	return (
-		<SectionCard title="分数趋势" description="每名选手 / 战队的总分随时间变化。">
+		<SectionCard title={t("events.trend.title")} description={t("events.trend.description")}>
 			<QueryState
 				query={query}
-				skeleton={<LoadingBlock label="加载趋势…" />}
-				errorTitle="加载趋势失败"
+				skeleton={<LoadingBlock label={t("events.trend.loading")} />}
+				errorTitle={t("events.trend.loadError")}
 				isEmpty={(series) => series.every((item) => item.points.length === 0)}
-				empty={<EmptyBlock title="还没有趋势数据" />}
+				empty={
+					<EmptyBlock
+						title={t("events.trend.emptyTitle")}
+						description={t("events.trend.emptyDescription")}
+					/>
+				}
 			>
 				{(series) => (
 					<TrendChart
@@ -337,7 +451,7 @@ export function TrendTab({ eventId }: { eventId: string }) {
 						}))}
 						formatY={(value) => value.toFixed(0)}
 						formatX={(value) =>
-							new Date(value).toLocaleTimeString("zh-CN", {
+							new Date(value).toLocaleTimeString(locale, {
 								hour: "2-digit",
 								minute: "2-digit",
 								hour12: false,
@@ -353,68 +467,79 @@ export function TrendTab({ eventId }: { eventId: string }) {
 /* ── 赛事实例 ───────────────────────────────────────────────────────────── */
 
 export function InstancesTab({ eventId }: { eventId: string }) {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const now = useNow(30_000);
+	const instanceStatus = useEnumLabel(INSTANCE_STATUS_KEYS);
 
 	const query = useQuery({
 		queryKey: qk.events.instances(eventId),
-		queryFn: () => call<EventInstanceResult[]>(client.service.events.getInstances(eventId), "赛事实例"),
+		queryFn: () =>
+			call<EventInstanceResult[]>(
+				client.service.events.getInstances(eventId),
+				t("events.instances.title"),
+			),
 		refetchInterval: 30_000,
 	});
 
 	const destroy = useMutation({
-		mutationFn: (id: string) => callVoid(client.service.instances.destroy(id), "销毁实例"),
+		mutationFn: (id: string) =>
+			callVoid(client.service.instances.destroy(id), t("events.instances.destroyAction")),
 		onSuccess: () => {
-			toast.success("实例已销毁");
+			toast.success(t("events.instances.destroySuccess"));
 			void queryClient.invalidateQueries({ queryKey: qk.events.instances(eventId) });
 			void queryClient.invalidateQueries({ queryKey: qk.instances.all });
 		},
-		onError: (error) => toast.apiError("销毁失败", error),
+		onError: (error) => toast.apiError(t("events.instances.destroyFailed"), error),
 	});
 
 	const columns: DataTableColumn<EventInstanceResult>[] = [
 		{
 			id: "challenge",
-			header: "题目",
+			header: t("events.instances.columns.challenge"),
 			sortValue: (row) => row.challenge_name,
 			cell: (row) => <span className="text-sm">{row.challenge_name}</span>,
 		},
 		{
 			id: "owner",
-			header: "归属",
+			header: t("events.instances.columns.owner"),
 			hideBelow: "sm",
 			cell: (row) => <span className="text-xs">{row.user_nickname}</span>,
 		},
 		{
 			id: "status",
-			header: "状态",
-			cell: (row) => <TonePill tone="neutral">{row.instance.status || "未知"}</TonePill>,
+			header: t("events.instances.columns.status"),
+			cell: (row) => (
+				<TonePill tone={INSTANCE_STATUS_TONES[row.instance.status] ?? "neutral"}>
+					{instanceStatus(row.instance.status)}
+				</TonePill>
+			),
 		},
 		{
 			id: "identifier",
-			header: "容器",
+			header: t("events.instances.columns.container"),
 			hideBelow: "md",
 			cell: (row) => <MonoText>{row.instance.identifier || "—"}</MonoText>,
 		},
 		{
 			id: "created",
-			header: "启动于",
+			header: t("events.instances.columns.created"),
 			hideBelow: "md",
 			sortValue: (row) => row.instance.created_at,
 			cell: (row) => (
-				<span className="text-xs text-muted-foreground">
+				<span className="text-xs text-muted-foreground tnum">
 					{formatRelative(row.instance.created_at, now)}
 				</span>
 			),
 		},
 		{
 			id: "expires",
-			header: "自动回收",
+			header: t("events.instances.columns.expires"),
 			hideBelow: "lg",
 			cell: (row) => (
-				<span className="text-xs text-muted-foreground">
+				<span className="text-xs whitespace-nowrap text-muted-foreground tnum">
 					{row.instance.destroy_at ? formatDateTime(row.instance.destroy_at) : "—"}
 				</span>
 			),
@@ -423,19 +548,19 @@ export function InstancesTab({ eventId }: { eventId: string }) {
 
 	return (
 		<SectionCard
-			title="赛事实例"
-			description="本赛事中你（或你的战队）启动的题目环境。"
+			title={t("events.instances.title")}
+			description={t("events.instances.description")}
 			contentClassName="px-0"
 		>
 			<QueryState
 				query={query}
 				skeleton={<TableSkeleton rows={4} columns={5} />}
-				errorTitle="加载赛事实例失败"
+				errorTitle={t("events.instances.loadError")}
 				isEmpty={(items) => items.length === 0}
 				empty={
 					<EmptyBlock
-						title="还没有实例"
-						description="在赛事题目里启动实例后会出现在这里。"
+						title={t("events.instances.emptyTitle")}
+						description={t("events.instances.emptyDescription")}
 					/>
 				}
 			>
@@ -446,28 +571,29 @@ export function InstancesTab({ eventId }: { eventId: string }) {
 						columns={columns}
 						rowActions={(row) => (
 							<Button
-								variant="ghost"
+								variant="destructive"
 								size="sm"
 								disabled={destroy.isPending}
 								onClick={async () => {
 									const ok = await confirm({
-										title: "销毁该实例？",
+										title: t("events.instances.destroyTitle"),
 										description: row.challenge_name,
-										consequences: ["容器会被删除，环境内未保存的修改会丢失"],
+										consequences: [t("events.instances.destroyConsequence")],
 										tone: "danger",
-										confirmText: "销毁",
+										confirmText: t("events.instances.destroyConfirm"),
 									});
 									if (ok) destroy.mutate(row.instance.id);
 								}}
 							>
-								<Trash2 /> 销毁
+								<Trash2 aria-hidden="true" /> {t("events.instances.destroy")}
 							</Button>
 						)}
 						mobileCard={(row) => (
 							<div className="space-y-1">
 								<p className="text-sm font-medium">{row.challenge_name}</p>
 								<p className="text-xs text-muted-foreground">
-									{row.instance.status} · {row.instance.identifier}
+									{instanceStatus(row.instance.status)} ·{" "}
+									<MonoText>{row.instance.identifier || "—"}</MonoText>
 								</p>
 							</div>
 						)}
@@ -481,28 +607,37 @@ export function InstancesTab({ eventId }: { eventId: string }) {
 /* ── 赛事公告 ───────────────────────────────────────────────────────────── */
 
 export function BulletinTab({ eventId }: { eventId: string }) {
+	const { t } = useTranslation();
 	const client = useClient();
 	const now = useNow(30_000);
 	const query = useQuery({
 		queryKey: qk.events.announcements(eventId),
 		queryFn: () =>
-			call<EventAnnouncements[]>(client.service.events.getAnnouncements(eventId), "赛事公告"),
+			call<EventAnnouncements[]>(
+				client.service.events.getAnnouncements(eventId),
+				t("events.bulletin.title"),
+			),
 		refetchInterval: 60_000,
 	});
 
 	return (
-		<SectionCard title="赛事公告" description="主办方发布的赛程与规则变更（60s 刷新）。">
+		<SectionCard title={t("events.bulletin.title")} description={t("events.bulletin.description")}>
 			<QueryState
 				query={query}
-				skeleton={<LoadingBlock label="加载公告…" />}
-				errorTitle="加载公告失败"
+				skeleton={<LoadingBlock label={t("events.bulletin.loading")} />}
+				errorTitle={t("events.bulletin.loadError")}
 				isEmpty={(items) => items.length === 0}
-				empty={<EmptyBlock title="暂无赛事公告" />}
+				empty={
+					<EmptyBlock
+						title={t("events.bulletin.emptyTitle")}
+						description={t("events.bulletin.emptyDescription")}
+					/>
+				}
 			>
 				{(items) => (
 					<ul className="space-y-3">
 						{items.map((item) => (
-							<li key={item.id} className="rounded-md border p-3">
+							<li key={item.id} className="rounded-lg border p-4">
 								<div className="flex flex-wrap items-center justify-between gap-2">
 									<p className="text-sm font-medium">{item.title}</p>
 									<span className="text-xs text-muted-foreground">
@@ -524,27 +659,34 @@ export function BulletinTab({ eventId }: { eventId: string }) {
 /* ── AWD / AWDP 概览（只读摘要 + 进入专用工作区） ────────────────────────── */
 
 export function ArenaSummaryTab({ eventId }: { eventId: string }) {
+	const { t } = useTranslation();
+	const awdStatus = useEnumLabel(AWD_STATUS_KEYS);
+	const awdPhase = useEnumLabel(AWD_PHASE_KEYS);
 	const client = useClient();
 	const query = useQuery({
 		queryKey: qk.awd.status(eventId),
 		queryFn: () =>
-			call<AwdPlayerStatus>(client.awd.player.status(eventId), "AWD 赛事状态"),
+			call<AwdPlayerStatus>(client.awd.player.status(eventId), t("events.awd.statusAction")),
 		refetchInterval: 30_000,
 	});
 
 	return (
-		<div className="space-y-5">
+		<div className="space-y-4">
 			<QueryState
 				query={query}
-				skeleton={<LoadingBlock label="读取 AWD 状态…" />}
-				errorTitle="读取 AWD 状态失败"
+				skeleton={<LoadingBlock label={t("events.awd.loading")} />}
+				errorTitle={t("events.awd.loadError")}
 			>
 				{(status) => (
 					<>
 						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-							<StatCard label="赛事阶段" value={status.phase || "—"} hint={status.status} />
 							<StatCard
-								label="当前轮次"
+								label={t("events.awd.phase")}
+								value={awdPhase(status.phase)}
+								hint={awdStatus(status.status)}
+							/>
+							<StatCard
+								label={t("events.awd.round")}
 								value={
 									status.current_round !== null
 										? `${status.current_round}${status.round_count ? ` / ${status.round_count}` : ""}`
@@ -552,25 +694,25 @@ export function ArenaSummaryTab({ eventId }: { eventId: string }) {
 								}
 							/>
 							<StatCard
-								label="我的得分"
+								label={t("events.awd.score")}
 								value={formatScore(status.score)}
 								tone="success"
-								icon={<Swords className="size-5" />}
+								icon={<Swords className="size-5" aria-hidden="true" />}
 							/>
 							<StatCard
-								label="参赛状态"
-								value={status.banned ? "已被封禁" : "正常"}
+								label={t("events.awd.participation")}
+								value={status.banned ? t("events.awd.banned") : t("events.awd.normal")}
 								tone={status.banned ? "danger" : "default"}
-								hint={status.final_settlement ? "已进入最终结算" : undefined}
+								hint={status.final_settlement ? t("events.awd.finalSettlement") : undefined}
 							/>
 						</div>
 						<SectionCard
-							title="AWD 驾驶舱"
-							description="GameBox、WireGuard、SSH 凭据与实时积分榜都在驾驶舱里操作。"
+							title={t("events.awd.cockpitTitle")}
+							description={t("events.awd.cockpitDescription")}
 						>
 							<Button asChild>
 								<Link to={`/arena/${eventId}`}>
-									进入 AWD 驾驶舱 <ExternalLink />
+									{t("events.awd.enterCockpit")} <ExternalLink aria-hidden="true" />
 								</Link>
 							</Button>
 						</SectionCard>
@@ -582,53 +724,91 @@ export function ArenaSummaryTab({ eventId }: { eventId: string }) {
 }
 
 export function LabSummaryTab({ eventId }: { eventId: string }) {
+	const { t } = useTranslation();
+	const awdpPhase = useEnumLabel(AWDP_PHASE_KEYS);
 	const client = useClient();
 	const query = useQuery({
 		queryKey: qk.awdp.overview(eventId),
-		queryFn: () => call<AwdpOverview>(client.awdp.player.overview(eventId), "AWDP 总览"),
+		queryFn: () =>
+			call<AwdpOverview>(client.awdp.player.overview(eventId), t("events.awdp.overviewAction")),
 		refetchInterval: 30_000,
 	});
 
 	return (
-		<div className="space-y-5">
+		<div className="space-y-4">
 			<QueryState
 				query={query}
-				skeleton={<LoadingBlock label="读取 AWDP 总览…" />}
-				errorTitle="读取 AWDP 总览失败"
+				skeleton={<LoadingBlock label={t("events.awdp.loading")} />}
+				errorTitle={t("events.awdp.loadError")}
 			>
 				{(overview) => (
 					<>
 						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 							<StatCard
-								label="当前阶段"
-								value={overview.phase}
-								hint={overview.next_action_at ? `下一节点 ${formatDateTime(overview.next_action_at)}` : undefined}
+								label={t("events.awdp.phase")}
+								value={awdpPhase(overview.phase)}
+								hint={
+									overview.next_action_at
+										? t("events.awdp.nextAction", {
+												time: formatDateTime(overview.next_action_at),
+											})
+										: undefined
+								}
 							/>
 							<StatCard
-								label="轮次"
+								label={t("events.awdp.round")}
 								value={`${overview.current_round} / ${overview.total_rounds}`}
 							/>
-							<StatCard label="我的得分" value={formatScore(overview.my_score)} tone="success" />
-							<StatCard label="我的靶机" value={overview.gameboxes.length} />
+							<StatCard
+								label={t("events.awdp.score")}
+								value={formatScore(overview.my_score)}
+								tone="success"
+							/>
+							<StatCard
+								label={t("events.awdp.gameboxes")}
+								value={overview.gameboxes.length}
+							/>
 						</div>
 						<SectionCard
-							title="AWDP 工作台"
-							description="实例生命周期、Break 提交、补丁上传与官方评测都在工作台里。"
+							title={t("events.awdp.workbenchTitle")}
+							description={t("events.awdp.workbenchDescription")}
 						>
 							<Button asChild>
 								<Link to={`/lab/${eventId}`}>
-									进入 AWDP 工作台 <ExternalLink />
+									{t("events.awdp.enterWorkbench")} <ExternalLink aria-hidden="true" />
 								</Link>
 							</Button>
 						</SectionCard>
-						<SectionCard title="阶段节奏" description="后端配置的真实时长（秒）。">
+						<SectionCard
+							title={t("events.awdp.rhythmTitle")}
+							description={t("events.awdp.rhythmDescription")}
+						>
 							<KeyValueList
 								items={[
-									{ key: "Break 时长", value: `${overview.break_duration_secs}s` },
-									{ key: "Fix 时长", value: `${overview.fix_duration_secs}s` },
-									{ key: "轮次间隔", value: `${overview.fix_round_interval_secs}s` },
-									{ key: "Break 分值", value: formatScore(overview.break_score) },
-									{ key: "每轮 Fix 分值", value: formatScore(overview.fix_round_score) },
+									{
+										key: t("events.awdp.breakDuration"),
+										value: t("events.awdp.seconds", {
+											seconds: overview.break_duration_secs,
+										}),
+									},
+									{
+										key: t("events.awdp.fixDuration"),
+										value: t("events.awdp.seconds", { seconds: overview.fix_duration_secs }),
+									},
+									{
+										key: t("events.awdp.roundInterval"),
+										value: t("events.awdp.seconds", {
+											seconds: overview.fix_round_interval_secs,
+										}),
+									},
+									{
+										key: t("events.awdp.breakScore"),
+										value: formatScore(overview.break_score),
+									},
+									{
+										key: t("events.awdp.fixRoundScore"),
+										value: formatScore(overview.fix_round_score),
+									},
 								]}
 							/>
 						</SectionCard>

@@ -208,7 +208,7 @@ export function EmptyBlock({
 	return (
 		<Empty className={cn("border border-dashed py-10", className)}>
 			<EmptyHeader>
-				<EmptyMedia variant="icon">{icon ?? <Media className="size-5" />}</EmptyMedia>
+				<EmptyMedia variant="icon">{icon ?? <Media className="size-6" />}</EmptyMedia>
 				<EmptyTitle>{title ?? fallbackTitle}</EmptyTitle>
 				<EmptyDescription>
 					{description ??
@@ -228,7 +228,7 @@ export function PermissionDeniedBlock({ description }: { description?: string })
 		<Empty className="border border-dashed py-10">
 			<EmptyHeader>
 				<EmptyMedia variant="icon">
-					<Lock className="size-5" />
+					<Lock className="size-6" />
 				</EmptyMedia>
 				<EmptyTitle>{t("common.states.forbiddenTitle")}</EmptyTitle>
 				<EmptyDescription>
@@ -253,7 +253,7 @@ export function NotFoundBlock({
 		<Empty className="border border-dashed py-14">
 			<EmptyHeader>
 				<EmptyMedia variant="icon">
-					<SearchX className="size-5" />
+					<SearchX className="size-6" />
 				</EmptyMedia>
 				<EmptyTitle>{title ?? t("common.states.notFoundTitle")}</EmptyTitle>
 				<EmptyDescription>{description ?? t("common.states.notFoundDescription")}</EmptyDescription>

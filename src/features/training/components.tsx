@@ -1,16 +1,22 @@
 /**
  * AWDP Training Ground 的域内组件：
  * 阶段步进条 / 实例卡 / Break·Fix·ALL Check 动作区 / 轮次与评测 / 积分明细 / Writeup。
+ *
+ * 所有用户可见文案走 training 命名空间（zh / en 同步），技术标识（flag、patch.sh、
+ * Test Check、ALL Check、端点、ID）保持原文。
  */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	Activity,
 	CheckCircle2,
+	ChevronRight,
 	Download,
 	FileUp,
 	FlaskConical,
+	Loader2,
 	Play,
 	RefreshCw,
 	RotateCcw,
@@ -52,16 +58,15 @@ import { formatDateTime, formatDuration, formatInt, formatScore } from "~/lib/fo
 import { useNow } from "~/lib/hooks";
 
 import {
-	RUN_ALL_CHECK_CONSEQUENCES,
 	RUN_PHASE_ORDER,
-	runInstanceControlGate,
-	RUN_PREPARING_FIX_NOTE,
 	allCheckRunGate,
 	breakRunGate,
 	isRunInstanceRunning,
 	patchRunGate,
+	runAllCheckConsequences,
 	runEvaluationLabel,
 	runEvaluationTone,
+	runInstanceControlGate,
 	runPhaseIndex,
 	runPhaseLabel,
 	runPhaseTone,
@@ -83,6 +88,7 @@ export function RunPhaseSteps({
 	totalRounds: number;
 	nextActionAt: string | null;
 }): ReactNode {
+	const { t } = useTranslation();
 	const currentIndex = runPhaseIndex(phase);
 	const now = useNow(1000);
 	const remaining = (() => {
@@ -104,10 +110,13 @@ export function RunPhaseSteps({
 								tone={active ? runPhaseTone(step) : done ? "success" : "muted"}
 								className={active ? "ring-1 ring-current" : undefined}
 							>
-								{runPhaseLabel(step)}
+								{runPhaseLabel(step, t)}
 							</TonePill>
 							{index < RUN_PHASE_ORDER.length - 1 ? (
-								<span className="text-muted-foreground">→</span>
+								<ChevronRight
+									className="size-4 text-muted-foreground"
+									aria-hidden="true"
+								/>
 							) : null}
 						</li>
 					);
@@ -116,26 +125,38 @@ export function RunPhaseSteps({
 			<div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
 				{phase === "fix" ? (
 					<span className="tnum">
-						回合 {formatInt(currentRound)} / {formatInt(totalRounds)}
+						{t("training.phase.round", {
+							current: formatInt(currentRound),
+							total: formatInt(totalRounds),
+						})}
 					</span>
 				) : null}
 				{remaining !== null && (phase === "break" || phase === "fix") ? (
 					<span className="tnum">
-						{phase === "break" ? "Break 剩余" : "下一轮判定倒计时"}{" "}
-						{formatDuration(remaining)}
+						{phase === "break"
+							? t("training.phase.breakRemaining", {
+									duration: formatDuration(remaining),
+								})
+							: t("training.phase.nextRoundCountdown", {
+									duration: formatDuration(remaining),
+								})}
 					</span>
 				) : null}
 				{nextActionAt ? (
-					<span>下一动作时间：{formatDateTime(nextActionAt, { seconds: true })}</span>
+					<span className="tnum">
+						{t("training.phase.nextActionAt", {
+							time: formatDateTime(nextActionAt, { seconds: true }),
+						})}
+					</span>
 				) : null}
 			</div>
 			{phase === "preparing_fix" ? (
 				<div
-					className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs"
+					className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
 					role="status"
 				>
-					<TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
-					<span>{RUN_PREPARING_FIX_NOTE}</span>
+					<TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					<span>{t("training.phase.preparingFixNote")}</span>
 				</div>
 			) : null}
 		</div>
@@ -152,6 +173,8 @@ export function TrainingInstancePanel({
 	error,
 	judgeEndpoint,
 	busy,
+	pendingAction,
+	refreshing,
 	phase,
 	onStart,
 	onStop,
@@ -166,26 +189,53 @@ export function TrainingInstancePanel({
 	error: unknown;
 	judgeEndpoint: AwdpRunDto["judge_endpoint"];
 	busy: boolean;
+	/** 正在执行的实例动作（用于只在被点击的按钮上显示 spinner）。 */
+	pendingAction: "start" | "stop" | "reset" | null;
+	refreshing: boolean;
 	phase: AwdpRunDto["phase"];
 	onStart: () => void;
 	onStop: () => void;
 	onReset: () => void;
 	onRefresh: () => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const running = isRunInstanceRunning(instance);
-	const control = runInstanceControlGate(phase);
+	const control = runInstanceControlGate(phase, t);
+
+	const startTitle = !control.allowed
+		? control.reason
+		: running
+			? t("training.instance.startTitleRunning")
+			: t("training.instance.startTitleAllowed");
+	const stopTitle = !control.allowed
+		? control.reason
+		: running
+			? t("training.instance.stopTitleAllowed")
+			: t("training.instance.stopTitleNotRunning");
+	const resetTitle = !control.allowed
+		? control.reason
+		: instance
+			? t("training.instance.resetTitleAllowed")
+			: t("training.instance.resetTitleMissing");
 
 	return (
 		<SectionCard
-			title="我的靶机实例"
+			title={t("training.instance.title")}
 			description={gameboxName}
 			actions={
 				<div className="flex items-center gap-1">
 					<TonePill tone={broken ? "danger" : "muted"}>
-						{broken ? "已被攻破" : "未被攻破"}
+						{broken ? t("training.instance.broken") : t("training.instance.notBroken")}
 					</TonePill>
-					<Button variant="ghost" size="icon-xs" onClick={onRefresh} aria-label="刷新实例">
-						<RefreshCw />
+					<Button
+						variant="ghost"
+						size="icon-xs"
+						onClick={onRefresh}
+						disabled={refreshing}
+						aria-label={t("training.instance.refresh")}
+						title={t("training.instance.refresh")}
+					>
+						<RefreshCw className={refreshing ? "animate-spin" : undefined} />
 					</Button>
 				</div>
 			}
@@ -193,20 +243,28 @@ export function TrainingInstancePanel({
 			{isPending ? (
 				<TableSkeleton rows={2} columns={2} />
 			) : isError ? (
-				<ErrorBlock error={error} title="加载实例失败" onRetry={onRefresh} />
+				<ErrorBlock
+					error={error}
+					title={t("training.instance.loadError")}
+					onRetry={onRefresh}
+				/>
 			) : (
 				<div className="space-y-3">
 					<div className="flex flex-wrap items-center gap-2">
 						<TonePill tone={runRuntimeTone(instance?.runtime_state)}>
-							{runRuntimeLabel(instance?.runtime_state)}
+							{runRuntimeLabel(instance?.runtime_state, t)}
 						</TonePill>
 						{instance ? (
 							<>
 								<span className="tnum text-xs text-muted-foreground">
-									重建代数 {formatInt(instance.runtime_generation)}
+									{t("training.instance.generation", {
+										value: formatInt(instance.runtime_generation),
+									})}
 								</span>
 								<span className="tnum text-xs text-muted-foreground">
-									手动 Reset {formatInt(instance.reset_count)} 次
+									{t("training.instance.resetCount", {
+										value: formatInt(instance.reset_count),
+									})}
 								</span>
 								<MonoText className="text-muted-foreground">
 									{instance.instance_id}
@@ -214,7 +272,7 @@ export function TrainingInstancePanel({
 							</>
 						) : (
 							<span className="text-xs text-muted-foreground">
-								尚未启动：实例不存在，端点也不会暴露。
+								{t("training.instance.notStarted")}
 							</span>
 						)}
 					</div>
@@ -226,81 +284,108 @@ export function TrainingInstancePanel({
 								return (
 									<li
 										key={`${endpoint.protocol}:${endpoint.public_port}`}
-										className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2"
+										className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
 									>
-										<Terminal className="size-3.5 text-muted-foreground" />
-										<CopyText value={url} label="服务地址" />
+										<Terminal
+											className="size-4 text-muted-foreground"
+											aria-hidden="true"
+										/>
+										<CopyText
+											value={url}
+											label={t("training.instance.serviceAddress")}
+										/>
 										<span className="tnum text-xs text-muted-foreground">
-											容器端口 {endpoint.container_port}
+											{t("training.instance.containerPort", {
+												port: endpoint.container_port,
+											})}
 										</span>
 									</li>
 								);
 							})}
 						</ul>
 					) : (
-						<p className="text-xs text-muted-foreground">实例未运行时不暴露服务端点。</p>
+						<p className="text-xs text-muted-foreground">
+							{t("training.instance.noEndpoints")}
+						</p>
 					)}
 
-					{!control.allowed ? <TonePill tone="warning">{control.reason}</TonePill> : null}
+					{!control.allowed ? (
+						<div
+							className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
+							role="status"
+						>
+							<TriangleAlert
+								className="mt-0.5 size-4 shrink-0"
+								aria-hidden="true"
+							/>
+							<span>{control.reason}</span>
+						</div>
+					) : null}
 					<div className="flex flex-wrap items-center gap-2">
 						<Button
 							variant="outline"
 							size="sm"
 							disabled={busy || running || !control.allowed}
-							title={
-								!control.allowed
-									? control.reason
-									: running
-										? "实例已在运行"
-										: "启动（或复用）实例"
-							}
+							title={startTitle}
 							onClick={onStart}
 						>
-							<Play /> 启动实例
+							{pendingAction === "start" ? (
+								<Loader2 className="animate-spin" aria-hidden="true" />
+							) : (
+								<Play aria-hidden="true" />
+							)}
+							{t("training.instance.start")}
 						</Button>
 						<Button
 							variant="outline"
 							size="sm"
 							disabled={busy || !running || !control.allowed}
-							title={
-								!control.allowed
-									? control.reason
-									: running
-										? "停止实例（保留端点）"
-										: "实例未运行"
-							}
+							title={stopTitle}
 							onClick={onStop}
 						>
-							<Square /> 停止实例
+							{pendingAction === "stop" ? (
+								<Loader2 className="animate-spin" aria-hidden="true" />
+							) : (
+								<Square aria-hidden="true" />
+							)}
+							{t("training.instance.stop")}
 						</Button>
 						<Button
 							variant="outline"
 							size="sm"
 							disabled={busy || !instance || !control.allowed}
-							title={
-								!control.allowed
-									? control.reason
-									: instance
-										? "重置为原始状态（破坏性）"
-										: "实例不存在"
-							}
+							title={resetTitle}
 							onClick={onReset}
 						>
-							<RotateCcw /> 重置实例
+							{pendingAction === "reset" ? (
+								<Loader2 className="animate-spin" aria-hidden="true" />
+							) : (
+								<RotateCcw aria-hidden="true" />
+							)}
+							{t("training.instance.reset")}
 						</Button>
 					</div>
 
 					{judgeEndpoint ? (
-						<div className="space-y-1 rounded-md border bg-muted/30 px-3 py-2 text-xs">
+						<div className="space-y-1 rounded-lg border bg-muted/30 px-3 py-2 text-xs">
 							<p className="flex items-center gap-1.5 font-medium">
-								<ShieldCheck className="size-3.5" /> 练习 Flag Server（data plane）
+								<ShieldCheck className="size-4" aria-hidden="true" />
+								{t("training.instance.judge.title")}
 							</p>
 							<p className="text-muted-foreground">
-								作用域 {judgeEndpoint.scope}：仅 GameBox 内部网络可达，用作题目内的 SSRF / 攻击目标。
+								{t("training.instance.judge.scope", {
+									scope: judgeEndpoint.scope,
+								})}
 							</p>
 							<div className="flex flex-wrap items-center gap-2">
-								<CopyText value={judgeEndpoint.base_url} label="Flag Server 地址" />
-								<CopyText value={judgeEndpoint.flag_url} label="Flag URL" />
+								<CopyText
+									value={judgeEndpoint.base_url}
+									label={t("training.instance.judge.baseUrl")}
+								/>
+								<CopyText
+									value={judgeEndpoint.flag_url}
+									label={t("training.instance.judge.flagUrl")}
+								/>
 							</div>
 						</div>
 					) : null}
@@ -328,6 +413,7 @@ export function TrainingActionPanel({
 	instance: AwdpInstance | null;
 	onChanged: () => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const confirm = useConfirm();
 	const [flag, setFlag] = useState("");
@@ -337,11 +423,11 @@ export function TrainingActionPanel({
 	const [allCheckResult, setAllCheckResult] = useState<AllCheckDto | null>(null);
 	const fileRef = useRef<HTMLInputElement | null>(null);
 
-	const breakGate = breakRunGate(phase);
-	const patchGate = patchRunGate(phase, instance);
-	const testGate = testCheckRunGate(instance);
-	const allGate = allCheckRunGate(phase, instance);
-	const sourceGate = sourceRunGate(phase);
+	const breakGate = breakRunGate(phase, t);
+	const patchGate = patchRunGate(phase, instance, t);
+	const testGate = testCheckRunGate(instance, t);
+	const allGate = allCheckRunGate(phase, instance, t);
+	const sourceGate = sourceRunGate(phase, t);
 
 	const breakMutation = useMutation({
 		mutationFn: (value: string) =>
@@ -352,13 +438,18 @@ export function TrainingActionPanel({
 		onSuccess: (result) => {
 			setBreakResult(result);
 			setFlag("");
-			if (result.scored) toast.success("Break 得分已入账");
-			else if (result.already_broken) toast.info("此前已攻破", "本次提交不计分。");
-			else if (result.accepted) toast.info("flag 已接受，但未计分");
-			else toast.error("flag 未被接受");
+			if (result.scored) toast.success(t("training.actions.break.toast.scored"));
+			else if (result.already_broken)
+				toast.info(
+					t("training.actions.break.toast.alreadyBroken"),
+					t("training.actions.break.toast.alreadyBrokenDesc"),
+				);
+			else if (result.accepted)
+				toast.info(t("training.actions.break.toast.acceptedNoScore"));
+			else toast.error(t("training.actions.break.toast.rejected"));
 			onChanged();
 		},
-		onError: (error) => toast.apiError("提交 Break flag 失败", error),
+		onError: (error) => toast.apiError(t("training.actions.break.toast.failed"), error),
 	});
 
 	const patchMutation = useMutation({
@@ -369,14 +460,18 @@ export function TrainingActionPanel({
 			),
 		onSuccess: (result) => {
 			setPatchResult(result);
-			if (result.status === "applied") toast.success("补丁已应用");
-			else toast.error("补丁应用失败", result.error_message ?? undefined);
+			if (result.status === "applied") toast.success(t("training.actions.fix.toast.applied"));
+			else
+				toast.error(
+					t("training.actions.fix.toast.failed"),
+					result.error_message ?? undefined,
+				);
 			if (fileRef.current) fileRef.current.value = "";
 			onChanged();
 		},
 		onError: (error) => {
 			setPatchResult(null);
-			toast.apiError("上传补丁失败", error);
+			toast.apiError(t("training.actions.fix.toast.uploadFailed"), error);
 		},
 	});
 
@@ -385,10 +480,13 @@ export function TrainingActionPanel({
 			call<ManualCheckDto>(client.awdp.runs.testCheck(runId, gameboxId), "Test Check"),
 		onSuccess: (result) => {
 			setCheckResult(result);
-			toast.success("自检完成", "不计分，仅用于提交前确认。");
+			toast.success(
+				t("training.actions.test.toast.done"),
+				t("training.actions.test.toast.doneDesc"),
+			);
 			onChanged();
 		},
-		onError: (error) => toast.apiError("Test Check 失败", error),
+		onError: (error) => toast.apiError(t("training.actions.test.toast.failed"), error),
 	});
 
 	const allCheckMutation = useMutation({
@@ -398,17 +496,22 @@ export function TrainingActionPanel({
 			setAllCheckResult(result);
 			if (result.status === "patched") {
 				toast.success(
-					"ALL Check 通过",
+					t("training.actions.allCheck.toast.passed"),
 					result.swept
-						? `剩余 ${result.swept_rounds} 个回合已全部计分，run 已结束。`
-						: "判定通过。",
+						? t("training.actions.allCheck.toast.passedSwept", {
+								count: result.swept_rounds,
+							})
+						: t("training.actions.allCheck.toast.passedDesc"),
 				);
 			} else {
-				toast.error("ALL Check 未通过", "本次不落账、不扣分，等本轮官方 check。");
+				toast.error(
+					t("training.actions.allCheck.toast.failed"),
+					t("training.actions.allCheck.toast.failedDesc"),
+				);
 			}
 			onChanged();
 		},
-		onError: (error) => toast.apiError("ALL Check 失败", error),
+		onError: (error) => toast.apiError(t("training.actions.allCheck.toast.error"), error),
 	});
 
 	const sourceMutation = useMutation({
@@ -416,22 +519,22 @@ export function TrainingActionPanel({
 			call<string>(client.awdp.runs.sourceUrl(runId, gameboxId), "获取源码地址"),
 		onSuccess: (url) => {
 			if (!url) {
-				toast.error("后端未返回下载地址");
+				toast.error(t("training.actions.source.missingUrl"));
 				return;
 			}
 			// presigned URL 直接交给浏览器，不 fetch 到内存。
 			window.open(url, "_blank", "noopener,noreferrer");
-			toast.success("已打开源码下载");
+			toast.success(t("training.actions.source.opened"));
 		},
-		onError: (error) => toast.apiError("获取源码地址失败", error),
+		onError: (error) => toast.apiError(t("training.actions.source.failed"), error),
 	});
 
 	return (
 		<div className="space-y-5">
 			<SectionCard
-				title="Break：提交 flag"
-				description="在 Break 阶段攻破靶机并提交 flag。"
-				actions={<TonePill tone={runPhaseTone(phase)}>{runPhaseLabel(phase)}</TonePill>}
+				title={t("training.actions.break.title")}
+				description={t("training.actions.break.description")}
+				actions={<TonePill tone={runPhaseTone(phase)}>{runPhaseLabel(phase, t)}</TonePill>}
 			>
 				<form
 					className="space-y-3"
@@ -466,44 +569,60 @@ export function TrainingActionPanel({
 									flag.trim().length === 0
 								}
 							>
-								<FlaskConical /> 提交
+								{breakMutation.isPending ? (
+									<Loader2 className="animate-spin" aria-hidden="true" />
+								) : (
+									<FlaskConical aria-hidden="true" />
+								)}
+								{t("training.actions.break.submit")}
 							</Button>
 						</div>
 					</Field>
 				</form>
 				{breakResult ? (
-					<div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs">
-						<span className="text-muted-foreground">后端返回：</span>
+					<div
+						className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+						aria-live="polite"
+					>
+						<span className="text-muted-foreground">
+							{t("training.actions.break.result")}
+						</span>
 						<TonePill tone={breakResult.accepted ? "success" : "danger"}>
-							{breakResult.accepted ? "已接受" : "未接受"}
+							{breakResult.accepted
+								? t("training.actions.break.accepted")
+								: t("training.actions.break.rejected")}
 						</TonePill>
 						<TonePill tone={breakResult.scored ? "success" : "muted"}>
-							{breakResult.scored ? "已计分" : "未计分"}
+							{breakResult.scored
+								? t("training.actions.break.scored")
+								: t("training.actions.break.notScored")}
 						</TonePill>
 						<TonePill tone={breakResult.already_broken ? "warning" : "muted"}>
-							{breakResult.already_broken ? "此前已攻破" : "首次攻破"}
+							{breakResult.already_broken
+								? t("training.actions.break.alreadyBroken")
+								: t("training.actions.break.firstBroken")}
 						</TonePill>
 					</div>
 				) : null}
 			</SectionCard>
 
 			<SectionCard
-				title="Fix：补丁 / 自检 / 全量校验"
-				description="上传 patch.sh 修复漏洞；Test Check 自检；ALL Check 一键官方判定。"
+				title={t("training.actions.fix.title")}
+				description={t("training.actions.fix.description")}
 			>
 				<div className="space-y-4">
 					<Field
-						label="patch.sh"
+						label={t("training.actions.fix.patchLabel")}
 						htmlFor="training-patch"
 						error={!patchGate.allowed ? patchGate.reason : undefined}
-						hint="multipart 字段名为 patch_file；不要手动设置 Content-Type。"
+						hint={t("training.actions.fix.patchHint")}
 					>
 						<div className="flex flex-wrap items-center gap-2">
 							<Input
 								id="training-patch"
 								ref={fileRef}
 								type="file"
-								className="max-w-sm"
+								className="hidden"
 								disabled={!patchGate.allowed || patchMutation.isPending}
 								onChange={(event) => {
 									const file = event.target.files?.[0];
@@ -516,18 +635,32 @@ export function TrainingActionPanel({
 								disabled={!patchGate.allowed || patchMutation.isPending}
 								onClick={() => fileRef.current?.click()}
 							>
-								<FileUp /> 选择并上传
+								{patchMutation.isPending ? (
+									<Loader2 className="animate-spin" aria-hidden="true" />
+								) : (
+									<FileUp aria-hidden="true" />
+								)}
+								{t("training.actions.fix.chooseUpload")}
 							</Button>
 						</div>
 					</Field>
 					{patchResult ? (
-						<div className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs">
-							<span className="text-muted-foreground">补丁结果：</span>
+						<div
+							className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+							aria-live="polite"
+						>
+							<span className="text-muted-foreground">
+								{t("training.actions.fix.patchResult")}
+							</span>
 							<TonePill tone={patchResult.status === "applied" ? "success" : "danger"}>
-								{patchResult.status === "applied" ? "已应用" : "应用失败"}
+								{patchResult.status === "applied"
+									? t("training.actions.fix.applied")
+									: t("training.actions.fix.failed")}
 							</TonePill>
 							{patchResult.error_message ? (
-								<span className="text-destructive">{patchResult.error_message}</span>
+								<span className="min-w-0 break-words text-destructive">
+									{patchResult.error_message}
+								</span>
 							) : null}
 						</div>
 					) : null}
@@ -537,38 +670,61 @@ export function TrainingActionPanel({
 							variant="outline"
 							size="sm"
 							disabled={!testGate.allowed || checkMutation.isPending}
-							title={testGate.allowed ? "运行 healthcheck + judge + exploit 诊断" : testGate.reason}
+							title={testGate.allowed ? t("training.actions.test.title") : testGate.reason}
 							onClick={() => checkMutation.mutate()}
 						>
-							<Activity /> Test Check
+							{checkMutation.isPending ? (
+								<Loader2 className="animate-spin" aria-hidden="true" />
+							) : (
+								<Activity aria-hidden="true" />
+							)}
+							{t("training.actions.test.label")}
 						</Button>
 						<Button
 							variant="outline"
 							size="sm"
 							disabled={!allGate.allowed || allCheckMutation.isPending}
-							title={allGate.allowed ? "一键官方判定：通过即结束本 run" : allGate.reason}
+							title={
+								allGate.allowed
+									? t("training.actions.allCheck.title")
+									: allGate.reason
+							}
 							onClick={async () => {
 								// ALL Check 通过会直接结束本 run（剩余回合全部计分）→ 破坏性，需确认。
 								const ok = await confirm({
-									title: "执行 ALL Check（一键官方判定）？",
-									description: "立即用官方流程判定当前补丁；一旦通过，本 run 会直接结束。",
-									consequences: RUN_ALL_CHECK_CONSEQUENCES,
+									title: t("training.confirm.allCheck.title"),
+									description: t("training.confirm.allCheck.description"),
+									consequences: runAllCheckConsequences(t),
 									tone: "danger",
-									confirmText: "执行 ALL Check",
+									confirmText: t("training.confirm.allCheck.confirmText"),
 								});
 								if (ok) allCheckMutation.mutate();
 							}}
 						>
-							<CheckCircle2 /> ALL Check
+							{allCheckMutation.isPending ? (
+								<Loader2 className="animate-spin" aria-hidden="true" />
+							) : (
+								<CheckCircle2 aria-hidden="true" />
+							)}
+							{t("training.actions.allCheck.label")}
 						</Button>
 						<Button
 							variant="outline"
 							size="sm"
 							disabled={!sourceGate.allowed || sourceMutation.isPending}
-							title={sourceGate.allowed ? "下载源码压缩包" : sourceGate.reason}
+							title={
+								sourceGate.allowed
+									? t("training.actions.source.title")
+									: sourceGate.reason
+							}
 							onClick={() => sourceMutation.mutate()}
 						>
-							<Download /> 下载源码
+							{sourceMutation.isPending ? (
+								<Loader2 className="animate-spin" aria-hidden="true" />
+							) : (
+								<Download aria-hidden="true" />
+							)}
+							{t("training.actions.source.label")}
 						</Button>
 					</div>
 					{!testGate.allowed ? (
@@ -582,57 +738,91 @@ export function TrainingActionPanel({
 					) : null}
 
 					{checkResult ? (
-						<div className="space-y-2 rounded-md border px-3 py-2 text-xs">
-							<p className="font-medium">
-								自检结果（评估 <MonoText>{checkResult.evaluation_id}</MonoText>）
-							</p>
+						<div
+							className="space-y-2 rounded-lg border px-3 py-2 text-xs"
+							aria-live="polite"
+						>
+							<div className="flex flex-wrap items-center gap-2">
+								<span className="font-medium">
+									{t("training.actions.test.resultTitle")}
+								</span>
+								<span className="text-muted-foreground">
+									{t("training.actions.test.evaluationId")}
+								</span>
+								<MonoText>{checkResult.evaluation_id}</MonoText>
+							</div>
 							<ul className="space-y-1">
 								<li className="flex items-center gap-2">
 									{checkResult.healthcheck_ok ? (
-										<CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+										<CheckCircle2
+											className="size-4 text-emerald-600 dark:text-emerald-400"
+											aria-hidden="true"
+										/>
 									) : (
-										<XCircle className="size-3.5 text-destructive" />
+										<XCircle className="size-4 text-destructive" aria-hidden="true" />
 									)}
-									<span>Healthcheck：{checkResult.healthcheck_ok ? "通过" : "未通过"}</span>
+									<span>
+										{t("training.actions.test.healthcheck", {
+											result: checkResult.healthcheck_ok
+												? t("training.actions.test.pass")
+												: t("training.actions.test.fail"),
+										})}
+									</span>
 								</li>
 								<li className="flex items-center gap-2">
 									{checkResult.judge_ok ? (
-										<CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+										<CheckCircle2
+											className="size-4 text-emerald-600 dark:text-emerald-400"
+											aria-hidden="true"
+										/>
 									) : (
-										<XCircle className="size-3.5 text-destructive" />
+										<XCircle className="size-4 text-destructive" aria-hidden="true" />
 									)}
-									<span>Judge：{checkResult.judge_ok ? "通过" : "未通过"}</span>
+									<span>
+										{t("training.actions.test.judge", {
+											result: checkResult.judge_ok
+												? t("training.actions.test.pass")
+												: t("training.actions.test.fail"),
+										})}
+									</span>
 								</li>
 								<li className="flex items-center gap-2">
 									{checkResult.exploit_ok === null ? (
-										<TonePill tone="muted">未执行</TonePill>
+										<TonePill tone="muted">
+											{t("training.actions.test.exploitSkipped")}
+										</TonePill>
 									) : checkResult.exploit_ok ? (
-										<XCircle className="size-3.5 text-destructive" />
+										<XCircle className="size-4 text-destructive" aria-hidden="true" />
 									) : (
-										<CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+										<CheckCircle2
+											className="size-4 text-emerald-600 dark:text-emerald-400"
+											aria-hidden="true"
+										/>
 									)}
 									<span>
-										Exploit：
-										{checkResult.exploit_ok === null
-											? "未执行到该步骤"
-											: checkResult.exploit_ok
-												? "漏洞仍可利用（不计分）"
-												: "已不可利用"}
+										{t("training.actions.test.exploit", {
+											result:
+												checkResult.exploit_ok === null
+													? t("training.actions.test.exploitNotRun")
+													: checkResult.exploit_ok
+														? t("training.actions.test.exploitStillVulnerable")
+														: t("training.actions.test.exploitFixed"),
+										})}
 									</span>
 								</li>
 							</ul>
 							{checkResult.healthcheck_detail?.length ? (
-								<pre className="max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-[11px] whitespace-pre-wrap">
+								<pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
 									{checkResult.healthcheck_detail.join("\n")}
 								</pre>
 							) : null}
 							{checkResult.judge_detail ? (
-								<pre className="max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-[11px] whitespace-pre-wrap">
+								<pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
 									{checkResult.judge_detail}
 								</pre>
 							) : null}
 							{checkResult.exploit_detail ? (
-								<pre className="max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-[11px] whitespace-pre-wrap">
+								<pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
 									{checkResult.exploit_detail}
 								</pre>
 							) : null}
@@ -640,35 +830,47 @@ export function TrainingActionPanel({
 					) : null}
 
 					{allCheckResult ? (
-						<div className="space-y-2 rounded-md border px-3 py-2 text-xs">
+						<div
+							className="space-y-2 rounded-lg border px-3 py-2 text-xs"
+							aria-live="polite"
+						>
 							<div className="flex flex-wrap items-center gap-2">
-								<span className="text-muted-foreground">ALL Check 终态：</span>
+								<span className="text-muted-foreground">
+									{t("training.actions.allCheck.finalStatus")}
+								</span>
 								<TonePill
 									tone={allCheckResult.status === "patched" ? "success" : "danger"}
 								>
-									{runEvaluationLabel(allCheckResult.status)}
+									{runEvaluationLabel(allCheckResult.status, t)}
 								</TonePill>
-								<TonePill tone={allCheckResult.swept ? "success" : "muted"}>
+								<TonePill
+									tone={allCheckResult.swept ? "success" : "muted"}
+									className="tnum"
+								>
 									{allCheckResult.swept
-										? `剩余回合已全部计分（${allCheckResult.swept_rounds}）`
-										: "未扫尾计分"}
+										? t("training.actions.allCheck.swept", {
+												count: allCheckResult.swept_rounds,
+											})
+										: t("training.actions.allCheck.notSwept")}
 								</TonePill>
 								<span className="tnum text-muted-foreground">
-									目标回合 #{allCheckResult.target_round}
+									{t("training.actions.allCheck.targetRound", {
+										round: allCheckResult.target_round,
+									})}
 								</span>
 							</div>
 							{allCheckResult.healthcheck_detail ? (
-								<pre className="max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-[11px] whitespace-pre-wrap">
+								<pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
 									{allCheckResult.healthcheck_detail}
 								</pre>
 							) : null}
 							{allCheckResult.judge_detail ? (
-								<pre className="max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-[11px] whitespace-pre-wrap">
+								<pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
 									{allCheckResult.judge_detail}
 								</pre>
 							) : null}
 							{allCheckResult.exploit_detail ? (
-								<pre className="max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-[11px] whitespace-pre-wrap">
+								<pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
 									{allCheckResult.exploit_detail}
 								</pre>
 							) : null}
@@ -682,6 +884,7 @@ export function TrainingActionPanel({
 
 /** 轮次与评测。 */
 export function RunRoundsEvaluationsPanel({ runId }: { runId: string }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const roundsQuery = useQuery({
@@ -705,19 +908,22 @@ export function RunRoundsEvaluationsPanel({ runId }: { runId: string }): ReactNo
 
 	return (
 		<div className="space-y-5">
-			<SectionCard title="Fix 回合" description="每个回合 cutoff 时后端对在跑实例做官方判定。">
+			<SectionCard
+				title={t("training.rounds.title")}
+				description={t("training.rounds.description")}
+			>
 				{roundsQuery.isPending ? (
 					<TableSkeleton rows={3} columns={3} />
 				) : roundsQuery.isError ? (
 					<ErrorBlock
 						error={roundsQuery.error}
-						title="加载回合失败"
+						title={t("training.rounds.loadError")}
 						onRetry={() => void roundsQuery.refetch()}
 					/>
 				) : (roundsQuery.data ?? []).length === 0 ? (
 					<EmptyBlock
-						title="暂无回合"
-						description="进入 Fix 阶段后，后端会物化回合时间线。"
+						title={t("training.rounds.emptyTitle")}
+						description={t("training.rounds.emptyDescription")}
 					/>
 				) : (
 					<DataTable
@@ -726,13 +932,13 @@ export function RunRoundsEvaluationsPanel({ runId }: { runId: string }): ReactNo
 						columns={[
 							{
 								id: "sequence",
-								header: "回合",
+								header: t("training.rounds.columns.round"),
 								sortValue: (row) => row.sequence,
 								cell: (row) => <MonoText>#{row.sequence}</MonoText>,
 							},
 							{
 								id: "cutoff",
-								header: "截止",
+								header: t("training.rounds.columns.cutoff"),
 								sortValue: (row) => row.cutoff_at,
 								cell: (row) => (
 									<span className="tnum text-xs">
@@ -742,7 +948,7 @@ export function RunRoundsEvaluationsPanel({ runId }: { runId: string }): ReactNo
 							},
 							{
 								id: "status",
-								header: "状态",
+								header: t("training.rounds.columns.status"),
 								sortValue: (row) => row.status,
 								cell: (row) => <MonoText>{row.status}</MonoText>,
 							},
@@ -752,21 +958,21 @@ export function RunRoundsEvaluationsPanel({ runId }: { runId: string }): ReactNo
 			</SectionCard>
 
 			<SectionCard
-				title="我的评测"
-				description="manual = Test Check；official = 回合官方判定。"
+				title={t("training.evaluations.title")}
+				description={t("training.evaluations.description")}
 			>
 				{evaluationsQuery.isPending ? (
 					<TableSkeleton rows={4} columns={4} />
 				) : evaluationsQuery.isError ? (
 					<ErrorBlock
 						error={evaluationsQuery.error}
-						title="加载评测失败"
+						title={t("training.evaluations.loadError")}
 						onRetry={() => void evaluationsQuery.refetch()}
 					/>
 				) : (evaluationsQuery.data ?? []).length === 0 ? (
 					<EmptyBlock
-						title="暂无评测记录"
-						description="运行一次 Test Check 或等本轮官方判定后会出现在这里。"
+						title={t("training.evaluations.emptyTitle")}
+						description={t("training.evaluations.emptyDescription")}
 					/>
 				) : (
 					<DataTable
@@ -775,7 +981,7 @@ export function RunRoundsEvaluationsPanel({ runId }: { runId: string }): ReactNo
 						columns={[
 							{
 								id: "round",
-								header: "回合",
+								header: t("training.evaluations.columns.round"),
 								sortValue: (row) => row.round_sequence ?? 0,
 								cell: (row) => (
 									<MonoText>
@@ -785,27 +991,29 @@ export function RunRoundsEvaluationsPanel({ runId }: { runId: string }): ReactNo
 							},
 							{
 								id: "kind",
-								header: "类型",
+								header: t("training.evaluations.columns.kind"),
 								sortValue: (row) => row.kind,
 								cell: (row) => (
 									<TonePill tone={row.kind === "official" ? "info" : "muted"}>
-										{row.kind === "official" ? "官方" : "自检"}
+										{row.kind === "official"
+											? t("training.evaluation.kind.official")
+											: t("training.evaluation.kind.manual")}
 									</TonePill>
 								),
 							},
 							{
 								id: "status",
-								header: "结果",
+								header: t("training.evaluations.columns.result"),
 								sortValue: (row) => row.status,
 								cell: (row) => (
 									<TonePill tone={runEvaluationTone(row.status)}>
-										{runEvaluationLabel(row.status)}
+										{runEvaluationLabel(row.status, t)}
 									</TonePill>
 								),
 							},
 							{
 								id: "finished",
-								header: "完成时间",
+								header: t("training.evaluations.columns.finished"),
 								hideBelow: "md",
 								sortValue: (row) => row.finished_at ?? "",
 								cell: (row) => (
@@ -826,6 +1034,7 @@ export function RunRoundsEvaluationsPanel({ runId }: { runId: string }): ReactNo
 
 /** 积分明细（append-only ledger）。 */
 export function RunScoresPanel({ runId }: { runId: string }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const query = useQuery({
 		queryKey: qk.runs.scores(runId),
@@ -835,22 +1044,26 @@ export function RunScoresPanel({ runId }: { runId: string }): ReactNode {
 	if (query.isPending) return <TableSkeleton rows={4} columns={5} />;
 	if (query.isError) {
 		return (
-			<ErrorBlock error={query.error} title="加载积分失败" onRetry={() => void query.refetch()} />
+			<ErrorBlock
+				error={query.error}
+				title={t("training.scores.loadError")}
+				onRetry={() => void query.refetch()}
+			/>
 		);
 	}
 	const data = query.data;
 	if (!data || data.history.length === 0) {
 		return (
 			<EmptyBlock
-				title="暂无积分记录"
-				description="Break 攻破或 Fix 回合判定成功后会写入计分账本。"
+				title={t("training.scores.emptyTitle")}
+				description={t("training.scores.emptyDescription")}
 			/>
 		);
 	}
 	return (
 		<div className="space-y-3">
 			<div className="flex items-center gap-2">
-				<span className="text-xs text-muted-foreground">当前总分</span>
+				<span className="text-xs text-muted-foreground">{t("training.scores.total")}</span>
 				<MonoText className="text-base font-semibold">{formatScore(data.total)}</MonoText>
 			</div>
 			<DataTable
@@ -859,7 +1072,7 @@ export function RunScoresPanel({ runId }: { runId: string }): ReactNode {
 				columns={[
 					{
 						id: "type",
-						header: "类型",
+						header: t("training.scores.columns.type"),
 						sortValue: (row) => row.score_type,
 						cell: (row) => (
 							<TonePill tone={row.score_type === "break" ? "info" : "success"}>
@@ -869,7 +1082,7 @@ export function RunScoresPanel({ runId }: { runId: string }): ReactNode {
 					},
 					{
 						id: "delta",
-						header: "分值",
+						header: t("training.scores.columns.delta"),
 						align: "right",
 						sortValue: (row) => row.delta,
 						cell: (row) => (
@@ -880,19 +1093,24 @@ export function RunScoresPanel({ runId }: { runId: string }): ReactNode {
 					},
 					{
 						id: "round",
-						header: "回合",
+						header: t("training.scores.columns.round"),
 						hideBelow: "sm",
 						sortValue: (row) => row.fix_round_id ?? "",
 						cell: (row) => (
-							<MonoText className="text-muted-foreground">
-								{row.fix_round_id ? "回合判定" : "—"}
-							</MonoText>
+							<span className="text-xs text-muted-foreground">
+								{row.fix_round_id ? t("training.scores.roundJudgement") : "—"}
+							</span>
 						),
 					},
-					{ id: "gamebox", header: "靶机", hideBelow: "md", cell: (row) => <MonoText>{row.gamebox_id}</MonoText> },
+					{
+						id: "gamebox",
+						header: t("training.scores.columns.gamebox"),
+						hideBelow: "md",
+						cell: (row) => <MonoText>{row.gamebox_id}</MonoText>,
+					},
 					{
 						id: "created",
-						header: "时间",
+						header: t("training.scores.columns.created"),
 						sortValue: (row) => row.created_at,
 						cell: (row) => (
 							<span className="tnum text-xs text-muted-foreground">
@@ -908,6 +1126,7 @@ export function RunScoresPanel({ runId }: { runId: string }): ReactNode {
 
 /** Writeup 读写（一 run 一份）。 */
 export function RunWriteupPanel({ runId }: { runId: string }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	// `null` = 用户尚未编辑；非 null 时以本地草稿为准，避免 refetch 覆盖输入。
@@ -933,20 +1152,22 @@ export function RunWriteupPanel({ runId }: { runId: string }): ReactNode {
 			setDraft(null);
 			queryClient.setQueryData(qk.runs.writeup(runId), result);
 			void queryClient.invalidateQueries({ queryKey: qk.runs.writeup(runId) });
-			toast.success("Writeup 已保存");
+			toast.success(t("training.writeup.toast.saved"));
 		},
-		onError: (error) => toast.apiError("保存 Writeup 失败", error),
+		onError: (error) => toast.apiError(t("training.writeup.toast.failed"), error),
 	});
 
 	return (
 		<SectionCard
-			title="我的 Writeup"
-			description="记录破题与修复思路（Markdown，支持插图）。一个 run 一份。"
+			title={t("training.writeup.title")}
+			description={t("training.writeup.description")}
 			actions={
 				<div className="flex items-center gap-2">
 					{query.data?.updated_at ? (
 						<span className="tnum text-xs text-muted-foreground">
-							更新于 {formatDateTime(query.data.updated_at, { seconds: true })}
+							{t("training.writeup.updatedAt", {
+								time: formatDateTime(query.data.updated_at, { seconds: true }),
+							})}
 						</span>
 					) : null}
 					<Button
@@ -954,7 +1175,12 @@ export function RunWriteupPanel({ runId }: { runId: string }): ReactNode {
 						disabled={!dirty || mutation.isPending || query.isPending}
 						onClick={() => mutation.mutate(value)}
 					>
-						<Save /> 保存
+						{mutation.isPending ? (
+							<Loader2 className="animate-spin" aria-hidden="true" />
+						) : (
+							<Save aria-hidden="true" />
+						)}
+						{t("training.writeup.save")}
 					</Button>
 				</div>
 			}
@@ -964,7 +1190,7 @@ export function RunWriteupPanel({ runId }: { runId: string }): ReactNode {
 			) : query.isError ? (
 				<ErrorBlock
 					error={query.error}
-					title="加载 Writeup 失败"
+					title={t("training.writeup.loadError")}
 					onRetry={() => void query.refetch()}
 				/>
 			) : (
@@ -973,10 +1199,12 @@ export function RunWriteupPanel({ runId }: { runId: string }): ReactNode {
 						value={value}
 						onChange={setDraft}
 						minHeight={320}
-						placeholder="记录你如何发现并利用漏洞、如何修复，以及验证结果…"
+						placeholder={t("training.writeup.placeholder")}
 					/>
 					{dirty ? (
-						<p className="text-xs text-muted-foreground">有未保存的修改。</p>
+						<p className="text-xs text-muted-foreground">
+							{t("training.writeup.unsaved")}
+						</p>
 					) : null}
 				</div>
 			)}

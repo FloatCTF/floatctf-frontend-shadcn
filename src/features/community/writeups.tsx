@@ -12,6 +12,8 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, BookOpen, ExternalLink, Mail } from "lucide-react";
 
@@ -43,8 +45,10 @@ import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
 
 import { SearchField } from "./components";
 
-function writeupTypeLabel(type: UnifiedWriteupResult["writeup_type"]): string {
-	return type === "gamebox" ? "GameBox" : "Challenge";
+function writeupTypeLabel(t: TFunction, type: UnifiedWriteupResult["writeup_type"]): string {
+	return type === "gamebox"
+		? t("community.writeups.type.gamebox")
+		: t("community.writeups.type.challenge");
 }
 
 function writeupTypeTone(type: UnifiedWriteupResult["writeup_type"]): "info" | "success" {
@@ -53,7 +57,8 @@ function writeupTypeTone(type: UnifiedWriteupResult["writeup_type"]): "info" | "
 
 /** 题解列表：接口一次返回全部，视图内搜索 + 分页。 */
 export function WriteupsPage(): ReactNode {
-	useDocumentTitle("题解 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("community.writeups.documentTitle"));
 	const client = useClient();
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
@@ -82,7 +87,7 @@ export function WriteupsPage(): ReactNode {
 	const columns: DataTableColumn<UnifiedWriteupResult>[] = [
 		{
 			id: "content_name",
-			header: "内容",
+			header: t("community.writeups.columns.content"),
 			sortValue: (row) => row.content_name,
 			cell: (row) => (
 				<Link to={`/writeups/${row.id}`} className="text-sm font-medium hover:underline">
@@ -92,18 +97,18 @@ export function WriteupsPage(): ReactNode {
 		},
 		{
 			id: "writeup_type",
-			header: "类型",
+			header: t("community.writeups.columns.type"),
 			hideBelow: "sm",
 			sortValue: (row) => row.writeup_type,
 			cell: (row) => (
 				<TonePill tone={writeupTypeTone(row.writeup_type)}>
-					{writeupTypeLabel(row.writeup_type)}
+					{writeupTypeLabel(t, row.writeup_type)}
 				</TonePill>
 			),
 		},
 		{
 			id: "nickname",
-			header: "作者",
+			header: t("community.writeups.columns.author"),
 			sortValue: (row) => row.nickname,
 			cell: (row) => (
 				<UserCell
@@ -116,7 +121,7 @@ export function WriteupsPage(): ReactNode {
 		},
 		{
 			id: "email",
-			header: "邮箱",
+			header: t("community.writeups.columns.email"),
 			hideBelow: "lg",
 			sortValue: (row) => row.email,
 			cell: (row) =>
@@ -125,16 +130,16 @@ export function WriteupsPage(): ReactNode {
 						href={`mailto:${row.email}`}
 						className="inline-flex items-center gap-1 text-xs hover:underline"
 					>
-						<Mail className="size-3.5" />
+						<Mail aria-hidden="true" className="size-4" />
 						{row.email}
 					</a>
 				) : (
-					<span className="text-xs text-muted-foreground">—</span>
+					<span className="text-xs text-muted-foreground">{t("common.empty")}</span>
 				),
 		},
 		{
 			id: "updated_at",
-			header: "更新",
+			header: t("community.writeups.columns.updatedAt"),
 			align: "right",
 			sortValue: (row) => row.updated_at,
 			cell: (row) => <RelativeTime value={row.updated_at} />,
@@ -144,20 +149,20 @@ export function WriteupsPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="题解"
-				description="全站公开题解与自己的 AWDP 练习题解。后端接口一次性返回全部条目，搜索与分页在视图内完成。"
-				badge={<TonePill tone="info">Writeup</TonePill>}
+				title={t("community.writeups.title")}
+				description={t("community.writeups.subtitle")}
+				badge={<TonePill tone="info">{t("community.writeups.badge")}</TonePill>}
 			/>
 
 			<SectionCard
-				title="题解列表"
-				description="可按题目名 / 作者 / 邮箱在已加载数据中检索。"
+				title={t("community.writeups.section.title")}
+				description={t("community.writeups.section.description")}
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
 						<SearchField
 							value={search}
-							placeholder="搜索题目、作者或邮箱…"
+							placeholder={t("community.writeups.search.placeholder")}
 							onChange={(value) => {
 								setSearch(value);
 								setPage(1);
@@ -182,28 +187,31 @@ export function WriteupsPage(): ReactNode {
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={5} />}
-					errorTitle="加载题解失败"
+					errorTitle={t("community.writeups.errors.load")}
 					// 搜索是视图内的：过滤后为空也要走空态（而不是让表格显示空白）。
 					isEmpty={() => filtered.length === 0}
 					empty={
 						trimmed === "" ? (
 							<EmptyBlock
-								title="还没有公开题解"
-								description="在题目工作台提交题解后，这里会展示出来。"
-								icon={<BookOpen className="size-5" />}
+								title={t("community.writeups.empty.title")}
+								description={t("community.writeups.empty.description")}
+								icon={<BookOpen aria-hidden="true" />}
 								action={
 									<Button size="sm" asChild>
-										<Link to="/challenges">去题库</Link>
+										<Link to="/challenges">{t("community.writeups.empty.action")}</Link>
 									</Button>
 								}
 							/>
 						) : (
 							<EmptyBlock
 								variant="filtered"
-								description={`已加载的 ${query.data?.items.length ?? 0} 条题解里没有匹配「${debouncedSearch.trim()}」的条目。`}
+								description={t("community.writeups.filtered.description", {
+									count: query.data?.items.length ?? 0,
+									query: debouncedSearch.trim(),
+								})}
 								action={
 									<Button size="sm" variant="outline" onClick={() => setSearch("")}>
-										清除搜索
+										{t("community.writeups.filtered.clear")}
 									</Button>
 								}
 							/>
@@ -225,7 +233,7 @@ export function WriteupsPage(): ReactNode {
 											{row.content_name}
 										</Link>
 										<TonePill tone={writeupTypeTone(row.writeup_type)}>
-											{writeupTypeLabel(row.writeup_type)}
+											{writeupTypeLabel(t, row.writeup_type)}
 										</TonePill>
 									</div>
 									<UserCell
@@ -250,6 +258,7 @@ export function WriteupsPage(): ReactNode {
 
 /** 题解详情：challenge 与 gamebox 统一渲染。 */
 export function WriteupDetailPage(): ReactNode {
+	const { t } = useTranslation();
 	const params = useParams<{ id: string }>();
 	const writeupId = params.id ?? "";
 	const client = useClient();
@@ -259,18 +268,22 @@ export function WriteupDetailPage(): ReactNode {
 		queryFn: () =>
 			call<UnifiedWriteupDetail>(
 				client.service.challenges.getWriteup(writeupId),
-				"题解详情",
+				t("community.requests.writeupDetail"),
 			),
 		enabled: writeupId !== "",
 	});
 
 	const writeup = query.data;
-	useDocumentTitle(writeup ? `${writeup.content_name} 题解 · FloatCTF` : "题解详情 · FloatCTF");
+	useDocumentTitle(
+		writeup
+			? t("community.writeups.detail.documentTitle", { title: writeup.content_name })
+			: t("community.writeups.detail.documentTitleFallback"),
+	);
 
 	return (
 		<PageBody>
 			<PageHeader
-				title={writeup?.content_name ?? "题解详情"}
+				title={writeup?.content_name ?? t("community.writeups.detail.titleFallback")}
 				description={
 					writeup ? (
 						<span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -283,26 +296,28 @@ export function WriteupDetailPage(): ReactNode {
 								<span className="text-foreground">{writeup.nickname}</span>
 							</span>
 							<span className="text-xs text-muted-foreground">
-								更新于 <RelativeTime value={writeup.updated_at} />
+								{t("community.writeups.detail.updatedLabel")}{" "}
+								<RelativeTime value={writeup.updated_at} />
 							</span>
 							<span className="text-xs text-muted-foreground">
-								创建于 <RelativeTime value={writeup.created_at} />
+								{t("community.writeups.detail.createdLabel")}{" "}
+								<RelativeTime value={writeup.created_at} />
 							</span>
 						</span>
 					) : (
-						"选手分享的解题过程。"
+						t("community.writeups.detail.subtitleFallback")
 					)
 				}
 				badge={
 					writeup ? (
 						<TonePill tone={writeupTypeTone(writeup.writeup_type)}>
-							{writeupTypeLabel(writeup.writeup_type)}
+							{writeupTypeLabel(t, writeup.writeup_type)}
 						</TonePill>
 					) : null
 				}
 				breadcrumbs={
 					<Link to="/writeups" className="inline-flex items-center gap-1 hover:underline">
-						<ArrowLeft className="size-3.5" /> 返回题解列表
+						<ArrowLeft aria-hidden="true" className="size-4" /> {t("community.writeups.detail.back")}
 					</Link>
 				}
 				actions={
@@ -311,13 +326,13 @@ export function WriteupDetailPage(): ReactNode {
 							{writeup.writeup_type === "challenge" ? (
 								<Button variant="outline" asChild>
 									<Link to={`/challenges/${writeup.content_id}`}>
-										<ExternalLink /> 打开题目
+										<ExternalLink aria-hidden="true" /> {t("community.writeups.detail.openChallenge")}
 									</Link>
 								</Button>
 							) : (
 								<Button variant="outline" asChild>
 									<Link to={`/training/runs/${writeup.id}`}>
-										<ExternalLink /> 打开训练 Run
+										<ExternalLink aria-hidden="true" /> {t("community.writeups.detail.openRun")}
 									</Link>
 								</Button>
 							)}
@@ -328,18 +343,18 @@ export function WriteupDetailPage(): ReactNode {
 
 			<QueryState
 				query={query}
-				skeleton={<LoadingBlock label="加载题解…" />}
-				errorTitle="加载题解失败"
+				skeleton={<LoadingBlock label={t("community.writeups.detail.loading")} />}
+				errorTitle={t("community.writeups.detail.loadError")}
 			>
 				{(data) => (
 					<div className="space-y-5">
 						<SectionCard
-							title="元信息"
-							description="题解归属与作者信息由后端返回。"
+							title={t("community.writeups.detail.metaTitle")}
+							description={t("community.writeups.detail.metaDescription")}
 						>
 							<div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
 								<span className="text-muted-foreground">
-									内容：
+									{t("community.writeups.detail.contentLabel")}
 									{data.writeup_type === "challenge" ? (
 										<Link
 											to={`/challenges/${data.content_id}`}
@@ -353,21 +368,25 @@ export function WriteupDetailPage(): ReactNode {
 									)}
 								</span>
 								<span className="text-muted-foreground">
-									作者：<span className="text-foreground">{data.nickname}</span>
+									{t("community.writeups.detail.authorLabel")}
+									<span className="text-foreground">{data.nickname}</span>
 								</span>
 								{data.email ? (
 									<a
 										href={`mailto:${data.email}`}
 										className="inline-flex items-center gap-1 text-muted-foreground hover:underline"
 									>
-										<Mail className="size-3.5" />
+										<Mail aria-hidden="true" className="size-4" />
 										{data.email}
 									</a>
 								) : null}
 							</div>
 						</SectionCard>
 
-						<SectionCard title="题解正文" description="Markdown 渲染，不执行原始 HTML。">
+						<SectionCard
+							title={t("community.writeups.detail.contentTitle")}
+							description={t("community.writeups.detail.contentDescription")}
+						>
 							<div className="rounded-md border bg-muted/20 px-4 py-3">
 								<MarkdownView>{data.content}</MarkdownView>
 							</div>

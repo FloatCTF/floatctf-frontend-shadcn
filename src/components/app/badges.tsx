@@ -14,9 +14,9 @@ export type PillTone = "neutral" | "muted" | "success" | "warning" | "danger" | 
 const toneClass: Record<PillTone, string> = {
 	neutral: "border-border bg-muted text-foreground",
 	muted: "border-transparent bg-transparent text-muted-foreground",
-	success: "border-transparent bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-	warning: "border-transparent bg-amber-500/20 text-amber-700 dark:text-amber-400",
-	danger: "border-transparent bg-destructive/15 text-destructive",
+	success: "border-transparent bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+	warning: "border-transparent bg-amber-500/10 text-amber-700 dark:text-amber-400",
+	danger: "border-transparent bg-destructive/10 text-destructive",
 	info: "border-transparent bg-sky-500/10 text-sky-700 dark:text-sky-400",
 };
 

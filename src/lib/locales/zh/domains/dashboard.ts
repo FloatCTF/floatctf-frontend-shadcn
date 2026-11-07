@@ -1,3 +1,108 @@
 /** dashboard 域文案（中文）。 */
 
-export default {} as Record<string, unknown>;
+export default {
+	page: {
+		documentTitle: "总览 · FloatCTF",
+		title: "总览",
+		greeting: "你好，{{name}}",
+		description: "你的赛事进度、平台动态与下一步动作。",
+		updatedAt: "更新于 {{time}}",
+		refresh: "刷新总览",
+		goSolve: "去解题",
+	},
+	stats: {
+		unavailable: "暂时无法加载",
+		myEvents: {
+			label: "我参加的赛事",
+			hintMore: "另有 {{count}} 场可加入",
+			hintNone: "暂无新的可加入赛事",
+		},
+		ongoing: {
+			label: "进行中的赛事",
+			hint: "按赛事时间窗实时判定",
+		},
+		solves: {
+			label: "我的练习解题",
+			hint: "题库练习记录，不含赛事解题",
+		},
+		announcements: {
+			label: "公告",
+			hint: "全站级通知",
+		},
+	},
+	family: {
+		jeopardy: "Jeopardy 解题",
+		awd: "AWD 攻防",
+		awdp: "AWDP 攻防",
+	},
+	status: {
+		upcoming: "未开始",
+		ongoing: "进行中",
+		ended: "已结束",
+		unknown: "时间未知",
+	},
+	myEvents: {
+		title: "我的赛事",
+		description: "已加入的赛事，点开进入赛事工作区。",
+		viewAll: "全部",
+		loading: "加载赛事…",
+		errorTitle: "加载赛事失败",
+		emptyTitle: "还没有加入任何赛事",
+		emptyDescription: "从赛事列表加入一场比赛；加入后这里会显示进度与状态。",
+		emptyAction: "浏览赛事",
+		columns: {
+			event: "赛事",
+			family: "赛制",
+			start: "开始时间",
+			status: "状态",
+		},
+	},
+	announcements: {
+		title: "全站公告",
+		description: "平台与赛事通知。",
+		viewAll: "全部公告",
+		loading: "加载公告…",
+		errorTitle: "加载公告失败",
+		emptyTitle: "暂无公告",
+		emptyDescription: "管理员发布全站公告后，会出现在这里。",
+		emptyAction: "公告中心",
+		columns: {
+			announcement: "公告",
+			publisher: "发布者",
+			publishedAt: "发布时间",
+		},
+	},
+	solves: {
+		title: "最近练习解题",
+		description: "你在题库练习中的解题记录（30 秒轮询；赛事解题不计入）。",
+		viewAll: "全部",
+		loading: "加载解题记录…",
+		errorTitle: "加载解题记录失败",
+		emptyTitle: "还没有练习解题记录",
+		emptyDescription: "在题库解出一道题后，这里会记录你的练习进度。",
+		emptyAction: "去题库",
+		columns: {
+			user: "选手",
+			challenge: "题目",
+			points: "得分",
+			time: "时间",
+		},
+		points: "+{{score}}",
+	},
+	top: {
+		title: "练习排行",
+		description: "系统练习赛事按解题数排名，展示前 8 名。",
+		viewAll: "完整榜单",
+		loading: "加载排行…",
+		errorTitle: "加载排行失败",
+		emptyTitle: "暂无排行数据",
+		emptyDescription: "练习赛事产生解出记录后，这里会显示前 8 名。",
+		emptyAction: "查看排行榜",
+		columns: {
+			rank: "排名",
+			user: "选手",
+			solved: "解出题数",
+		},
+		solvedCount: "{{count}} 题",
+	},
+} as const;

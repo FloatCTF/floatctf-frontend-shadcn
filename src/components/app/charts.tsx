@@ -5,6 +5,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import i18n from "~/lib/i18n";
 
 import { cn } from "~/lib/utils";
 
@@ -160,7 +161,7 @@ export function TrendChart({
 						className="fill-muted-foreground"
 						style={{ fontSize: 11 }}
 					>
-						{formatX ? formatX(tick) : new Date(tick).toLocaleTimeString("zh-CN", { hour12: false })}
+						{formatX ? formatX(tick) : new Date(tick).toLocaleTimeString(i18n.language === "en" ? "en-US" : "zh-CN", { hour12: false })}
 					</text>
 				))}
 

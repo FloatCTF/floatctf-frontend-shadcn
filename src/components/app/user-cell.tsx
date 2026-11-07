@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import i18n from "~/lib/i18n";
 import { formatRelative } from "~/lib/format";
 import { useNow } from "~/lib/hooks";
 import { cn } from "~/lib/utils";
@@ -87,7 +88,7 @@ export function AbsoluteTime({
 function formatDateTimeLocal(value: string, seconds: boolean): string {
 	const date = new Date(value);
 	if (Number.isNaN(date.getTime())) return value;
-	return date.toLocaleString("zh-CN", {
+	return date.toLocaleString(i18n.language === "en" ? "en-US" : "zh-CN", {
 		year: "numeric",
 		month: "2-digit",
 		day: "2-digit",

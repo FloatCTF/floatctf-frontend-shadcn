@@ -49,7 +49,7 @@ export function PageHeader({
 			<div className="flex flex-wrap items-start justify-between gap-3">
 				<div className="min-w-0 space-y-1">
 					<div className="flex flex-wrap items-center gap-2">
-						<h1 className="truncate text-xl font-semibold tracking-tight">{title}</h1>
+						<h1 className="truncate text-xl font-semibold tracking-tight" title={typeof title === "string" ? title : undefined}>{title}</h1>
 						{badge}
 					</div>
 					{description ? (
@@ -131,10 +131,10 @@ export function StatCard({
 		<Card>
 			<CardContent className="flex items-start justify-between gap-3">
 				<div className="min-w-0 space-y-1">
-					<p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+					<p className="text-xs font-medium text-muted-foreground">
 						{label}
 					</p>
-					<p className={cn("tnum text-2xl font-semibold", toneClass)}>{value}</p>
+					<p className={cn("tnum text-2xl font-medium", toneClass)}>{value}</p>
 					{hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
 				</div>
 				{icon ? <div className="text-muted-foreground">{icon}</div> : null}
@@ -331,6 +331,7 @@ export function PaginationBar({
 					disabled={page <= 1}
 					onClick={() => onPageChange(page - 1)}
 					aria-label={t("common.table.prevPage")}
+					title={t("common.table.prevPage")}
 				>
 					<ChevronLeft />
 				</Button>
@@ -343,6 +344,7 @@ export function PaginationBar({
 					disabled={page >= totalPages}
 					onClick={() => onPageChange(page + 1)}
 					aria-label={t("common.table.nextPage")}
+					title={t("common.table.nextPage")}
 				>
 					<ChevronRight />
 				</Button>

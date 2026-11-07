@@ -2,9 +2,11 @@
  * 选手端赛事 —— 列表 + **赛事工作区**（一个赛事一个工作区，能力以标签面板呈现）。
  *
  * 参赛门禁与后端一致：非「未开始」且未加入时不展示题目 / 积分榜 / 实例等工作区内容。
+ * 全部用户可见文案走 `events` 命名空间；状态判定仍由 `~/lib/event-status.ts` 提供。
  */
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, ChevronRight, Search } from "lucide-react";
@@ -18,7 +20,6 @@ import {
 	PageHeader,
 	PaginationBar,
 	SectionCard,
-	Toolbar,
 } from "~/components/app/page";
 import {
 	EmptyBlock,
@@ -39,12 +40,10 @@ import {
 } from "~/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import type { EventChallengeResult, EventInfo } from "@floatctf/sdk";
-import { formatRange } from "~/lib/format";
+import { formatRange, formatScore } from "~/lib/format";
 import {
-	EVENT_FAMILY_LABEL,
 	EVENT_STATUS_LABEL,
 	EVENT_STATUS_TONE,
-	PARTICIPANT_MODE_LABEL,
 	computeEventStatus,
 	eventCapabilities,
 	eventIdOf,
@@ -56,6 +55,7 @@ import {
 	JoinLeaveControl,
 	MemberGateNotice,
 	TeamPanel,
+	useEventLabels,
 } from "./components";
 import { ChallengeWorkbench } from "~/features/jeopardy/workbench";
 import {
@@ -72,7 +72,9 @@ import {
 /* ── 赛事列表 ───────────────────────────────────────────────────────────── */
 
 export function EventsListPage() {
-	useDocumentTitle("赛事 · FloatCTF");
+	const { t } = useTranslation();
+	const labels = useEventLabels();
+	useDocumentTitle(t("events.list.documentTitle"));
 	const client = useClient();
 	const now = useNow(30_000);
 	const [search, setSearch] = useState("");
@@ -121,7 +123,7 @@ export function EventsListPage() {
 	const columns: DataTableColumn<EventInfo>[] = [
 		{
 			id: "title",
-			header: "赛事",
+			header: t("events.list.columns.event"),
 			sortValue: (row) => row.event.title,
 			cell: (row) => (
 				<div className="min-w-0">
@@ -129,30 +131,27 @@ export function EventsListPage() {
 						{row.event.title}
 					</Link>
 					<p className="truncate text-xs text-muted-foreground">
-						{row.event.purpose === "practice" ? "练习" : "正式赛"} ·{" "}
-						{PARTICIPANT_MODE_LABEL[row.event.participant_mode] ?? row.event.participant_mode}
+						{labels.purpose(row.event.purpose)} · {labels.mode(row.event.participant_mode)}
 					</p>
 				</div>
 			),
 		},
 		{
 			id: "family",
-			header: "家族",
+			header: t("events.list.columns.family"),
 			sortValue: (row) => row.event.family,
-			cell: (row) => (
-				<TonePill tone="neutral">{EVENT_FAMILY_LABEL[row.event.family] ?? row.event.family}</TonePill>
-			),
+			cell: (row) => <TonePill tone="neutral">{labels.family(row.event.family)}</TonePill>,
 		},
 		{
 			id: "status",
-			header: "状态",
+			header: t("events.list.columns.status"),
 			sortValue: (row) =>
 				computeEventStatus(row.event.start_time, row.event.end_time ?? null, now.getTime()),
 			cell: (row) => <EventStatusPill event={row.event} />,
 		},
 		{
 			id: "window",
-			header: "时间窗",
+			header: t("events.list.columns.window"),
 			hideBelow: "lg",
 			cell: (row) => (
 				<span className="text-xs text-muted-foreground">
@@ -162,12 +161,12 @@ export function EventsListPage() {
 		},
 		{
 			id: "joined",
-			header: "参赛",
+			header: t("events.list.columns.joined"),
 			cell: (row) =>
 				row.joined ? (
-					<TonePill tone="success">已加入</TonePill>
+					<TonePill tone="success">{t("events.list.joined")}</TonePill>
 				) : (
-					<TonePill tone="muted">未加入</TonePill>
+					<TonePill tone="muted">{t("events.list.notJoined")}</TonePill>
 				),
 		},
 		{
@@ -177,7 +176,7 @@ export function EventsListPage() {
 			cell: (row) => (
 				<Button variant="ghost" size="sm" asChild>
 					<Link to={`/events/${eventIdOf(row)}`}>
-						打开 <ChevronRight />
+						{t("events.list.open")} <ChevronRight aria-hidden="true" />
 					</Link>
 				</Button>
 			),
@@ -187,72 +186,18 @@ export function EventsListPage() {
 	return (
 		<PageBody>
 			<PageHeader
-				title="赛事"
-				description="全部可见赛事。加入后进入赛事工作区解题 / 攻防。"
+				title={t("events.list.title")}
+				description={t("events.list.description")}
 			/>
 
 			<SectionCard
-				title="赛事列表"
-				description={query.isSuccess ? `共 ${items.length} 场，筛选后 ${filtered.length} 场` : undefined}
-				actions={
-					<Toolbar>
-						<div className="relative">
-							<Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground" />
-							<Input
-								value={search}
-								onChange={(event) => {
-									setSearch(event.target.value);
-									setPage(1);
-								}}
-								placeholder="搜索赛事标题"
-								className="w-52 pl-8"
-							/>
-						</div>
-						<Select
-							value={family}
-							onValueChange={(value) => {
-								setFamily(value);
-								setPage(1);
-							}}
-						>
-							<SelectTrigger className="w-40" aria-label="家族筛选">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="all">全部家族</SelectItem>
-								<SelectItem value="jeopardy">Jeopardy 解题</SelectItem>
-								<SelectItem value="awd">AWD 攻防</SelectItem>
-								<SelectItem value="awdp">AWDP 攻防</SelectItem>
-							</SelectContent>
-						</Select>
-						<Select
-							value={statusFilter}
-							onValueChange={(value) => {
-								setStatusFilter(value);
-								setPage(1);
-							}}
-						>
-							<SelectTrigger className="w-32" aria-label="状态筛选">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="all">全部状态</SelectItem>
-								<SelectItem value="upcoming">未开始</SelectItem>
-								<SelectItem value="ongoing">进行中</SelectItem>
-								<SelectItem value="ended">已结束</SelectItem>
-							</SelectContent>
-						</Select>
-						<Button
-							variant={onlyJoined ? "default" : "outline"}
-							size="sm"
-							onClick={() => {
-								setOnlyJoined((value) => !value);
-								setPage(1);
-							}}
-						>
-							只看我参加的
-						</Button>
-					</Toolbar>
+				title={t("events.list.cardTitle")}
+				description={
+					query.isSuccess ? (
+						<span className="tnum">
+							{t("events.list.count", { total: items.length, filtered: filtered.length })}
+						</span>
+					) : undefined
 				}
 				contentClassName="px-0"
 				footer={
@@ -270,16 +215,76 @@ export function EventsListPage() {
 					) : null
 				}
 			>
+				<div className="flex flex-wrap items-center gap-2 px-4 pb-4">
+					<div className="relative w-full sm:max-w-xs">
+						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							value={search}
+							onChange={(event) => {
+								setSearch(event.target.value);
+								setPage(1);
+							}}
+							placeholder={t("events.list.searchPlaceholder")}
+							aria-label={t("events.list.searchPlaceholder")}
+							className="w-full pl-8"
+						/>
+					</div>
+					<Select
+						value={family}
+						onValueChange={(value) => {
+							setFamily(value);
+							setPage(1);
+						}}
+					>
+						<SelectTrigger className="w-full sm:w-40" aria-label={t("events.list.familyFilter")}>
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="all">{t("events.family.all")}</SelectItem>
+							<SelectItem value="jeopardy">{t("events.family.jeopardy")}</SelectItem>
+							<SelectItem value="awd">{t("events.family.awd")}</SelectItem>
+							<SelectItem value="awdp">{t("events.family.awdp")}</SelectItem>
+						</SelectContent>
+					</Select>
+					<Select
+						value={statusFilter}
+						onValueChange={(value) => {
+							setStatusFilter(value);
+							setPage(1);
+						}}
+					>
+						<SelectTrigger className="w-full sm:w-32" aria-label={t("events.list.statusFilter")}>
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="all">{t("events.status.all")}</SelectItem>
+							<SelectItem value="upcoming">{t("events.status.upcoming")}</SelectItem>
+							<SelectItem value="ongoing">{t("events.status.ongoing")}</SelectItem>
+							<SelectItem value="ended">{t("events.status.ended")}</SelectItem>
+						</SelectContent>
+					</Select>
+					<Button
+						variant={onlyJoined ? "default" : "outline"}
+						size="sm"
+						onClick={() => {
+							setOnlyJoined((value) => !value);
+							setPage(1);
+						}}
+					>
+						{t("events.list.onlyJoined")}
+					</Button>
+				</div>
+
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={5} />}
-					errorTitle="加载赛事失败"
+					errorTitle={t("events.list.loadError")}
 					isEmpty={() => items.length === 0}
 					empty={
 						<EmptyBlock
-							title="还没有可见的赛事"
-							description="管理员创建并公开赛事后会出现在这里。"
-							icon={<CalendarDays className="size-5" />}
+							title={t("events.list.emptyTitle")}
+							description={t("events.list.emptyDescription")}
+							icon={<CalendarDays className="size-5" aria-hidden="true" />}
 						/>
 					}
 				>
@@ -298,8 +303,8 @@ export function EventsListPage() {
 											<EventStatusPill event={row.event} />
 										</div>
 										<p className="text-xs text-muted-foreground">
-											{EVENT_FAMILY_LABEL[row.event.family] ?? row.event.family} ·{" "}
-											{row.joined ? "已加入" : "未加入"}
+											{labels.family(row.event.family)} ·{" "}
+											{row.joined ? t("events.list.joined") : t("events.list.notJoined")}
 										</p>
 									</Link>
 								)}
@@ -315,6 +320,8 @@ export function EventsListPage() {
 /* ── 赛事工作区 ─────────────────────────────────────────────────────────── */
 
 export function EventWorkspacePage() {
+	const { t } = useTranslation();
+	const labels = useEventLabels();
 	const { eventId = "" } = useParams<{ eventId: string }>();
 	const client = useClient();
 	const now = useNow(30_000);
@@ -323,19 +330,23 @@ export function EventWorkspacePage() {
 
 	const query = useQuery({
 		queryKey: qk.events.detail(eventId),
-		queryFn: () => call<EventInfo>(client.service.events.get(eventId), "赛事详情"),
+		queryFn: () => call<EventInfo>(client.service.events.get(eventId), t("events.workspace.loadError")),
 		enabled: eventId !== "",
 	});
 
 	const info = query.data;
-	useDocumentTitle(info ? `${info.event.title} · FloatCTF` : "赛事 · FloatCTF");
+	useDocumentTitle(
+		info
+			? t("events.workspace.documentTitle", { title: info.event.title })
+			: t("events.list.documentTitle"),
+	);
 
 	return (
 		<PageBody>
 			<QueryState
 				query={query}
-				skeleton={<LoadingBlock label="加载赛事…" />}
-				errorTitle="加载赛事失败"
+				skeleton={<LoadingBlock label={t("events.workspace.loading")} />}
+				errorTitle={t("events.workspace.loadError")}
 			>
 				{(data) => {
 					const status = computeEventStatus(
@@ -344,7 +355,7 @@ export function EventWorkspacePage() {
 						now.getTime(),
 					);
 					const caps = eventCapabilities(data.event);
-					const eventId = eventIdOf(data);
+					const resolvedEventId = eventIdOf(data);
 					const gated = status !== "upcoming" && !data.joined;
 					const isTeam = data.event.participant_mode === "team";
 
@@ -356,25 +367,22 @@ export function EventWorkspacePage() {
 								badge={
 									<div className="flex flex-wrap items-center gap-2">
 										<EventStatusPill event={data.event} />
-										<TonePill tone="neutral">
-											{EVENT_FAMILY_LABEL[data.event.family] ?? data.event.family}
-										</TonePill>
-										<TonePill tone="neutral">
-											{PARTICIPANT_MODE_LABEL[data.event.participant_mode] ??
-												data.event.participant_mode}
-										</TonePill>
-										{data.joined ? <TonePill tone="success">已参赛</TonePill> : null}
+										<TonePill tone="neutral">{labels.family(data.event.family)}</TonePill>
+										<TonePill tone="neutral">{labels.mode(data.event.participant_mode)}</TonePill>
+										{data.joined ? (
+											<TonePill tone="success">{t("events.workspace.joinedBadge")}</TonePill>
+										) : null}
 									</div>
 								}
 								actions={
 									<Button variant="outline" asChild>
-										<Link to="/events">返回赛事列表</Link>
+										<Link to="/events">{t("events.workspace.backToList")}</Link>
 									</Button>
 								}
 							/>
 
-							<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-								<div className="min-w-0 space-y-5">
+							<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+								<div className="min-w-0 space-y-4">
 									{gated ? (
 										<MemberGateNotice />
 									) : (
@@ -386,20 +394,42 @@ export function EventWorkspacePage() {
 											}}
 										>
 											<TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto">
-												<TabsTrigger value="overview">总览</TabsTrigger>
+												<TabsTrigger value="overview" className="shrink-0">
+													{t("events.workspace.tabs.overview")}
+												</TabsTrigger>
 												{caps.challenges ? (
-													<TabsTrigger value="challenges">题目</TabsTrigger>
+													<TabsTrigger value="challenges" className="shrink-0">
+														{t("events.workspace.tabs.challenges")}
+													</TabsTrigger>
 												) : null}
-												{caps.arena ? <TabsTrigger value="arena">AWD</TabsTrigger> : null}
-												{caps.lab ? <TabsTrigger value="lab">AWDP</TabsTrigger> : null}
+												{caps.arena ? (
+													<TabsTrigger value="arena" className="shrink-0">
+														{t("events.workspace.tabs.arena")}
+													</TabsTrigger>
+												) : null}
+												{caps.lab ? (
+													<TabsTrigger value="lab" className="shrink-0">
+														{t("events.workspace.tabs.lab")}
+													</TabsTrigger>
+												) : null}
 												{caps.scoreboard ? (
-													<TabsTrigger value="scoreboard">积分榜</TabsTrigger>
+													<TabsTrigger value="scoreboard" className="shrink-0">
+														{t("events.workspace.tabs.scoreboard")}
+													</TabsTrigger>
 												) : null}
-												{caps.trend ? <TabsTrigger value="trend">趋势</TabsTrigger> : null}
+												{caps.trend ? (
+													<TabsTrigger value="trend" className="shrink-0">
+														{t("events.workspace.tabs.trend")}
+													</TabsTrigger>
+												) : null}
 												{caps.instances ? (
-													<TabsTrigger value="instances">实例</TabsTrigger>
+													<TabsTrigger value="instances" className="shrink-0">
+														{t("events.workspace.tabs.instances")}
+													</TabsTrigger>
 												) : null}
-												<TabsTrigger value="bulletin">公告</TabsTrigger>
+												<TabsTrigger value="bulletin" className="shrink-0">
+													{t("events.workspace.tabs.bulletin")}
+												</TabsTrigger>
 											</TabsList>
 
 											<TabsContent value="overview" className="mt-4">
@@ -407,17 +437,17 @@ export function EventWorkspacePage() {
 											</TabsContent>
 											{caps.challenges ? (
 												<TabsContent value="challenges" className="mt-4">
-													<ChallengesTab eventId={eventId} />
+													<ChallengesTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
 											{caps.arena ? (
 												<TabsContent value="arena" className="mt-4">
-													<ArenaSummaryTab eventId={eventId} />
+													<ArenaSummaryTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
 											{caps.lab ? (
 												<TabsContent value="lab" className="mt-4">
-													<LabSummaryTab eventId={eventId} />
+													<LabSummaryTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
 											{caps.scoreboard ? (
@@ -427,54 +457,66 @@ export function EventWorkspacePage() {
 											) : null}
 											{caps.trend ? (
 												<TabsContent value="trend" className="mt-4">
-													<TrendTab eventId={eventId} />
+													<TrendTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
 											{caps.instances ? (
 												<TabsContent value="instances" className="mt-4">
-													<InstancesTab eventId={eventId} />
+													<InstancesTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
 											<TabsContent value="bulletin" className="mt-4">
-												<BulletinTab eventId={eventId} />
+												<BulletinTab eventId={resolvedEventId} />
 											</TabsContent>
 										</Tabs>
 									)}
 								</div>
 
-								<div className="space-y-5">
+								<div className="flex flex-col gap-4">
 									<SectionCard
-										title={isTeam ? "我的战队" : "参赛"}
+										title={
+											isTeam
+												? t("events.workspace.teamCardTitle")
+												: t("events.workspace.participationCardTitle")
+										}
 										description={
 											status === "upcoming"
-												? "赛事开始前可自由加入 / 退出。"
-												: "赛事进行中，参赛名单已锁定。"
+												? t("events.workspace.participationOpen")
+												: t("events.workspace.participationLocked")
 										}
 									>
 										{isTeam ? <TeamPanel info={data} /> : <JoinLeaveControl info={data} />}
 									</SectionCard>
 
 									{!gated ? (
-										<SectionCard title="快速跳转">
+										<SectionCard title={t("events.workspace.quickLinks")}>
 											<div className="flex flex-col gap-2">
 												{caps.challenges ? (
 													<Button variant="outline" asChild className="justify-start">
-														<Link to={`/events/${eventId}?tab=challenges`}>赛事题目列表</Link>
+														<Link to={`/events/${resolvedEventId}?tab=challenges`}>
+															{t("events.workspace.linkChallenges")}
+														</Link>
 													</Button>
 												) : null}
 												{caps.scoreboard ? (
 													<Button variant="outline" asChild className="justify-start">
-														<Link to={`/events/${eventId}?tab=scoreboard`}>积分榜</Link>
+														<Link to={`/events/${resolvedEventId}?tab=scoreboard`}>
+															{t("events.workspace.linkScoreboard")}
+														</Link>
 													</Button>
 												) : null}
 												{caps.arena ? (
 													<Button variant="outline" asChild className="justify-start">
-														<Link to={`/arena/${eventId}`}>AWD 驾驶舱</Link>
+														<Link to={`/arena/${resolvedEventId}`}>
+															{t("events.workspace.linkArena")}
+														</Link>
 													</Button>
 												) : null}
 												{caps.lab ? (
 													<Button variant="outline" asChild className="justify-start">
-														<Link to={`/lab/${eventId}`}>AWDP 工作台</Link>
+														<Link to={`/lab/${resolvedEventId}`}>
+															{t("events.workspace.linkLab")}
+														</Link>
 													</Button>
 												) : null}
 											</div>
@@ -493,31 +535,40 @@ export function EventWorkspacePage() {
 /* ── 赛事内题目工作台 ───────────────────────────────────────────────────── */
 
 export function EventChallengePage() {
+	const { t } = useTranslation();
 	const { eventId = "", challengeId = "" } = useParams<{ eventId: string; challengeId: string }>();
 	const client = useClient();
 
 	const eventQuery = useQuery({
 		queryKey: qk.events.detail(eventId),
-		queryFn: () => call<EventInfo>(client.service.events.get(eventId), "赛事详情"),
+		queryFn: () => call<EventInfo>(client.service.events.get(eventId), t("events.challengePage.loadError")),
 		enabled: eventId !== "",
 	});
 
 	const challengesQuery = useQuery({
 		queryKey: qk.events.challenges(eventId, { limit: 200 }),
-		queryFn: () => callList<EventChallengeResult>(client.service.events.fetchChallenges(eventId, { limit: 200 })),
+		queryFn: () =>
+			callList<EventChallengeResult>(
+				client.service.events.fetchChallenges(eventId, { limit: 200 }),
+			),
 		enabled: eventId !== "",
 	});
 
 	const item = (challengesQuery.data?.items ?? []).find(
 		(entry) => entry.challenge.id === challengeId,
 	);
+	useDocumentTitle(
+		item
+			? t("events.challengePage.documentTitle", { title: item.challenge.name })
+			: t("events.challengePage.fallbackDocumentTitle"),
+	);
 
 	return (
 		<PageBody>
 			<QueryState
 				query={challengesQuery}
-				skeleton={<LoadingBlock label="加载题目…" />}
-				errorTitle="加载赛事题目失败"
+				skeleton={<LoadingBlock label={t("events.challengePage.loading")} />}
+				errorTitle={t("events.challengePage.loadError")}
 			>
 				{() =>
 					item ? (
@@ -526,29 +577,39 @@ export function EventChallengePage() {
 								title={item.challenge.name}
 								description={
 									<span className="flex flex-wrap items-center gap-2">
-										<TonePill tone="info">当前分值 {item.current_points}</TonePill>
-										<TonePill tone="neutral">{item.solved_count} 队解出</TonePill>
+										<TonePill tone="info" className="tnum">
+											{t("events.challengePage.currentPoints", {
+												points: formatScore(item.current_points),
+											})}
+										</TonePill>
+										<TonePill tone="neutral" className="tnum">
+											{t("events.challengePage.solvedTeams", { count: item.solved_count })}
+										</TonePill>
 										{item.solved ? (
-											<TonePill tone="success">已解出 #{item.solved_no}</TonePill>
+											<TonePill tone="success">
+												{t("events.challengePage.solved", { no: item.solved_no })}
+											</TonePill>
 										) : null}
 									</span>
 								}
 								breadcrumbs={
 									<span className="flex flex-wrap items-center gap-1">
 										<Link to="/events" className="hover:underline">
-											赛事
+											{t("events.list.title")}
 										</Link>
-										<ChevronRight className="size-3" />
+										<ChevronRight className="size-3" aria-hidden="true" />
 										<Link to={`/events/${eventId}`} className="hover:underline">
 											{eventQuery.data?.event.title ?? eventId}
 										</Link>
-										<ChevronRight className="size-3" />
-										<span>{item.challenge.category || "未分类"}</span>
+										<ChevronRight className="size-3" aria-hidden="true" />
+										<span>{item.challenge.category || t("events.challengePage.uncategorized")}</span>
 									</span>
 								}
 								actions={
 									<Button variant="outline" asChild>
-										<Link to={`/events/${eventId}?tab=challenges`}>返回题目列表</Link>
+										<Link to={`/events/${eventId}?tab=challenges`}>
+											{t("events.challengePage.backToList")}
+										</Link>
 									</Button>
 								}
 							/>
@@ -559,11 +620,13 @@ export function EventChallengePage() {
 						</>
 					) : (
 						<NotFoundBlock
-							title="该题目不在本赛事中"
-							description="题目可能已被下架，或赛事题目列表已更新。"
+							title={t("events.challengePage.notFoundTitle")}
+							description={t("events.challengePage.notFoundDescription")}
 							action={
 								<Button asChild>
-									<Link to={`/events/${eventId}?tab=challenges`}>返回题目列表</Link>
+									<Link to={`/events/${eventId}?tab=challenges`}>
+										{t("events.challengePage.backToList")}
+									</Link>
 								</Button>
 							}
 						/>

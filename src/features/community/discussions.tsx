@@ -12,6 +12,8 @@
 
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ArrowLeft,
@@ -65,6 +67,7 @@ import {
 
 /** 删除讨论（列表 / 我的 / 详情共用）：`useConfirm` + 真实后果 + 失效全部讨论查询。 */
 function useDeleteDiscussion() {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -72,25 +75,26 @@ function useDeleteDiscussion() {
 
 	const mutation = useMutation({
 		mutationFn: (discussionId: string) =>
-			callVoid(client.service.discussions.remove(discussionId), "删除讨论"),
+			callVoid(client.service.discussions.remove(discussionId), t("community.requests.discussionDelete")),
 		onSuccess: () => {
-			toast.success("讨论已删除");
+			toast.success(t("community.discussions.toasts.discussionDeleted"));
 			void queryClient.invalidateQueries({ queryKey: qk.discussions.all });
 		},
-		onError: (error) => toast.apiError("删除讨论失败", error),
+		onError: (error) =>
+			toast.apiError(t("community.discussions.toasts.discussionDeleteFailed"), error),
 		onSettled: () => setPendingId(null),
 	});
 
 	async function requestDelete(row: { id: string; title: string }): Promise<boolean> {
 		const ok = await confirm({
-			title: "删除该讨论？",
+			title: t("community.discussions.detail.deleteTitle"),
 			description: row.title,
 			consequences: [
-				"该讨论及其全部评论会被删除，不可恢复",
-				"其他选手将无法再查看这个帖子",
+				t("community.discussions.detail.deleteConsequences.content"),
+				t("community.discussions.detail.deleteConsequences.visibility"),
 			],
 			tone: "danger",
-			confirmText: "删除讨论",
+			confirmText: t("community.discussions.detail.deleteConfirm"),
 		});
 		if (!ok) return false;
 		setPendingId(row.id);
@@ -102,11 +106,14 @@ function useDeleteDiscussion() {
 }
 
 /** 列表 / 我的：共用列定义（`mineId` 用于标记「我的」条目）。 */
-function discussionColumns(mineId: string | undefined): DataTableColumn<DiscussionWithAuthor>[] {
+function discussionColumns(
+	t: TFunction,
+	mineId: string | undefined,
+): DataTableColumn<DiscussionWithAuthor>[] {
 	return [
 		{
 			id: "title",
-			header: "标题",
+			header: t("community.discussions.table.title"),
 			sortValue: (row) => row.title,
 			cell: (row) => (
 				<div className="flex min-w-0 items-center gap-2">
@@ -117,14 +124,14 @@ function discussionColumns(mineId: string | undefined): DataTableColumn<Discussi
 						{row.title}
 					</Link>
 					{mineId !== undefined && row.author_id === mineId ? (
-						<TonePill tone="info">我的</TonePill>
+						<TonePill tone="info">{t("community.discussions.table.mine")}</TonePill>
 					) : null}
 				</div>
 			),
 		},
 		{
 			id: "author",
-			header: "作者",
+			header: t("community.discussions.table.author"),
 			hideBelow: "sm",
 			sortValue: (row) => row.author_nickname,
 			cell: (row) => (
@@ -138,20 +145,29 @@ function discussionColumns(mineId: string | undefined): DataTableColumn<Discussi
 		},
 		{
 			id: "stats",
-			header: "互动",
+			header: t("community.discussions.table.interactions"),
 			align: "right",
 			cell: (row) => (
 				<div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
-					<span className="inline-flex items-center gap-1" title="浏览">
-						<Eye className="size-3.5" />
+					<span
+						className="tnum inline-flex items-center gap-1"
+						title={t("community.discussions.table.viewCount")}
+					>
+						<Eye aria-hidden="true" className="size-4" />
 						{row.view_count}
 					</span>
-					<span className="inline-flex items-center gap-1" title="点赞">
-						<ThumbsUp className="size-3.5" />
+					<span
+						className="tnum inline-flex items-center gap-1"
+						title={t("community.discussions.table.likeCount")}
+					>
+						<ThumbsUp aria-hidden="true" className="size-4" />
 						{row.like_count}
 					</span>
-					<span className="inline-flex items-center gap-1" title="评论">
-						<MessageSquare className="size-3.5" />
+					<span
+						className="tnum inline-flex items-center gap-1"
+						title={t("community.discussions.table.commentCount")}
+					>
+						<MessageSquare aria-hidden="true" className="size-4" />
 						{row.comment_count}
 					</span>
 				</div>
@@ -159,14 +175,14 @@ function discussionColumns(mineId: string | undefined): DataTableColumn<Discussi
 		},
 		{
 			id: "created_at",
-			header: "创建",
+			header: t("community.discussions.table.createdAt"),
 			hideBelow: "md",
 			sortValue: (row) => row.created_at,
 			cell: (row) => <RelativeTime value={row.created_at} />,
 		},
 		{
 			id: "updated_at",
-			header: "更新",
+			header: t("community.discussions.table.updatedAt"),
 			hideBelow: "lg",
 			sortValue: (row) => row.updated_at,
 			cell: (row) => <RelativeTime value={row.updated_at} />,
@@ -174,7 +190,11 @@ function discussionColumns(mineId: string | undefined): DataTableColumn<Discussi
 	];
 }
 
-function discussionMobileCard(row: DiscussionWithAuthor, mineId: string | undefined): ReactNode {
+function discussionMobileCard(
+	t: TFunction,
+	row: DiscussionWithAuthor,
+	mineId: string | undefined,
+): ReactNode {
 	return (
 		<div className="space-y-1.5">
 			<div className="flex items-start justify-between gap-2">
@@ -185,7 +205,7 @@ function discussionMobileCard(row: DiscussionWithAuthor, mineId: string | undefi
 					{row.title}
 				</Link>
 				{mineId !== undefined && row.author_id === mineId ? (
-					<TonePill tone="info">我的</TonePill>
+					<TonePill tone="info">{t("community.discussions.table.mine")}</TonePill>
 				) : null}
 			</div>
 			<div className="flex items-center gap-2">
@@ -193,9 +213,15 @@ function discussionMobileCard(row: DiscussionWithAuthor, mineId: string | undefi
 				<span className="truncate text-xs text-muted-foreground">{row.author_nickname}</span>
 			</div>
 			<div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-				<span>浏览 {row.view_count}</span>
-				<span>点赞 {row.like_count}</span>
-				<span>评论 {row.comment_count}</span>
+				<span className="tnum">
+					{t("community.discussions.table.mobile.views", { count: row.view_count })}
+				</span>
+				<span className="tnum">
+					{t("community.discussions.table.mobile.likes", { count: row.like_count })}
+				</span>
+				<span className="tnum">
+					{t("community.discussions.table.mobile.comments", { count: row.comment_count })}
+				</span>
 				<RelativeTime value={row.updated_at} />
 			</div>
 		</div>
@@ -204,7 +230,8 @@ function discussionMobileCard(row: DiscussionWithAuthor, mineId: string | undefi
 
 /** 讨论区列表：全站讨论，支持按标题过滤与新建。 */
 export function DiscussionsPage(): ReactNode {
-	useDocumentTitle("讨论区 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("community.discussions.documentTitle"));
 	const client = useClient();
 	const me = useMe();
 	const navigate = useNavigate();
@@ -214,7 +241,7 @@ export function DiscussionsPage(): ReactNode {
 	const [formOpen, setFormOpen] = useState(false);
 	const debouncedSearch = useDebouncedValue(search, 300);
 	const deleteAction = useDeleteDiscussion();
-	const columns = discussionColumns(me?.id);
+	const columns = discussionColumns(t, me?.id);
 
 	const trimmed = debouncedSearch.trim();
 	const filter = trimmed === "" ? undefined : `title:${trimmed}`;
@@ -230,31 +257,31 @@ export function DiscussionsPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="讨论区"
-				description="选手之间的技术交流：解题思路、环境问题、平台反馈。"
+				title={t("community.discussions.title")}
+				description={t("community.discussions.subtitle")}
 				actions={
 					<Toolbar>
 						<Button variant="outline" asChild>
 							<Link to="/community/discussions/mine">
-								<MessagesSquare /> 我的讨论
+								<MessagesSquare aria-hidden="true" /> {t("community.discussions.actions.mine")}
 							</Link>
 						</Button>
 						<Button onClick={() => setFormOpen(true)}>
-							<Pencil /> 新建讨论
+							<Pencil aria-hidden="true" /> {t("community.discussions.actions.create")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
 			<SectionCard
-				title="全部讨论"
-				description="按最近更新时间排序，支持按标题搜索。"
+				title={t("community.discussions.list.sectionTitle")}
+				description={t("community.discussions.list.sectionDescription")}
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
 						<SearchField
 							value={search}
-							placeholder="搜索标题…"
+							placeholder={t("community.discussions.list.searchPlaceholder")}
 							onChange={(value) => {
 								setSearch(value);
 								setPage(1);
@@ -279,28 +306,30 @@ export function DiscussionsPage(): ReactNode {
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={5} />}
-					errorTitle="加载讨论失败"
+					errorTitle={t("community.discussions.list.loadError")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
 						trimmed === "" ? (
 							<EmptyBlock
-								title="还没有讨论"
-								description="发起第一个话题，让其他选手参与进来。"
-								icon={<MessagesSquare className="size-5" />}
+								title={t("community.discussions.list.emptyTitle")}
+								description={t("community.discussions.list.emptyDescription")}
+								icon={<MessagesSquare aria-hidden="true" />}
 								action={
 									<Button size="sm" onClick={() => setFormOpen(true)}>
-										新建讨论
+										{t("community.discussions.actions.create")}
 									</Button>
 								}
 							/>
 						) : (
 							<EmptyBlock
 								variant="filtered"
-								title="没有匹配的讨论"
-								description={`没有标题包含「${trimmed}」的讨论。`}
+								title={t("community.discussions.list.filteredTitle")}
+								description={t("community.discussions.list.filteredDescription", {
+									query: trimmed,
+								})}
 								action={
 									<Button size="sm" variant="outline" onClick={() => setSearch("")}>
-										清除搜索
+										{t("community.discussions.list.clearSearch")}
 									</Button>
 								}
 							/>
@@ -313,22 +342,24 @@ export function DiscussionsPage(): ReactNode {
 							getRowId={(row) => row.id}
 							columns={columns}
 							onRowClick={(row) => void navigate(`/community/discussions/${row.id}`)}
-							mobileCard={(row) => discussionMobileCard(row, me?.id)}
+							mobileCard={(row) => discussionMobileCard(t, row, me?.id)}
 							rowActions={(row) => (
 								<div className="flex items-center gap-1">
 									<Button variant="ghost" size="sm" asChild>
-										<Link to={`/community/discussions/${row.id}`}>查看</Link>
+										<Link to={`/community/discussions/${row.id}`}>
+											{t("community.discussions.table.view")}
+										</Link>
 									</Button>
 									{me !== null && row.author_id === me.id ? (
 										<Button
 											variant="ghost"
 											size="icon-sm"
-											aria-label="删除讨论"
-											title="删除讨论"
+											aria-label={t("community.discussions.table.delete")}
+											title={t("community.discussions.table.delete")}
 											disabled={deleteAction.isPending}
 											onClick={() => void deleteAction.requestDelete(row)}
 										>
-											<Trash2 className="text-destructive" />
+											<Trash2 aria-hidden="true" className="text-destructive" />
 										</Button>
 									) : null}
 								</div>
@@ -345,7 +376,8 @@ export function DiscussionsPage(): ReactNode {
 
 /** 我的讨论：后端按 `author_id` 过滤（不是客户端过滤），支持发帖 / 编辑 / 删除闭环。 */
 export function MyDiscussionsPage(): ReactNode {
-	useDocumentTitle("我的讨论 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("community.discussions.mine.documentTitle"));
 	const client = useClient();
 	const me = useMe();
 	const navigate = useNavigate();
@@ -364,10 +396,10 @@ export function MyDiscussionsPage(): ReactNode {
 	// 避免拿不到账号时永远停在加载态。
 	const authQuery = useQuery({
 		queryKey: qk.auth.me(),
-		queryFn: () => call<Users>(client.service.users.getMe(), "当前账号"),
+		queryFn: () => call<Users>(client.service.users.getMe(), t("community.requests.currentAccount")),
 	});
 	const meId = me?.id ?? authQuery.data?.id;
-	const columns = discussionColumns(meId);
+	const columns = discussionColumns(t, meId);
 
 	const trimmed = debouncedSearch.trim();
 	// 条件之间用 `&` 分隔（后端解析规则），`author_id` 始终生效。
@@ -389,34 +421,35 @@ export function MyDiscussionsPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="我的讨论"
-				description="你发布的全部讨论，可在这里编辑标题 / 正文或删除帖子。"
+				title={t("community.discussions.mine.title")}
+				description={t("community.discussions.mine.subtitle")}
 				breadcrumbs={
 					<Link
 						to="/community/discussions"
 						className="inline-flex items-center gap-1 hover:underline"
 					>
-						<ArrowLeft className="size-3.5" /> 返回讨论区
+						<ArrowLeft aria-hidden="true" className="size-4" />{" "}
+						{t("community.discussions.mine.back")}
 					</Link>
 				}
 				actions={
 					<Toolbar>
 						<Button onClick={() => setFormOpen(true)}>
-							<Pencil /> 新建讨论
+							<Pencil aria-hidden="true" /> {t("community.discussions.actions.create")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
 			<SectionCard
-				title="我发布的讨论"
-				description="列表由后端按当前账号过滤（author_id）。"
+				title={t("community.discussions.mine.sectionTitle")}
+				description={t("community.discussions.mine.sectionDescription")}
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
 						<SearchField
 							value={search}
-							placeholder="搜索我的标题…"
+							placeholder={t("community.discussions.mine.searchPlaceholder")}
 							onChange={(value) => {
 								setSearch(value);
 								setPage(1);
@@ -442,37 +475,39 @@ export function MyDiscussionsPage(): ReactNode {
 					authQuery.isError ? (
 						<ErrorBlock
 							error={authQuery.error}
-							title="读取当前账号失败"
+							title={t("community.discussions.mine.accountError")}
 							onRetry={() => void authQuery.refetch()}
 						/>
 					) : (
-						<LoadingBlock label="读取当前账号…" />
+						<LoadingBlock label={t("community.discussions.mine.accountLoading")} />
 					)
 				) : (
 					<QueryState
 						query={query}
 						skeleton={<TableSkeleton rows={5} columns={5} />}
-						errorTitle="加载我的讨论失败"
+						errorTitle={t("community.discussions.mine.loadError")}
 						isEmpty={(result) => result.items.length === 0}
 						empty={
 							trimmed === "" ? (
 								<EmptyBlock
-									title="你还没有发过讨论"
-									description="把你的解题思路或遇到的问题写下来，其他选手可以回复你。"
-									icon={<MessagesSquare className="size-5" />}
+									title={t("community.discussions.mine.emptyTitle")}
+									description={t("community.discussions.mine.emptyDescription")}
+									icon={<MessagesSquare aria-hidden="true" />}
 									action={
 										<Button size="sm" onClick={() => setFormOpen(true)}>
-											新建讨论
+											{t("community.discussions.actions.create")}
 										</Button>
 									}
 								/>
 							) : (
 								<EmptyBlock
 									variant="filtered"
-									description={`你的讨论里没有标题包含「${trimmed}」的条目。`}
+									description={t("community.discussions.mine.filteredDescription", {
+										query: trimmed,
+									})}
 									action={
 										<Button size="sm" variant="outline" onClick={() => setSearch("")}>
-											清除搜索
+											{t("community.discussions.mine.clearSearch")}
 										</Button>
 									}
 								/>
@@ -485,11 +520,13 @@ export function MyDiscussionsPage(): ReactNode {
 								getRowId={(row) => row.id}
 								columns={columns}
 								onRowClick={(row) => void navigate(`/community/discussions/${row.id}`)}
-								mobileCard={(row) => discussionMobileCard(row, meId)}
+								mobileCard={(row) => discussionMobileCard(t, row, meId)}
 								rowActions={(row) => (
 									<div className="flex items-center gap-1">
 										<Button variant="ghost" size="sm" asChild>
-											<Link to={`/community/discussions/${row.id}`}>查看</Link>
+											<Link to={`/community/discussions/${row.id}`}>
+												{t("community.discussions.table.view")}
+											</Link>
 										</Button>
 										<Button
 											variant="ghost"
@@ -498,17 +535,17 @@ export function MyDiscussionsPage(): ReactNode {
 												setEditing({ id: row.id, title: row.title, content: row.content })
 											}
 										>
-											<Pencil /> 编辑
+											<Pencil aria-hidden="true" /> {t("community.discussions.detail.edit")}
 										</Button>
 										<Button
 											variant="ghost"
 											size="icon-sm"
-											aria-label="删除讨论"
-											title="删除讨论"
+											aria-label={t("community.discussions.table.delete")}
+											title={t("community.discussions.table.delete")}
 											disabled={deleteAction.isPending}
 											onClick={() => void deleteAction.requestDelete(row)}
 										>
-											<Trash2 className="text-destructive" />
+											<Trash2 aria-hidden="true" className="text-destructive" />
 										</Button>
 									</div>
 								)}
@@ -532,6 +569,7 @@ export function MyDiscussionsPage(): ReactNode {
 
 /** 讨论详情：左侧正文（Markdown），右侧评论流（`lg:grid-cols-[2fr_1fr]`）。 */
 export function DiscussionDetailPage(): ReactNode {
+	const { t } = useTranslation();
 	const params = useParams<{ id: string }>();
 	const discussionId = params.id ?? "";
 	const client = useClient();
@@ -546,7 +584,7 @@ export function DiscussionDetailPage(): ReactNode {
 	const discussionQuery = useQuery({
 		queryKey: qk.discussions.detail(discussionId),
 		queryFn: () =>
-			call<DiscussionWithAuthor>(client.service.discussions.get(discussionId), "讨论详情"),
+			call<DiscussionWithAuthor>(client.service.discussions.get(discussionId), t("community.requests.discussionDetail")),
 		enabled: discussionId !== "",
 	});
 
@@ -557,42 +595,53 @@ export function DiscussionDetailPage(): ReactNode {
 		queryFn: () =>
 			call<DiscussionComment[]>(
 				client.service.discussions.getComments(discussionId),
-				"评论列表",
+				t("community.requests.commentList"),
 			),
 		enabled: discussionId !== "",
 	});
 
 	const discussion = discussionQuery.data;
-	useDocumentTitle(discussion ? `${discussion.title} · FloatCTF` : "讨论详情 · FloatCTF");
+	useDocumentTitle(
+		discussion
+			? t("community.discussions.detail.documentTitle", { title: discussion.title })
+			: t("community.discussions.detail.documentTitleFallback"),
+	);
 
 	const like = useMutation({
-		mutationFn: () => callVoid(client.service.discussions.like(discussionId), "点赞"),
+		mutationFn: () => callVoid(client.service.discussions.like(discussionId), t("community.requests.like")),
 		onSuccess: () => {
-			toast.success("已点赞");
+			toast.success(t("community.discussions.toasts.likeSuccess"));
 			void queryClient.invalidateQueries({ queryKey: qk.discussions.detail(discussionId) });
 		},
-		onError: (error) => toast.apiError("点赞失败", error),
+		onError: (error) =>
+			toast.apiError(t("community.discussions.toasts.likeFailed"), error),
 	});
 
 	const unlike = useMutation({
-		mutationFn: () => callVoid(client.service.discussions.unlike(discussionId), "取消点赞"),
+		mutationFn: () => callVoid(client.service.discussions.unlike(discussionId), t("community.requests.unlike")),
 		onSuccess: () => {
-			toast.success("已取消点赞");
+			toast.success(t("community.discussions.toasts.unlikeSuccess"));
 			void queryClient.invalidateQueries({ queryKey: qk.discussions.detail(discussionId) });
 		},
-		onError: (error) => toast.apiError("取消点赞失败", error),
+		onError: (error) =>
+			toast.apiError(t("community.discussions.toasts.unlikeFailed"), error),
 	});
 
 	const createComment = useMutation({
 		mutationFn: (input: { content: string; parent_id?: string }) =>
-			call(client.service.discussions.createComment(discussionId, input), "发表评论"),
+			call(client.service.discussions.createComment(discussionId, input), t("community.requests.commentCreate")),
 		onSuccess: (_data, input) => {
-			toast.success(input.parent_id ? "回复已发表" : "评论已发表");
+			toast.success(
+				input.parent_id
+					? t("community.discussions.toasts.replyCreated")
+					: t("community.discussions.toasts.commentCreated"),
+			);
 			if (!input.parent_id) setNewComment("");
 			void queryClient.invalidateQueries({ queryKey: qk.discussions.comments(discussionId) });
 			void queryClient.invalidateQueries({ queryKey: qk.discussions.detail(discussionId) });
 		},
-		onError: (error) => toast.apiError("发表评论失败", error),
+		onError: (error) =>
+			toast.apiError(t("community.discussions.toasts.commentCreateFailed"), error),
 	});
 
 	const patchComment = useMutation({
@@ -601,41 +650,44 @@ export function DiscussionDetailPage(): ReactNode {
 				client.service.discussions.patchComment(discussionId, input.commentId, {
 					content: input.content,
 				}),
-				"更新评论",
+				t("community.requests.commentUpdate"),
 			),
 		onSuccess: () => {
-			toast.success("评论已更新");
+			toast.success(t("community.discussions.toasts.commentUpdated"));
 			void queryClient.invalidateQueries({ queryKey: qk.discussions.comments(discussionId) });
 		},
-		onError: (error) => toast.apiError("更新评论失败", error),
+		onError: (error) =>
+			toast.apiError(t("community.discussions.toasts.commentUpdateFailed"), error),
 	});
 
 	const deleteComment = useMutation({
 		mutationFn: (commentId: string) =>
-			callVoid(client.service.discussions.deleteComment(discussionId, commentId), "删除评论"),
+			callVoid(client.service.discussions.deleteComment(discussionId, commentId), t("community.requests.commentDelete")),
 		onSuccess: () => {
-			toast.success("评论已删除");
+			toast.success(t("community.discussions.toasts.commentDeleted"));
 			void queryClient.invalidateQueries({ queryKey: qk.discussions.comments(discussionId) });
 			void queryClient.invalidateQueries({ queryKey: qk.discussions.detail(discussionId) });
 		},
-		onError: (error) => toast.apiError("删除评论失败", error),
+		onError: (error) =>
+			toast.apiError(t("community.discussions.toasts.commentDeleteFailed"), error),
 	});
 
 	const removeDiscussion = useMutation({
-		mutationFn: () => callVoid(client.service.discussions.remove(discussionId), "删除讨论"),
+		mutationFn: () => callVoid(client.service.discussions.remove(discussionId), t("community.requests.discussionDelete")),
 		onSuccess: () => {
-			toast.success("讨论已删除");
+			toast.success(t("community.discussions.toasts.discussionDeleted"));
 			void queryClient.invalidateQueries({ queryKey: qk.discussions.all });
 			void navigate("/community/discussions/mine", { replace: true });
 		},
-		onError: (error) => toast.apiError("删除讨论失败", error),
+		onError: (error) =>
+			toast.apiError(t("community.discussions.toasts.discussionDeleteFailed"), error),
 	});
 
 	const isAuthor = me !== null && discussion !== undefined && discussion.author_id === me.id;
 
 	async function handleCreateComment() {
 		if (newComment.trim() === "") {
-			toast.warning("评论内容不能为空");
+			toast.warning(t("community.discussions.comment.mustNotBeEmpty"));
 			return;
 		}
 		setSubmittingComment(true);
@@ -650,14 +702,14 @@ export function DiscussionDetailPage(): ReactNode {
 
 	async function handleDeleteComment(commentId: string) {
 		const ok = await confirm({
-			title: "删除这条评论？",
-			description: "删除后无法恢复。",
+			title: t("community.discussions.comment.deleteTitle"),
+			description: t("community.discussions.comment.deleteDescription"),
 			consequences: [
-				"该评论会被永久删除",
-				"它下面的全部回复会被级联删除（父评论外键 ON DELETE CASCADE）",
+				t("community.discussions.comment.deleteConsequences.comment"),
+				t("community.discussions.comment.deleteConsequences.replies"),
 			],
 			tone: "danger",
-			confirmText: "删除评论",
+			confirmText: t("community.discussions.comment.deleteConfirm"),
 		});
 		if (ok) deleteComment.mutate(commentId);
 	}
@@ -665,7 +717,9 @@ export function DiscussionDetailPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title={discussion?.title ?? "讨论详情"}
+				title={
+					discussion?.title ?? t("community.discussions.detail.titleFallback")
+				}
 				description={
 					discussion ? (
 						<span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -678,14 +732,16 @@ export function DiscussionDetailPage(): ReactNode {
 								<span className="text-foreground">{discussion.author_nickname}</span>
 							</span>
 							<span className="text-xs text-muted-foreground">
-								发布于 <RelativeTime value={discussion.created_at} />
+								{t("community.discussions.detail.postedLabel")}{" "}
+								<RelativeTime value={discussion.created_at} />
 							</span>
 							<span className="text-xs text-muted-foreground">
-								更新于 <RelativeTime value={discussion.updated_at} />
+								{t("community.discussions.detail.updatedLabel")}{" "}
+								<RelativeTime value={discussion.updated_at} />
 							</span>
 						</span>
 					) : (
-						"帖子正文与评论。"
+						t("community.discussions.detail.subtitleFallback")
 					)
 				}
 				breadcrumbs={
@@ -693,7 +749,8 @@ export function DiscussionDetailPage(): ReactNode {
 						to="/community/discussions"
 						className="inline-flex items-center gap-1 hover:underline"
 					>
-						<ArrowLeft className="size-3.5" /> 返回讨论区
+						<ArrowLeft aria-hidden="true" className="size-4" />{" "}
+						{t("community.discussions.detail.back")}
 					</Link>
 				}
 				actions={
@@ -707,11 +764,15 @@ export function DiscussionDetailPage(): ReactNode {
 									else like.mutate();
 								}}
 							>
-								<ThumbsUp /> {discussion.is_liked ? "已点赞" : "点赞"} {discussion.like_count}
+								<ThumbsUp aria-hidden="true" />{" "}
+								{discussion.is_liked
+									? t("community.discussions.detail.liked")
+									: t("community.discussions.detail.like")}{" "}
+								<span className="tnum">{discussion.like_count}</span>
 							</Button>
 							{isAuthor ? (
 								<Button variant="outline" onClick={() => setEditOpen(true)}>
-									<Pencil /> 编辑
+									<Pencil aria-hidden="true" /> {t("community.discussions.detail.edit")}
 								</Button>
 							) : null}
 							{isAuthor ? (
@@ -720,19 +781,19 @@ export function DiscussionDetailPage(): ReactNode {
 									disabled={removeDiscussion.isPending}
 									onClick={async () => {
 										const ok = await confirm({
-											title: "删除该讨论？",
+											title: t("community.discussions.detail.deleteTitle"),
 											description: discussion.title,
 											consequences: [
-												"该讨论及其全部评论会被删除，不可恢复",
-												"其他选手将无法再查看这个帖子",
+												t("community.discussions.detail.deleteConsequences.content"),
+												t("community.discussions.detail.deleteConsequences.visibility"),
 											],
 											tone: "danger",
-											confirmText: "删除讨论",
+											confirmText: t("community.discussions.detail.deleteConfirm"),
 										});
 										if (ok) removeDiscussion.mutate();
 									}}
 								>
-									<Trash2 /> 删除
+									<Trash2 aria-hidden="true" /> {t("community.discussions.detail.delete")}
 								</Button>
 							) : null}
 						</Toolbar>
@@ -742,14 +803,18 @@ export function DiscussionDetailPage(): ReactNode {
 
 			<QueryState
 				query={discussionQuery}
-				skeleton={<LoadingBlock label="加载讨论…" />}
-				errorTitle="加载讨论失败"
+				skeleton={<LoadingBlock label={t("community.discussions.detail.loadingDiscussion")} />}
+				errorTitle={t("community.discussions.detail.loadError")}
 			>
 				{(data) => (
 					<div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
 						<SectionCard
-							title="正文"
-							description={`浏览 ${data.view_count} 次 · 点赞 ${data.like_count} · 评论 ${data.comment_count}`}
+							title={t("community.discussions.detail.contentTitle")}
+							description={t("community.discussions.detail.contentStats", {
+								views: data.view_count,
+								likes: data.like_count,
+								comments: data.comment_count,
+							})}
 							contentClassName="space-y-3"
 						>
 							<div className="rounded-md border bg-muted/20 px-4 py-3">
@@ -757,14 +822,17 @@ export function DiscussionDetailPage(): ReactNode {
 							</div>
 							{data.updated_at !== data.created_at ? (
 								<p className="text-xs text-muted-foreground">
-									最后更新于 <RelativeTime value={data.updated_at} />
+									{t("community.discussions.detail.lastUpdatedLabel")}{" "}
+									<RelativeTime value={data.updated_at} />
 								</p>
 							) : null}
 						</SectionCard>
 
 						<SectionCard
-							title={`评论（${commentsQuery.data?.length ?? data.comment_count}）`}
-							description="发表你的看法，或回复其他选手。"
+							title={t("community.discussions.detail.commentsTitle", {
+								count: commentsQuery.data?.length ?? data.comment_count,
+							})}
+							description={t("community.discussions.detail.commentsDescription")}
 							actions={
 								<RefreshingBadge
 									active={commentsQuery.isFetching && !commentsQuery.isPending}
@@ -781,18 +849,24 @@ export function DiscussionDetailPage(): ReactNode {
 
 								<QueryState
 									query={commentsQuery}
-									skeleton={<LoadingBlock label="加载评论…" />}
-									errorTitle="加载评论失败"
+									skeleton={
+										<LoadingBlock
+											label={t("community.discussions.detail.loadingComments")}
+										/>
+									}
+									errorTitle={t("community.discussions.detail.commentsLoadError")}
 									isEmpty={(list) => list.length === 0}
 									empty={
 										<EmptyBlock
-											title="还没有评论"
-											description="第一条评论往往能带动整场讨论。"
+											title={t("community.discussions.detail.commentsEmptyTitle")}
+											description={t(
+												"community.discussions.detail.commentsEmptyDescription",
+											)}
 										/>
 									}
 								>
 									{(list) => (
-										<div className="space-y-3">
+										<div className="space-y-1">
 											{buildCommentTree(list).map((node) => (
 												<CommentCard
 													key={node.id}

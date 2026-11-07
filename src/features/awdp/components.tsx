@@ -4,13 +4,17 @@
  *
  * 组件只做展示与各自的数据读取；`overview` 的取数与实例生命周期动作由页面持有，
  * 以保证「选中的靶机」在两列之间一致。
+ *
+ * 文案全部走 i18n（`awdp.*`），阶段 / 状态判定来自 `./domain`（SDK `AwdpPhase` 与后端 status）。
  */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	Activity,
 	CheckCircle2,
+	ChevronRight,
 	Download,
 	FileUp,
 	FlaskConical,
@@ -42,32 +46,54 @@ import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { TonePill } from "~/components/app/badges";
 import { TrendChart } from "~/components/app/charts";
-import { DataTable } from "~/components/app/data-table";
+import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import { Field } from "~/components/app/form";
 import { CopyText, MonoText, SectionCard } from "~/components/app/page";
 import { EmptyBlock, ErrorBlock, TableSkeleton } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { formatDateTime, formatDuration, formatInt, formatScore } from "~/lib/format";
+import {
+	formatDateTime,
+	formatDuration,
+	formatInt,
+	formatScore,
+	formatTime,
+} from "~/lib/format";
 import { useNow } from "~/lib/hooks";
+import { cn } from "~/lib/utils";
 
 import {
 	AWDP_PHASE_ORDER,
-	AWDP_PREPARING_FIX_NOTE,
 	awdpBreakGate,
-	awdpInstanceControlGate,
+	awdpEvaluationKindLabel,
 	awdpEvaluationLabel,
 	awdpEvaluationTone,
+	awdpInstanceControlGate,
 	awdpPatchGate,
 	awdpPhaseIndex,
 	awdpPhaseLabel,
 	awdpPhaseTone,
+	awdpRoundStatusLabel,
+	awdpRoundStatusTone,
 	awdpRuntimeLabel,
 	awdpRuntimeTone,
 	awdpSourceGate,
 	awdpTestCheckGate,
 } from "./domain";
+
+/** 门禁原因条：显式解释「为什么现在不能操作」，不用红色错误样式（那是用户可纠正的错误）。 */
+function GateNotice({ reason }: { reason: string }): ReactNode {
+	return (
+		<div
+			role="status"
+			className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
+		>
+			<TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+			<span>{reason}</span>
+		</div>
+	);
+}
 
 /** 阶段步进条：pending → Break → 准备 Fix（过渡）→ Fix → 已结束。 */
 export function AwdpPhaseSteps({
@@ -81,6 +107,7 @@ export function AwdpPhaseSteps({
 	currentRound: number;
 	nextActionAt: string | null;
 }): ReactNode {
+	const { t } = useTranslation();
 	const currentIndex = awdpPhaseIndex(phase);
 	const now = useNow(1000);
 	const remaining = (() => {
@@ -92,7 +119,10 @@ export function AwdpPhaseSteps({
 
 	return (
 		<div className="space-y-3">
-			<ol className="flex flex-wrap items-stretch gap-2">
+			<ol
+				className="flex flex-wrap items-stretch gap-2"
+				aria-label={t("awdp.phases.stepsLabel")}
+			>
 				{AWDP_PHASE_ORDER.map((step, index) => {
 					const done = currentIndex > index;
 					const active = currentIndex === index;
@@ -102,38 +132,53 @@ export function AwdpPhaseSteps({
 								tone={active ? awdpPhaseTone(step) : done ? "success" : "muted"}
 								className={active ? "ring-1 ring-current" : undefined}
 							>
-								{awdpPhaseLabel(step)}
+								{awdpPhaseLabel(step, t)}
 							</TonePill>
 							{index < AWDP_PHASE_ORDER.length - 1 ? (
-								<span className="text-muted-foreground">→</span>
+								<ChevronRight
+									className="size-4 text-muted-foreground"
+									aria-hidden="true"
+								/>
 							) : null}
 						</li>
 					);
 				})}
 			</ol>
-			<div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+			<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
 				{phase === "fix" ? (
 					<span className="tnum">
-						回合 {formatInt(currentRound)} / {formatInt(totalRounds)}
+						{t("awdp.phases.roundProgress", {
+							current: formatInt(currentRound),
+							total: formatInt(totalRounds),
+						})}
 					</span>
 				) : null}
 				{remaining !== null && (phase === "break" || phase === "fix") ? (
 					<span className="tnum">
-						{phase === "break" ? "Break 剩余" : "下一轮判定倒计时"}{" "}
-						{formatDuration(remaining)}
+						{phase === "break"
+							? t("awdp.phases.breakRemaining", {
+									duration: formatDuration(remaining),
+								})
+							: t("awdp.phases.nextRoundCountdown", {
+									duration: formatDuration(remaining),
+								})}
 					</span>
 				) : null}
 				{nextActionAt ? (
-					<span>下一动作时间：{formatDateTime(nextActionAt, { seconds: true })}</span>
+					<span className="tnum">
+						{t("awdp.phases.nextActionTime", {
+							time: formatDateTime(nextActionAt, { seconds: true }),
+						})}
+					</span>
 				) : null}
 			</div>
 			{phase === "preparing_fix" ? (
 				<div
-					className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs"
+					className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
 					role="status"
 				>
-					<TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
-					<span>{AWDP_PREPARING_FIX_NOTE}</span>
+					<TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					<span>{t("awdp.phases.preparingFixNote")}</span>
 				</div>
 			) : null}
 		</div>
@@ -150,11 +195,12 @@ export function AwdpGameboxList({
 	selectedId: string | null;
 	onSelect: (id: string) => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	if (gameboxes.length === 0) {
 		return (
 			<EmptyBlock
-				title="本赛事没有可用 GameBox"
-				description="赛事尚未部署 GameBox，或所有 GameBox 都被隐藏。"
+				title={t("awdp.gameboxes.emptyTitle")}
+				description={t("awdp.gameboxes.emptyDescription")}
 			/>
 		);
 	}
@@ -168,37 +214,52 @@ export function AwdpGameboxList({
 							type="button"
 							onClick={() => onSelect(gamebox.id)}
 							aria-pressed={active}
-							className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
-								active ? "border-primary bg-primary/5" : "hover:bg-muted/40"
-							}`}
+							className={cn(
+								"w-full rounded-lg border px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+								active ? "border-primary bg-primary/5" : "hover:bg-muted/40",
+							)}
 						>
 							<div className="flex items-center justify-between gap-2">
-								<span className="truncate text-sm font-medium">{gamebox.name}</span>
-								<span className="flex items-center gap-1">
+								<span
+									className="min-w-0 truncate text-sm font-medium"
+									title={gamebox.name}
+								>
+									{gamebox.name}
+								</span>
+								<span className="flex shrink-0 items-center gap-1">
 									{gamebox.broken ? (
-										<TonePill tone="danger">已被攻破</TonePill>
+										<TonePill tone="danger">
+											{t("awdp.gameboxes.broken")}
+										</TonePill>
 									) : (
-										<TonePill tone="muted">未被攻破</TonePill>
+										<TonePill tone="muted">
+											{t("awdp.gameboxes.notBroken")}
+										</TonePill>
 									)}
 									<TonePill tone={awdpRuntimeTone(gamebox.instance?.runtime_state)}>
-										{awdpRuntimeLabel(gamebox.instance?.runtime_state)}
+										{awdpRuntimeLabel(gamebox.instance?.runtime_state, t)}
 									</TonePill>
 								</span>
 							</div>
 							<p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-								<span>{gamebox.category || "未分类"}</span>
+								<span>{gamebox.category || t("awdp.gameboxes.unclassified")}</span>
 								{gamebox.exposed.length > 0 ? (
 									<>
 										<span>·</span>
-										<span>暴露</span>
+										<span>{t("awdp.gameboxes.exposed")}</span>
 										{gamebox.exposed.map(([proto, port]) => (
-											<MonoText key={`${proto}:${port}`} className="text-muted-foreground">
+											<MonoText
+												key={`${proto}:${port}`}
+												className="text-muted-foreground"
+											>
 												{proto}:{port}
 											</MonoText>
 										))}
 									</>
 								) : null}
-								{gamebox.enabled ? null : <TonePill tone="muted">已禁用</TonePill>}
+								{gamebox.enabled ? null : (
+									<TonePill tone="muted">{t("awdp.gameboxes.disabled")}</TonePill>
+								)}
 							</p>
 						</button>
 					</li>
@@ -234,18 +295,30 @@ export function AwdpInstancePanel({
 	onRefresh: () => void;
 	phase: AwdpOverview["phase"];
 }): ReactNode {
+	const { t } = useTranslation();
 	if (!gamebox) {
-		return <EmptyBlock title="请选择一个靶机" description="先从左列选择要操作的 GameBox。" />;
+		return (
+			<EmptyBlock
+				title={t("awdp.instance.selectTitle")}
+				description={t("awdp.instance.selectDescription")}
+			/>
+		);
 	}
 	const running = instance?.runtime_state === "running";
-	const control = awdpInstanceControlGate(phase);
+	const control = awdpInstanceControlGate(phase, t);
 
 	return (
 		<SectionCard
-			title="实例"
-			description={`${gamebox.name} 的容器实例：端点、重建代数与手动 Reset 次数。`}
+			title={t("awdp.instance.sectionTitle")}
+			description={t("awdp.instance.sectionDescription", { name: gamebox.name })}
 			actions={
-				<Button variant="ghost" size="icon-xs" onClick={onRefresh} aria-label="刷新实例">
+				<Button
+					variant="ghost"
+					size="icon-xs"
+					onClick={onRefresh}
+					aria-label={t("awdp.instance.refresh")}
+					title={t("awdp.instance.refresh")}
+				>
 					<RefreshCw />
 				</Button>
 			}
@@ -253,32 +326,40 @@ export function AwdpInstancePanel({
 			{isPending ? (
 				<TableSkeleton rows={2} columns={2} />
 			) : isError ? (
-				<ErrorBlock error={error} title="加载实例失败" onRetry={onRefresh} />
+				<ErrorBlock
+					error={error}
+					title={t("awdp.states.loadInstance")}
+					onRetry={onRefresh}
+				/>
 			) : (
 				<div className="space-y-3">
-					<div className="flex flex-wrap items-center gap-2">
+					<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
 						<TonePill tone={awdpRuntimeTone(instance?.runtime_state)}>
-							{awdpRuntimeLabel(instance?.runtime_state)}
+							{awdpRuntimeLabel(instance?.runtime_state, t)}
 						</TonePill>
 						{instance ? (
 							<>
 								<span className="tnum text-xs text-muted-foreground">
-									重建代数 {formatInt(instance.runtime_generation)}
+									{t("awdp.instance.generation", {
+										count: formatInt(instance.runtime_generation),
+									})}
 								</span>
 								<span className="tnum text-xs text-muted-foreground">
-									手动 Reset {formatInt(instance.reset_count)} 次
+									{t("awdp.instance.resets", {
+										count: formatInt(instance.reset_count),
+									})}
 								</span>
 							</>
 						) : (
 							<span className="text-xs text-muted-foreground">
-								尚未启动：实例不存在，端点也不会暴露。
+								{t("awdp.instance.notStartedHint")}
 							</span>
 						)}
-						<span className="text-xs text-muted-foreground">阶段 {awdpPhaseLabel(phase)}</span>
+						<span className="text-xs text-muted-foreground">
+							{t("awdp.phases.currentPhase", { phase: awdpPhaseLabel(phase, t) })}
+						</span>
 					</div>
-					{!control.allowed ? (
-						<TonePill tone="warning">{control.reason}</TonePill>
-					) : null}
+					{!control.allowed ? <GateNotice reason={control.reason} /> : null}
 
 					{instance && instance.endpoints.length > 0 ? (
 						<ul className="space-y-1.5">
@@ -287,12 +368,17 @@ export function AwdpInstancePanel({
 								return (
 									<li
 										key={`${endpoint.protocol}:${endpoint.public_port}`}
-										className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2"
+										className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
 									>
-										<Terminal className="size-3.5 text-muted-foreground" />
-										<CopyText value={url} label="服务地址" />
+										<Terminal
+											className="size-4 shrink-0 text-muted-foreground"
+											aria-hidden="true"
+										/>
+										<CopyText value={url} label={t("awdp.instance.endpointLabel")} />
 										<span className="tnum text-xs text-muted-foreground">
-											容器端口 {endpoint.container_port}
+											{t("awdp.instance.containerPort", {
+												port: endpoint.container_port,
+											})}
 										</span>
 									</li>
 								);
@@ -300,7 +386,7 @@ export function AwdpInstancePanel({
 						</ul>
 					) : (
 						<p className="text-xs text-muted-foreground">
-							实例未运行时不暴露服务端点。
+							{t("awdp.instance.endpointsEmpty")}
 						</p>
 					)}
 
@@ -314,11 +400,12 @@ export function AwdpInstancePanel({
 								!control.allowed
 									? control.reason
 									: running
-										? "实例已在运行"
-										: "启动（或复用）实例"
+										? t("awdp.instance.startRunning")
+										: t("awdp.instance.startHint")
 							}
 						>
-							<Play /> 启动
+							<Play />
+							{t("awdp.instance.start")}
 						</Button>
 						<Button
 							variant="outline"
@@ -329,11 +416,12 @@ export function AwdpInstancePanel({
 								!control.allowed
 									? control.reason
 									: running
-										? "停止实例（保留端点）"
-										: "实例未运行"
+										? t("awdp.instance.stopHint")
+										: t("awdp.instance.stopNotRunning")
 							}
 						>
-							<Square /> 停止
+							<Square />
+							{t("awdp.instance.stop")}
 						</Button>
 						<Button
 							variant="outline"
@@ -344,16 +432,119 @@ export function AwdpInstancePanel({
 								!control.allowed
 									? control.reason
 									: instance
-										? "重置为原始状态（破坏性）"
-										: "实例不存在"
+										? t("awdp.instance.resetHint")
+										: t("awdp.instance.resetMissing")
 							}
 						>
-							<RotateCcw /> 重置实例
+							<RotateCcw />
+							{t("awdp.instance.reset")}
 						</Button>
 					</div>
 				</div>
 			)}
 		</SectionCard>
+	);
+}
+
+/** 自检结果的一行：颜色 + 图标 + 文字同时表达状态（颜色不单独承载信息）。 */
+function CheckLine({
+	label,
+	ok,
+	invert = false,
+	trueText,
+	falseText,
+	notExecutedText,
+}: {
+	label: string;
+	ok: boolean | null;
+	invert?: boolean;
+	trueText: string;
+	falseText: string;
+	notExecutedText?: string;
+}): ReactNode {
+	const { t } = useTranslation();
+	if (ok === null) {
+		return (
+			<li className="flex flex-wrap items-center gap-2">
+				<TonePill tone="muted">{t("awdp.actions.notExecuted")}</TonePill>
+				<span>
+					{t("awdp.actions.checkLine", {
+						label,
+						value: notExecutedText ?? t("awdp.actions.notExecuted"),
+					})}
+				</span>
+			</li>
+		);
+	}
+	const good = invert ? !ok : ok;
+	return (
+		<li className="flex flex-wrap items-center gap-2">
+			{good ? (
+				<CheckCircle2
+					className="size-4 text-emerald-600 dark:text-emerald-400"
+					aria-hidden="true"
+				/>
+			) : (
+				<XCircle className="size-4 text-destructive" aria-hidden="true" />
+			)}
+			<span>{t("awdp.actions.checkLine", { label, value: ok ? trueText : falseText })}</span>
+		</li>
+	);
+}
+
+function CheckDetail({ label, detail }: { label: string; detail: string | null }): ReactNode {
+	if (!detail) return null;
+	return (
+		<div className="space-y-1">
+			<p className="text-muted-foreground">{label}</p>
+			<pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 font-mono text-[11px] break-words whitespace-pre-wrap">
+				{detail}
+			</pre>
+		</div>
+	);
+}
+
+/** Test Check 结果：healthcheck / judge / exploit 三项如实展示后端返回值。 */
+function CheckResult({ result }: { result: ManualCheckDto }): ReactNode {
+	const { t } = useTranslation();
+	return (
+		<div className="space-y-2 rounded-lg border px-3 py-2 text-xs" role="status">
+			<p className="font-medium">
+				<Trans
+					i18nKey="awdp.actions.checkResult"
+					values={{ id: result.evaluation_id }}
+					components={{ mono: <MonoText>{null}</MonoText> }}
+				/>
+			</p>
+			<ul className="space-y-1">
+				<CheckLine
+					label={t("awdp.actions.healthcheck")}
+					ok={result.healthcheck_ok}
+					trueText={t("awdp.actions.passed")}
+					falseText={t("awdp.actions.failed")}
+				/>
+				<CheckLine
+					label={t("awdp.actions.judge")}
+					ok={result.judge_ok}
+					trueText={t("awdp.actions.passed")}
+					falseText={t("awdp.actions.failed")}
+				/>
+				<CheckLine
+					label={t("awdp.actions.exploit")}
+					ok={result.exploit_ok}
+					invert
+					trueText={t("awdp.actions.exploitStillVulnerable")}
+					falseText={t("awdp.actions.exploitNotExploitable")}
+					notExecutedText={t("awdp.actions.exploitNotReached")}
+				/>
+			</ul>
+			<CheckDetail
+				label={t("awdp.actions.healthcheckDetail")}
+				detail={result.healthcheck_detail?.join("\n") ?? null}
+			/>
+			<CheckDetail label={t("awdp.actions.judgeDetail")} detail={result.judge_detail} />
+			<CheckDetail label={t("awdp.actions.exploitDetail")} detail={result.exploit_detail} />
+		</div>
 	);
 }
 
@@ -376,6 +567,7 @@ export function AwdpActionPanel({
 	phase: AwdpOverview["phase"];
 	onChanged: () => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const [flag, setFlag] = useState("");
 	const [breakResult, setBreakResult] = useState<BreakSubmitResponse | null>(null);
@@ -384,151 +576,191 @@ export function AwdpActionPanel({
 	const fileRef = useRef<HTMLInputElement | null>(null);
 
 	const gameboxId = gamebox?.id ?? "";
-	const breakGate = awdpBreakGate(phase);
-	const patchGate = awdpPatchGate(phase, instance);
-	const testGate = awdpTestCheckGate(instance);
-	const sourceGate = awdpSourceGate(phase);
+	const breakGate = awdpBreakGate(phase, t);
+	const patchGate = awdpPatchGate(phase, instance, t);
+	const testGate = awdpTestCheckGate(instance, t);
+	const sourceGate = awdpSourceGate(phase, t);
 
 	const breakMutation = useMutation({
 		mutationFn: (value: string) =>
 			call<BreakSubmitResponse>(
 				client.awdp.player.submitBreak(eventId, gameboxId, value),
-				"提交 Break flag",
+				t("awdp.calls.breakFlag"),
 			),
 		onSuccess: (result) => {
 			setBreakResult(result);
 			setFlag("");
-			if (result.scored) toast.success("Break 得分已入账");
-			else if (result.already_broken) toast.info("该靶机此前已被攻破", "本次提交不计分。");
-			else if (result.accepted) toast.info("flag 已接受，但未计分");
-			else toast.error("flag 未被接受");
+			if (result.scored) toast.success(t("awdp.actions.breakScoredToast"));
+			else if (result.already_broken)
+				toast.info(
+					t("awdp.actions.breakAlreadyBrokenTitle"),
+					t("awdp.actions.breakAlreadyBrokenDescription"),
+				);
+			else if (result.accepted) toast.info(t("awdp.actions.breakAcceptedNoScore"));
+			else toast.error(t("awdp.actions.breakRejected"));
 			onChanged();
 		},
-		onError: (error) => toast.apiError("提交 Break flag 失败", error),
+		onError: (error) => toast.apiError(t("awdp.actions.breakFailedToast"), error),
 	});
 
 	const patchMutation = useMutation({
 		mutationFn: (file: File) =>
 			call<PatchSubmitResponse>(
 				client.awdp.player.uploadPatch(eventId, gameboxId, file),
-				"上传补丁",
+				t("awdp.calls.patch"),
 			),
 		onSuccess: (result) => {
 			setPatchResult(result);
-			if (result.status === "applied") toast.success("补丁已应用");
-			else toast.error("补丁应用失败", result.error_message ?? undefined);
+			if (result.status === "applied") toast.success(t("awdp.actions.patchAppliedToast"));
+			else
+				toast.error(
+					t("awdp.actions.patchFailedToast"),
+					result.error_message ?? undefined,
+				);
 			if (fileRef.current) fileRef.current.value = "";
 			onChanged();
 		},
 		onError: (error) => {
 			setPatchResult(null);
-			toast.apiError("上传补丁失败", error);
+			toast.apiError(t("awdp.actions.patchUploadFailed"), error);
 		},
 	});
 
 	const checkMutation = useMutation({
 		mutationFn: () =>
-			call<ManualCheckDto>(client.awdp.player.testCheck(eventId, gameboxId), "Test Check"),
+			call<ManualCheckDto>(
+				client.awdp.player.testCheck(eventId, gameboxId),
+				t("awdp.calls.testCheck"),
+			),
 		onSuccess: (result) => {
 			setCheckResult(result);
-			toast.success("自检完成", "结果不计分，仅用于提交前确认。");
+			toast.success(
+				t("awdp.actions.checkDoneTitle"),
+				t("awdp.actions.checkDoneDescription"),
+			);
 			onChanged();
 		},
-		onError: (error) => toast.apiError("Test Check 失败", error),
+		onError: (error) => toast.apiError(t("awdp.actions.checkFailed"), error),
 	});
 
 	const sourceMutation = useMutation({
 		mutationFn: () =>
-			call<string>(client.awdp.player.sourceUrl(eventId, gameboxId), "获取源码地址"),
+			call<string>(
+				client.awdp.player.sourceUrl(eventId, gameboxId),
+				t("awdp.calls.sourceUrl"),
+			),
 		onSuccess: (url) => {
 			if (!url) {
-				toast.error("后端未返回下载地址");
+				toast.error(t("awdp.actions.sourceMissingUrl"));
 				return;
 			}
 			// presigned URL 直接交给浏览器下载，不 fetch 到内存。
 			window.open(url, "_blank", "noopener,noreferrer");
-			toast.success("已打开源码下载");
+			toast.success(t("awdp.actions.sourceOpened"));
 		},
-		onError: (error) => toast.apiError("获取源码地址失败", error),
+		onError: (error) => toast.apiError(t("awdp.actions.sourceFailed"), error),
 	});
 
 	if (!gamebox) {
-		return <EmptyBlock title="请选择一个靶机" description="先从左列选择要操作的 GameBox。" />;
+		return (
+			<EmptyBlock
+				title={t("awdp.instance.selectTitle")}
+				description={t("awdp.instance.selectDescription")}
+			/>
+		);
 	}
 
 	return (
 		<div className="space-y-5">
 			<SectionCard
-				title="Break：提交 flag"
-				description="从靶机中取到 flag 后提交，按赛事配置计 Break 分。"
-				actions={<TonePill tone={awdpPhaseTone(phase)}>{awdpPhaseLabel(phase)}</TonePill>}
+				title={t("awdp.actions.breakTitle")}
+				description={t("awdp.actions.breakDescription")}
+				actions={
+					<TonePill tone={awdpPhaseTone(phase)}>{awdpPhaseLabel(phase, t)}</TonePill>
+				}
 			>
-				<form
-					className="space-y-3"
-					onSubmit={(event) => {
-						event.preventDefault();
-						const value = flag.trim();
-						if (!value || !breakGate.allowed || breakMutation.isPending) return;
-						breakMutation.mutate(value);
-					}}
-				>
-					<Field
-						label="flag"
-						htmlFor="awdp-break-flag"
-						error={!breakGate.allowed ? breakGate.reason : undefined}
-						hint="flag 只提交给后端校验，不写入 URL。"
+				<div className="space-y-3">
+					{!breakGate.allowed ? <GateNotice reason={breakGate.reason} /> : null}
+					<form
+						className="space-y-3"
+						onSubmit={(event) => {
+							event.preventDefault();
+							const value = flag.trim();
+							if (!value || !breakGate.allowed || breakMutation.isPending) return;
+							breakMutation.mutate(value);
+						}}
 					>
-						<div className="flex gap-2">
-							<Input
-								id="awdp-break-flag"
-								value={flag}
-								autoComplete="off"
-								spellCheck={false}
-								placeholder="flag{...}"
-								className="font-mono"
-								disabled={!breakGate.allowed || breakMutation.isPending}
-								onChange={(event) => setFlag(event.target.value)}
-							/>
-							<Button
-								type="submit"
-								disabled={
-									!breakGate.allowed ||
-									breakMutation.isPending ||
-									flag.trim().length === 0
-								}
-							>
-								<FlaskConical /> 提交
-							</Button>
+						<Field
+							label={t("awdp.actions.flagLabel")}
+							htmlFor="awdp-break-flag"
+							hint={breakGate.allowed ? t("awdp.actions.flagHint") : undefined}
+						>
+							<div className="flex flex-col gap-2 sm:flex-row">
+								<Input
+									id="awdp-break-flag"
+									value={flag}
+									autoComplete="off"
+									spellCheck={false}
+									placeholder={t("awdp.actions.flagPlaceholder")}
+									aria-label={t("awdp.actions.flagLabel")}
+									className="font-mono"
+									disabled={!breakGate.allowed || breakMutation.isPending}
+									title={!breakGate.allowed ? breakGate.reason : undefined}
+									onChange={(event) => setFlag(event.target.value)}
+								/>
+								<Button
+									type="submit"
+									disabled={
+										!breakGate.allowed ||
+										breakMutation.isPending ||
+										flag.trim().length === 0
+									}
+								>
+									<FlaskConical />
+									{t("awdp.actions.submit")}
+								</Button>
+							</div>
+						</Field>
+					</form>
+					{breakResult ? (
+						<div
+							className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+							role="status"
+						>
+							<span className="text-muted-foreground">
+								{t("awdp.actions.breakResult")}
+							</span>
+							<TonePill tone={breakResult.accepted ? "success" : "danger"}>
+								{breakResult.accepted
+									? t("awdp.actions.accepted")
+									: t("awdp.actions.rejected")}
+							</TonePill>
+							<TonePill tone={breakResult.scored ? "success" : "muted"}>
+								{breakResult.scored
+									? t("awdp.actions.scored")
+									: t("awdp.actions.notScored")}
+							</TonePill>
+							<TonePill tone={breakResult.already_broken ? "warning" : "muted"}>
+								{breakResult.already_broken
+									? t("awdp.actions.alreadyBroken")
+									: t("awdp.actions.firstBreak")}
+							</TonePill>
 						</div>
-					</Field>
-				</form>
-				{breakResult ? (
-					<div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs">
-						<span className="text-muted-foreground">后端返回：</span>
-						<TonePill tone={breakResult.accepted ? "success" : "danger"}>
-							{breakResult.accepted ? "已接受" : "未接受"}
-						</TonePill>
-						<TonePill tone={breakResult.scored ? "success" : "muted"}>
-							{breakResult.scored ? "已计分" : "未计分"}
-						</TonePill>
-						<TonePill tone={breakResult.already_broken ? "warning" : "muted"}>
-							{breakResult.already_broken ? "此前已攻破" : "首次攻破"}
-						</TonePill>
-					</div>
-				) : null}
+					) : null}
+				</div>
 			</SectionCard>
 
 			<SectionCard
-				title="Fix：补丁与自检"
-				description="上传 patch.sh 修复漏洞；Test Check 是官方评测前的自检（不计分）。"
+				title={t("awdp.actions.fixTitle")}
+				description={t("awdp.actions.fixDescription")}
 			>
 				<div className="space-y-4">
+					{!patchGate.allowed ? <GateNotice reason={patchGate.reason} /> : null}
 					<div className="space-y-2">
 						<Field
-							label="patch.sh"
+							label={t("awdp.actions.patchLabel")}
 							htmlFor="awdp-patch"
-							error={!patchGate.allowed ? patchGate.reason : undefined}
-							hint="以 multipart 字段 patch_file 上传；不要设置 Content-Type，SDK 会自动带 boundary。"
+							hint={patchGate.allowed ? t("awdp.actions.patchHint") : undefined}
 						>
 							<div className="flex flex-wrap items-center gap-2">
 								<Input
@@ -536,7 +768,9 @@ export function AwdpActionPanel({
 									ref={fileRef}
 									type="file"
 									className="max-w-sm"
+									aria-label={t("awdp.actions.patchLabel")}
 									disabled={!patchGate.allowed || patchMutation.isPending}
+									title={!patchGate.allowed ? patchGate.reason : undefined}
 									onChange={(event) => {
 										const file = event.target.files?.[0];
 										if (file) patchMutation.mutate(file);
@@ -548,18 +782,30 @@ export function AwdpActionPanel({
 									disabled={!patchGate.allowed || patchMutation.isPending}
 									onClick={() => fileRef.current?.click()}
 								>
-									<FileUp /> 选择并上传
+									<FileUp />
+									{t("awdp.actions.chooseAndUpload")}
 								</Button>
 							</div>
 						</Field>
 						{patchResult ? (
-							<div className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-xs">
-								<span className="text-muted-foreground">补丁结果：</span>
-								<TonePill tone={patchResult.status === "applied" ? "success" : "danger"}>
-									{patchResult.status === "applied" ? "已应用" : "应用失败"}
+							<div
+								className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs"
+								role="status"
+							>
+								<span className="text-muted-foreground">
+									{t("awdp.actions.patchResult")}
+								</span>
+								<TonePill
+									tone={patchResult.status === "applied" ? "success" : "danger"}
+								>
+									{patchResult.status === "applied"
+										? t("awdp.actions.patchApplied")
+										: t("awdp.actions.patchFailed")}
 								</TonePill>
 								{patchResult.error_message ? (
-									<span className="text-destructive">{patchResult.error_message}</span>
+									<span className="text-destructive break-words">
+										{patchResult.error_message}
+									</span>
 								) : null}
 							</div>
 						) : null}
@@ -570,87 +816,39 @@ export function AwdpActionPanel({
 							variant="outline"
 							size="sm"
 							disabled={!testGate.allowed || checkMutation.isPending}
-							title={testGate.allowed ? "运行 healthcheck + judge + exploit 诊断" : testGate.reason}
+							title={
+								testGate.allowed
+									? t("awdp.actions.testCheckHint")
+									: testGate.reason
+							}
 							onClick={() => checkMutation.mutate()}
 						>
-							<Activity /> Test Check
+							<Activity />
+							{t("awdp.actions.testCheck")}
 						</Button>
 						<Button
 							variant="outline"
 							size="sm"
 							disabled={!sourceGate.allowed || sourceMutation.isPending}
-							title={sourceGate.allowed ? "下载源码压缩包" : sourceGate.reason}
+							title={
+								sourceGate.allowed
+									? t("awdp.actions.downloadSourceHint")
+									: sourceGate.reason
+							}
 							onClick={() => sourceMutation.mutate()}
 						>
-							<Download /> 下载源码
+							<Download />
+							{t("awdp.actions.downloadSource")}
 						</Button>
-						{!testGate.allowed ? (
-							<span className="text-xs text-muted-foreground">{testGate.reason}</span>
-						) : null}
-						{!sourceGate.allowed ? (
-							<span className="text-xs text-muted-foreground">{sourceGate.reason}</span>
-						) : null}
 					</div>
-
-					{checkResult ? (
-						<div className="space-y-2 rounded-md border px-3 py-2 text-xs">
-							<p className="font-medium">
-								自检结果（评估 <MonoText>{checkResult.evaluation_id}</MonoText>）
-							</p>
-							<ul className="space-y-1">
-								<li className="flex items-center gap-2">
-									{checkResult.healthcheck_ok ? (
-										<CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-									) : (
-										<XCircle className="size-3.5 text-destructive" />
-									)}
-									<span>
-										Healthcheck：{checkResult.healthcheck_ok ? "通过" : "未通过"}
-									</span>
-								</li>
-								<li className="flex items-center gap-2">
-									{checkResult.judge_ok ? (
-										<CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-									) : (
-										<XCircle className="size-3.5 text-destructive" />
-									)}
-									<span>Judge：{checkResult.judge_ok ? "通过" : "未通过"}</span>
-								</li>
-								<li className="flex items-center gap-2">
-									{checkResult.exploit_ok === null ? (
-										<TonePill tone="muted">未执行</TonePill>
-									) : checkResult.exploit_ok ? (
-										<XCircle className="size-3.5 text-destructive" />
-									) : (
-										<CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-									)}
-									<span>
-										Exploit：
-										{checkResult.exploit_ok === null
-											? "未执行到该步骤"
-											: checkResult.exploit_ok
-												? "漏洞仍可利用（不计分，需继续修复）"
-												: "已不可利用"}
-									</span>
-								</li>
-							</ul>
-							{checkResult.healthcheck_detail?.length ? (
-								<pre className="max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-[11px] whitespace-pre-wrap">
-									{checkResult.healthcheck_detail.join("\n")}
-								</pre>
-							) : null}
-							{checkResult.judge_detail ? (
-								<pre className="max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-[11px] whitespace-pre-wrap">
-									{checkResult.judge_detail}
-								</pre>
-							) : null}
-							{checkResult.exploit_detail ? (
-								<pre className="max-h-40 overflow-auto rounded bg-muted p-2 font-mono text-[11px] whitespace-pre-wrap">
-									{checkResult.exploit_detail}
-								</pre>
-							) : null}
-						</div>
+					{!testGate.allowed ? (
+						<p className="text-xs text-muted-foreground">{testGate.reason}</p>
 					) : null}
+					{!sourceGate.allowed ? (
+						<p className="text-xs text-muted-foreground">{sourceGate.reason}</p>
+					) : null}
+
+					{checkResult ? <CheckResult result={checkResult} /> : null}
 				</div>
 			</SectionCard>
 		</div>
@@ -671,17 +869,22 @@ export function AwdpRoundsEvaluationsPanel({
 	eventId: string;
 	enabled: boolean;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const roundsQuery = useQuery({
 		queryKey: qk.awdp.rounds(eventId),
-		queryFn: () => call<AwdpRoundDto[]>(client.awdp.player.rounds(eventId), "Fix 回合"),
+		queryFn: () =>
+			call<AwdpRoundDto[]>(client.awdp.player.rounds(eventId), t("awdp.calls.rounds")),
 		enabled,
 	});
 	const evaluationsQuery = useQuery({
 		queryKey: qk.awdp.evaluations(eventId),
 		queryFn: () =>
-			call<AwdpEvaluationDto[]>(client.awdp.player.evaluations(eventId), "我的评估"),
+			call<AwdpEvaluationDto[]>(
+				client.awdp.player.evaluations(eventId),
+				t("awdp.calls.evaluations"),
+			),
 		enabled,
 	});
 
@@ -699,27 +902,30 @@ export function AwdpRoundsEvaluationsPanel({
 	if (!enabled) {
 		return (
 			<EmptyBlock
-				title="比赛尚未开始"
-				description="AWDP 开始后，这里会出现 Fix 回合时间线与你的评测记录。"
+				title={t("awdp.rounds.startPendingTitle")}
+				description={t("awdp.rounds.startPendingDescription")}
 			/>
 		);
 	}
 
 	return (
 		<div className="space-y-5">
-			<SectionCard title="Fix 回合" description="每个回合结束时后端对在跑实例做官方判定。">
+			<SectionCard
+				title={t("awdp.rounds.sectionTitle")}
+				description={t("awdp.rounds.sectionDescription")}
+			>
 				{roundsQuery.isPending ? (
 					<TableSkeleton rows={3} columns={4} />
 				) : roundsQuery.isError ? (
 					<ErrorBlock
 						error={roundsQuery.error}
-						title="加载回合失败"
+						title={t("awdp.states.loadRounds")}
 						onRetry={() => void roundsQuery.refetch()}
 					/>
 				) : (roundsQuery.data ?? []).length === 0 ? (
 					<EmptyBlock
-						title="暂无回合"
-						description="Fix 阶段开始后，后端会物化回合时间线。"
+						title={t("awdp.rounds.emptyTitle")}
+						description={t("awdp.rounds.emptyDescription")}
 					/>
 				) : (
 					<DataTable
@@ -728,13 +934,13 @@ export function AwdpRoundsEvaluationsPanel({
 						columns={[
 							{
 								id: "sequence",
-								header: "回合",
+								header: t("awdp.rounds.columnSequence"),
 								sortValue: (row) => row.sequence,
 								cell: (row) => <MonoText>#{row.sequence}</MonoText>,
 							},
 							{
 								id: "cutoff",
-								header: "截止",
+								header: t("awdp.rounds.columnCutoff"),
 								sortValue: (row) => row.cutoff_at,
 								cell: (row) => (
 									<span className="tnum text-xs">
@@ -744,9 +950,13 @@ export function AwdpRoundsEvaluationsPanel({
 							},
 							{
 								id: "status",
-								header: "状态",
+								header: t("awdp.rounds.columnStatus"),
 								sortValue: (row) => row.status,
-								cell: (row) => <MonoText>{row.status}</MonoText>,
+								cell: (row) => (
+									<TonePill tone={awdpRoundStatusTone(row.status)}>
+										{awdpRoundStatusLabel(row.status, t)}
+									</TonePill>
+								),
 							},
 						]}
 					/>
@@ -754,21 +964,21 @@ export function AwdpRoundsEvaluationsPanel({
 			</SectionCard>
 
 			<SectionCard
-				title="我的评测"
-				description="manual = Test Check 自检；official = 每回合官方判定。"
+				title={t("awdp.rounds.evaluationsTitle")}
+				description={t("awdp.rounds.evaluationsDescription")}
 			>
 				{evaluationsQuery.isPending ? (
 					<TableSkeleton rows={4} columns={4} />
 				) : evaluationsQuery.isError ? (
 					<ErrorBlock
 						error={evaluationsQuery.error}
-						title="加载评测失败"
+						title={t("awdp.states.loadEvaluations")}
 						onRetry={() => void evaluationsQuery.refetch()}
 					/>
 				) : (evaluationsQuery.data ?? []).length === 0 ? (
 					<EmptyBlock
-						title="暂无评测记录"
-						description="运行一次 Test Check 或等本轮官方判定后会出现在这里。"
+						title={t("awdp.rounds.evaluationsEmptyTitle")}
+						description={t("awdp.rounds.evaluationsEmptyDescription")}
 					/>
 				) : (
 					<DataTable
@@ -777,44 +987,46 @@ export function AwdpRoundsEvaluationsPanel({
 						columns={[
 							{
 								id: "round",
-								header: "回合",
+								header: t("awdp.rounds.columnSequence"),
 								sortValue: (row) => row.round_sequence ?? 0,
 								cell: (row) => (
 									<MonoText>
-										{row.round_sequence === null ? "—" : `#${row.round_sequence}`}
+										{row.round_sequence === null
+											? t("common.empty")
+											: `#${row.round_sequence}`}
 									</MonoText>
 								),
 							},
 							{
 								id: "kind",
-								header: "类型",
+								header: t("awdp.rounds.columnKind"),
 								sortValue: (row) => row.kind,
 								cell: (row) => (
 									<TonePill tone={row.kind === "official" ? "info" : "muted"}>
-										{row.kind === "official" ? "官方" : "自检"}
+										{awdpEvaluationKindLabel(row.kind, t)}
 									</TonePill>
 								),
 							},
 							{
 								id: "status",
-								header: "结果",
+								header: t("awdp.rounds.columnResult"),
 								sortValue: (row) => row.status,
 								cell: (row) => (
 									<TonePill tone={awdpEvaluationTone(row.status)}>
-										{awdpEvaluationLabel(row.status)}
+										{awdpEvaluationLabel(row.status, t)}
 									</TonePill>
 								),
 							},
 							{
 								id: "finished",
-								header: "完成时间",
+								header: t("awdp.rounds.columnFinishedAt"),
 								hideBelow: "md",
 								sortValue: (row) => row.finished_at ?? "",
 								cell: (row) => (
 									<span className="tnum text-xs text-muted-foreground">
 										{row.finished_at
 											? formatDateTime(row.finished_at, { seconds: true })
-											: "—"}
+											: t("common.empty")}
 									</span>
 								),
 							},
@@ -826,13 +1038,25 @@ export function AwdpRoundsEvaluationsPanel({
 	);
 }
 
+interface ScoreMatrixRow {
+	id: string;
+	name: string;
+	broken: boolean;
+	statuses: (string | null)[];
+	fixScore: number;
+}
+
 /** 底部 Tab：积分榜矩阵（Break/Fix 逐题逐回合）。 */
 export function AwdpScoreboardPanel({ eventId }: { eventId: string }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const query = useQuery({
 		queryKey: qk.awdp.scoreboard(eventId),
 		queryFn: () =>
-			call<AwdpScoreboardDetail>(client.awdp.player.scoreboard(eventId), "AWDP 积分榜"),
+			call<AwdpScoreboardDetail>(
+				client.awdp.player.scoreboard(eventId),
+				t("awdp.calls.scoreboard"),
+			),
 	});
 
 	if (query.isPending) return <TableSkeleton rows={6} columns={6} />;
@@ -840,7 +1064,7 @@ export function AwdpScoreboardPanel({ eventId }: { eventId: string }): ReactNode
 		return (
 			<ErrorBlock
 				error={query.error}
-				title="加载积分榜失败"
+				title={t("awdp.states.loadScoreboard")}
 				onRetry={() => void query.refetch()}
 			/>
 		);
@@ -850,104 +1074,139 @@ export function AwdpScoreboardPanel({ eventId }: { eventId: string }): ReactNode
 	if (!data || data.rows.length === 0) {
 		return (
 			<EmptyBlock
-				title="暂无积分榜数据"
-				description="比赛产生 Break / Fix 得分后这里会出现明细矩阵。"
+				title={t("awdp.scoreboard.emptyTitle")}
+				description={t("awdp.scoreboard.emptyDescription")}
 			/>
 		);
 	}
 
 	return (
 		<div className="space-y-3">
-			<p className="text-xs text-muted-foreground">
-				对象：{data.participant_mode === "team" ? "队伍" : "个人"} · 题数{" "}
-				{data.gameboxes.length} · 回合 {data.rounds.length}
+			<p className="tnum text-xs text-muted-foreground">
+				{t("awdp.scoreboard.summary", {
+					mode:
+						data.participant_mode === "team"
+							? t("awdp.scoreboard.modeTeam")
+							: t("awdp.scoreboard.modeIndividual"),
+					gameboxes: data.gameboxes.length,
+					rounds: data.rounds.length,
+				})}
 			</p>
-			{data.rows.map((row) => (
-				<div
-					key={row.subject_id}
-					className={`space-y-2 rounded-md border p-3 ${row.is_me ? "border-primary bg-primary/5" : ""}`}
-				>
-					<div className="flex flex-wrap items-center gap-2">
-						<MonoText className="font-semibold">#{row.rank}</MonoText>
-						<span className="text-sm font-medium">{row.subject_name}</span>
-						{row.is_me ? <TonePill tone="info">我</TonePill> : null}
-						<span className="tnum ml-auto text-xs text-muted-foreground">
-							Break {formatScore(row.break_score)} · Fix {formatScore(row.fix_score)} · 合计{" "}
-							<span className="font-semibold text-foreground">
-								{formatScore(row.total_score)}
+			{data.rows.map((row) => {
+				const matrix: ScoreMatrixRow[] = data.gameboxes.map((gamebox, index) => ({
+					id: gamebox.id,
+					name: gamebox.name,
+					broken: row.break_status[index] ?? false,
+					statuses: row.fix_round_status[index] ?? [],
+					fixScore: row.fix_gamebox_score[index] ?? 0,
+				}));
+				const columns: DataTableColumn<ScoreMatrixRow>[] = [
+					{
+						id: "gamebox",
+						header: t("awdp.scoreboard.columnGamebox"),
+						sortValue: (item) => item.name,
+						cell: (item) => <span className="text-xs">{item.name}</span>,
+					},
+					{
+						id: "break",
+						header: t("awdp.scoreboard.columnBreak"),
+						cell: (item) =>
+							item.broken ? (
+								<TonePill tone="success">
+									{t("awdp.scoreboard.breakBroken")}
+								</TonePill>
+							) : (
+								<TonePill tone="muted">
+									{t("awdp.scoreboard.breakNotBroken")}
+								</TonePill>
+							),
+					},
+					...data.rounds.map<DataTableColumn<ScoreMatrixRow>>((round, roundIndex) => ({
+						id: `round-${round.sequence}`,
+						header: <MonoText>R{round.sequence}</MonoText>,
+						cell: (item) => {
+							const status = item.statuses[roundIndex] ?? null;
+							return status === null ? (
+								<span className="text-muted-foreground">
+									{t("common.empty")}
+								</span>
+							) : (
+								<TonePill tone={awdpEvaluationTone(status)}>
+									{awdpEvaluationLabel(status, t)}
+								</TonePill>
+							);
+						},
+					})),
+					{
+						id: "fixScore",
+						header: t("awdp.scoreboard.columnFixScore"),
+						align: "right",
+						sortValue: (item) => item.fixScore,
+						cell: (item) => <MonoText>{formatScore(item.fixScore)}</MonoText>,
+					},
+				];
+				return (
+					<section
+						key={row.subject_id}
+						className={cn(
+							"space-y-2 rounded-lg border p-3",
+							row.is_me && "border-primary bg-primary/5",
+						)}
+					>
+						<div className="flex flex-wrap items-center gap-2">
+							<MonoText className="font-semibold">#{row.rank}</MonoText>
+							<MonoText className="text-sm font-medium">{row.subject_name}</MonoText>
+							{row.is_me ? (
+								<TonePill tone="info">{t("awdp.scoreboard.me")}</TonePill>
+							) : null}
+							<span className="tnum ml-auto text-xs text-muted-foreground">
+								{t("awdp.scoreboard.totals", {
+									breakScore: formatScore(row.break_score),
+									fixScore: formatScore(row.fix_score),
+									total: formatScore(row.total_score),
+								})}
 							</span>
-						</span>
-					</div>
-					<div className="overflow-x-auto">
-						<table className="w-full text-xs">
-							<thead>
-								<tr className="text-muted-foreground">
-									<th className="px-2 py-1 text-left font-normal">题目</th>
-									<th className="px-2 py-1 text-left font-normal">Break</th>
-									{data.rounds.map((round) => (
-										<th key={round.sequence} className="px-2 py-1 text-left font-normal">
-											R{round.sequence}
-										</th>
-									))}
-									<th className="px-2 py-1 text-right font-normal">Fix 分</th>
-								</tr>
-							</thead>
-							<tbody>
-								{data.gameboxes.map((gamebox, index) => (
-									<tr key={gamebox.id} className="border-t">
-										<td className="px-2 py-1">{gamebox.name}</td>
-										<td className="px-2 py-1">
-											{row.break_status[index] ? (
-												<TonePill tone="success">已攻破</TonePill>
-											) : (
-												<TonePill tone="muted">未攻破</TonePill>
-											)}
-										</td>
-										{data.rounds.map((round, roundIndex) => {
-											const status = row.fix_round_status[index]?.[roundIndex] ?? null;
-											return (
-												<td key={round.sequence} className="px-2 py-1">
-													{status === null ? (
-														<span className="text-muted-foreground">—</span>
-													) : (
-														<TonePill tone={awdpEvaluationTone(status)}>
-															{awdpEvaluationLabel(status)}
-														</TonePill>
-													)}
-												</td>
-											);
-										})}
-										<td className="tnum px-2 py-1 text-right">
-											{formatScore(row.fix_gamebox_score[index] ?? 0)}
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-				</div>
-			))}
+						</div>
+						<DataTable
+							data={matrix}
+							getRowId={(item) => item.id}
+							columns={columns}
+						/>
+					</section>
+				);
+			})}
 		</div>
 	);
 }
 
 /** 底部 Tab：官方积分榜（`awdp.player.scores` 聚合行）。 */
 export function AwdpMyScoresPanel({ eventId }: { eventId: string }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const query = useQuery({
 		queryKey: qk.awdp.scores(eventId),
-		queryFn: () => call<AwdpScoreRow[]>(client.awdp.player.scores(eventId), "AWDP 积分"),
+		queryFn: () =>
+			call<AwdpScoreRow[]>(client.awdp.player.scores(eventId), t("awdp.calls.scores")),
 	});
 
 	if (query.isPending) return <TableSkeleton rows={5} columns={5} />;
 	if (query.isError) {
 		return (
-			<ErrorBlock error={query.error} title="加载积分失败" onRetry={() => void query.refetch()} />
+			<ErrorBlock
+				error={query.error}
+				title={t("awdp.states.loadScores")}
+				onRetry={() => void query.refetch()}
+			/>
 		);
 	}
 	const rows = query.data ?? [];
 	if (rows.length === 0) {
-		return <EmptyBlock title="暂无积分" description="比赛产生得分后这里会出现排名。" />;
+		return (
+			<EmptyBlock
+				title={t("awdp.scoreboard.scoresEmptyTitle")}
+				description={t("awdp.scoreboard.scoresEmptyDescription")}
+			/>
+		);
 	}
 	return (
 		<DataTable
@@ -956,38 +1215,40 @@ export function AwdpMyScoresPanel({ eventId }: { eventId: string }): ReactNode {
 			columns={[
 				{
 					id: "rank",
-					header: "排名",
+					header: t("awdp.scoreboard.columnRank"),
 					align: "right",
 					sortValue: (row) => row.rank,
 					cell: (row) => <MonoText>{row.rank}</MonoText>,
 				},
 				{
 					id: "subject",
-					header: "对象",
+					header: t("awdp.scoreboard.columnSubject"),
 					sortValue: (row) => row.subject_name,
-					cell: (row) => <span>{row.subject_name}</span>,
+					cell: (row) => <MonoText>{row.subject_name}</MonoText>,
 				},
 				{
 					id: "break",
-					header: "Break",
+					header: t("awdp.scoreboard.columnBreak"),
 					align: "right",
 					sortValue: (row) => row.break_score,
 					cell: (row) => <MonoText>{formatScore(row.break_score)}</MonoText>,
 				},
 				{
 					id: "fix",
-					header: "Fix",
+					header: t("awdp.scoreboard.columnFix"),
 					align: "right",
 					sortValue: (row) => row.fix_score,
 					cell: (row) => <MonoText>{formatScore(row.fix_score)}</MonoText>,
 				},
 				{
 					id: "total",
-					header: "合计",
+					header: t("awdp.scoreboard.columnTotal"),
 					align: "right",
 					sortValue: (row) => row.total_score,
 					cell: (row) => (
-						<MonoText className="font-semibold">{formatScore(row.total_score)}</MonoText>
+						<MonoText className="font-semibold">
+							{formatScore(row.total_score)}
+						</MonoText>
 					),
 				},
 			]}
@@ -1003,16 +1264,22 @@ export function AwdpMyScoresPanel({ eventId }: { eventId: string }): ReactNode {
  * 要求的「不要叠加轮询」；平台的 30s 新鲜度语义由此满足。
  */
 export function AwdpTrendPanel({ eventId }: { eventId: string }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const query = useQuery({
 		queryKey: qk.awdp.trend(eventId),
-		queryFn: () => call<AwdpTrendItem[]>(client.awdp.player.trend(eventId), "AWDP 趋势"),
+		queryFn: () =>
+			call<AwdpTrendItem[]>(client.awdp.player.trend(eventId), t("awdp.calls.trend")),
 	});
 
 	if (query.isPending) return <TableSkeleton rows={5} columns={2} />;
 	if (query.isError) {
 		return (
-			<ErrorBlock error={query.error} title="加载趋势失败" onRetry={() => void query.refetch()} />
+			<ErrorBlock
+				error={query.error}
+				title={t("awdp.states.loadTrend")}
+				onRetry={() => void query.refetch()}
+			/>
 		);
 	}
 	const series = (query.data ?? []).map((item) => ({
@@ -1022,13 +1289,18 @@ export function AwdpTrendPanel({ eventId }: { eventId: string }): ReactNode {
 			.filter((point) => Number.isFinite(point.x)),
 	}));
 	if (series.length === 0 || series.every((item) => item.points.length === 0)) {
-		return <EmptyBlock title="暂无趋势数据" description="产生得分后这里会绘制累计得分曲线。" />;
+		return (
+			<EmptyBlock
+				title={t("awdp.scoreboard.trendEmptyTitle")}
+				description={t("awdp.scoreboard.trendEmptyDescription")}
+			/>
+		);
 	}
 	return (
 		<TrendChart
 			series={series}
 			formatY={(value) => formatScore(value)}
-			formatX={(x) => new Date(x).toLocaleTimeString("zh-CN", { hour12: false })}
+			formatX={(x) => formatTime(x)}
 		/>
 	);
 }

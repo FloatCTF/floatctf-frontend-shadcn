@@ -193,9 +193,16 @@ export function countdownText(target: DateInput, now: Date = new Date()): string
 	const date = parseDate(target);
 	if (!date) return "—";
 	const diff = Math.floor((date.getTime() - now.getTime()) / 1000);
-	if (diff <= 0) return "已到时间";
-	if (diff < 60) return `${diff} 秒`;
-	if (diff < 3600) return `${Math.floor(diff / 60)} 分钟`;
-	if (diff < 86400) return `${Math.floor(diff / 3600)} 小时 ${Math.floor((diff % 3600) / 60)} 分`;
-	return `${Math.floor(diff / 86400)} 天 ${Math.floor((diff % 86400) / 3600)} 小时`;
+	if (diff <= 0) return i18n.t("common.duration.reached");
+	if (diff < 60) return i18n.t("common.duration.seconds", { count: diff });
+	if (diff < 3600) return i18n.t("common.duration.minutes", { count: Math.floor(diff / 60) });
+	if (diff < 86400)
+		return i18n.t("common.duration.hoursMinutes", {
+			hours: Math.floor(diff / 3600),
+			minutes: Math.floor((diff % 3600) / 60),
+		});
+	return i18n.t("common.duration.daysHours", {
+		days: Math.floor(diff / 86400),
+		hours: Math.floor((diff % 86400) / 3600),
+	});
 }

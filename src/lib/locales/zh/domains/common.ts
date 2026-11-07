@@ -123,6 +123,7 @@ export default {
 		emptyBlock: "（空）",
 	},
 	markdown: {
+		insertImage: "插入图片",
 		placeholder: "支持 Markdown（GFM）。",
 		uploaded: "插图已上传",
 		uploadFailed: "插图上传失败",
@@ -131,6 +132,32 @@ export default {
 	chart: {
 		label: "趋势图",
 		empty: "暂无趋势数据",
+	},
+	eventStatus: {
+		upcoming: "未开始",
+		ongoing: "进行中",
+		ended: "已结束",
+		unknown: "时间未知",
+	},
+	eventFamily: {
+		jeopardy: "Jeopardy 解题",
+		awd: "AWD 攻防",
+		awdp: "AWDP 攻防",
+	},
+	participantMode: {
+		individual: "个人赛",
+		team: "战队赛",
+	},
+	eventPurpose: {
+		competition: "正式赛",
+		practice: "练习",
+	},
+	duration: {
+		reached: "已到时间",
+		seconds: "{{count}} 秒",
+		minutes: "{{count}} 分钟",
+		hoursMinutes: "{{hours}} 小时 {{minutes}} 分",
+		daysHours: "{{days}} 天 {{hours}} 小时",
 	},
 	realtime: {
 		label: "实时",

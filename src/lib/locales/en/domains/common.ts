@@ -124,6 +124,7 @@ export default {
 		emptyBlock: "(empty)",
 	},
 	markdown: {
+		insertImage: "Insert image",
 		placeholder: "Markdown (GFM) supported.",
 		uploaded: "Image uploaded",
 		uploadFailed: "Image upload failed",
@@ -132,6 +133,32 @@ export default {
 	chart: {
 		label: "Trend chart",
 		empty: "No trend data yet",
+	},
+	eventStatus: {
+		upcoming: "Upcoming",
+		ongoing: "Ongoing",
+		ended: "Ended",
+		unknown: "Time unknown",
+	},
+	eventFamily: {
+		jeopardy: "Jeopardy",
+		awd: "AWD",
+		awdp: "AWDP",
+	},
+	participantMode: {
+		individual: "Individual",
+		team: "Team",
+	},
+	eventPurpose: {
+		competition: "Competition",
+		practice: "Practice",
+	},
+	duration: {
+		reached: "Time reached",
+		seconds: "{{count}} s",
+		minutes: "{{count}} min",
+		hoursMinutes: "{{hours}} h {{minutes}} min",
+		daysHours: "{{days}} d {{hours}} h",
 	},
 	realtime: {
 		label: "Live",

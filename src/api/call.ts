@@ -12,6 +12,8 @@
  * `FloatCTFError` rejection；`call` / `callList` 只负责取数据，让页面的 `useQuery` 三态自然成立。
  */
 
+import i18n from "~/lib/i18n";
+
 import {
 	FloatCTFError,
 	UNI_SUCCESS_CODE,
@@ -103,7 +105,7 @@ export function installEnvelopeGuard(client: FloatCTFClient): void {
 }
 
 /** 把信封（或 AxiosResponse 包裹的信封）解成数据；失败抛 `FloatCTFError`。 */
-export function unwrap<T>(response: unknown, what = "请求"): T {
+export function unwrap<T>(response: unknown, what?: string): T {
 	const envelope = asEnvelope(response);
 	if (!envelope) {
 		if (response === undefined || response === null) return undefined as T;
@@ -114,7 +116,10 @@ export function unwrap<T>(response: unknown, what = "请求"): T {
 	if (envelope.code !== UNI_SUCCESS_CODE) {
 		throw (
 			floatCTFErrorFromEnvelope(envelope) ??
-			new FloatCTFError({ message: `${what}失败`, kind: "platform" })
+			new FloatCTFError({
+				message: i18n.t("errors.whatFailed", { what: what ?? i18n.t("errors.requestFailed") }),
+				kind: "platform",
+			})
 		);
 	}
 	return (envelope.data ?? undefined) as T;

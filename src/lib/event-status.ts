@@ -34,6 +34,36 @@ export function eventStatusOf(event: Events, nowMs?: number): EventStatus {
 	return computeEventStatus(event.start_time, event.end_time ?? null, nowMs);
 }
 
+/**
+ * 状态 / 赛制 / 参赛模式 / 目的 → i18n key。
+ *
+ * 界面必须用这些 key + `t()` 渲染，**不要**直接用下面的 `*_LABEL` 常量：
+ * 常量在模块加载时求值，语言切换后不会更新，且把中文写死进了共享层。
+ * （`*_LABEL` 仅为兼容尚未迁移的调用点保留，迁移完成后删除。）
+ */
+export const EVENT_STATUS_KEY: Record<EventStatus, string> = {
+	upcoming: "common.eventStatus.upcoming",
+	ongoing: "common.eventStatus.ongoing",
+	ended: "common.eventStatus.ended",
+	unknown: "common.eventStatus.unknown",
+};
+
+export const EVENT_FAMILY_KEY: Record<string, string> = {
+	jeopardy: "common.eventFamily.jeopardy",
+	awd: "common.eventFamily.awd",
+	awdp: "common.eventFamily.awdp",
+};
+
+export const PARTICIPANT_MODE_KEY: Record<string, string> = {
+	individual: "common.participantMode.individual",
+	team: "common.participantMode.team",
+};
+
+export const EVENT_PURPOSE_KEY: Record<string, string> = {
+	competition: "common.eventPurpose.competition",
+	practice: "common.eventPurpose.practice",
+};
+
 export const EVENT_STATUS_LABEL: Record<EventStatus, string> = {
 	upcoming: "未开始",
 	ongoing: "进行中",
