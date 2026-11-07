@@ -1,58 +1,94 @@
 /**
- * AWDP 运维页的共用语义层：阶段文案、生命周期可用性、破坏性操作后果、结局判定。
+ * AWDP 运维页的共用语义层：阶段文案、生命周期可用性、破坏性操作后果、参数校验。
  *
  * AWDP 阶段状态机（后端 `AwdpPhaseExt::can_transition_to`）是**线性**的：
  * `pending → break → preparing_fix → fix → ended`，禁止跳级与回退；
  * `preparing_fix` 是真实的过渡态（实例正在被重置为 pristine），必须如实展示。
+ *
+ * 文案：本文件只产出「已翻译的展示文案」，语言由调用方传入的 `t` 决定（theme.md §8.4）；
+ * 阶段 / 动作可用性的**判定**仍然只来自 SDK `AwdpPhase` 与后端守卫，前端不自造状态。
+ * 未知阶段值原样透传，不猜测语义。
  */
 
 import type { ReactNode } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
-import type { FloatCTFClient } from "@floatctf/sdk";
+import type { AwdpPhase, FloatCTFClient } from "@floatctf/sdk";
 
 import { callVoid } from "~/api/call";
 import { isFloatCTFError } from "~/api/errors";
 import { TonePill, type PillTone } from "~/components/app/badges";
 import type { ConfirmOptions } from "~/components/app/confirm";
 
-export const AWDP_PHASE_LABEL: Record<string, string> = {
-	pending: "未开始",
-	break: "攻破阶段",
-	preparing_fix: "准备修复（过渡态）",
-	fix: "修复阶段",
-	ended: "已结束",
+/* ── 阶段 ─────────────────────────────────────────────────────────────────── */
+
+/** 后端线性阶段顺序（`AwdpPhaseExt::can_transition_to`），用于步骤条展示。 */
+export const AWDP_PHASE_ORDER: readonly AwdpPhase[] = [
+	"pending",
+	"break",
+	"preparing_fix",
+	"fix",
+	"ended",
+];
+
+const PHASE_LABEL_KEY: Record<string, string> = {
+	pending: "adminAwdpOps.phase.label.pending",
+	break: "adminAwdpOps.phase.label.break",
+	preparing_fix: "adminAwdpOps.phase.label.preparingFix",
+	fix: "adminAwdpOps.phase.label.fix",
+	ended: "adminAwdpOps.phase.label.ended",
 };
 
-export const AWDP_PHASE_TONE: Record<string, PillTone> = {
+const PHASE_DESCRIPTION_KEY: Record<string, string> = {
+	pending: "adminAwdpOps.phase.description.pending",
+	break: "adminAwdpOps.phase.description.break",
+	preparing_fix: "adminAwdpOps.phase.description.preparingFix",
+	fix: "adminAwdpOps.phase.description.fix",
+	ended: "adminAwdpOps.phase.description.ended",
+};
+
+const PHASE_TONE: Record<string, PillTone> = {
 	pending: "muted",
 	break: "info",
 	preparing_fix: "warning",
 	fix: "success",
-	ended: "neutral",
+	ended: "muted",
 };
 
-export const AWDP_PHASE_DESCRIPTION: Record<string, string> = {
-	pending: "尚未开始：等待手动开始或到点自动开始。",
-	break: "攻破阶段：选手提交 flag 得分，倒计时结束进入修复阶段。",
-	preparing_fix: "过渡态：平台正在把全部实例重置为 pristine，完成后自动进入修复阶段。",
-	fix: "修复阶段：按回合 cutoff 自动评估并计分。",
-	ended: "已结束：不再接受 flag / 修正包提交，遗留评估仍会结算。",
-};
-
-export function awdpPhaseLabel(phase: string | null | undefined): string {
-	if (!phase) return "未知";
-	return AWDP_PHASE_LABEL[phase] ?? phase;
+/** 阶段名：已知值走 i18n，未知值原样透传（theme.md §8.4 技术标识保持原文）。 */
+export function awdpPhaseLabel(phase: AwdpPhase | string | null | undefined, t: TFunction): string {
+	if (phase === null || phase === undefined || phase === "") {
+		return t("adminAwdpOps.phase.label.unknown");
+	}
+	const key = PHASE_LABEL_KEY[phase];
+	return key ? t(key) : phase;
 }
 
-export function awdpPhaseTone(phase: string | null | undefined): PillTone {
+/** 阶段说明：未知阶段给出「先刷新配置」的下一步，而不是空文案。 */
+export function awdpPhaseDescription(
+	phase: AwdpPhase | string | null | undefined,
+	t: TFunction,
+): string {
+	const key = phase ? PHASE_DESCRIPTION_KEY[phase] : undefined;
+	return key ? t(key) : t("adminAwdpOps.phase.description.unknown");
+}
+
+export function awdpPhaseTone(phase: AwdpPhase | string | null | undefined): PillTone {
 	if (!phase) return "muted";
-	return AWDP_PHASE_TONE[phase] ?? "neutral";
+	return PHASE_TONE[phase] ?? "neutral";
 }
 
-export function AwdpPhasePill({ phase }: { phase: string | null | undefined }): ReactNode {
+export function AwdpPhasePill({
+	phase,
+}: {
+	phase: AwdpPhase | string | null | undefined;
+}): ReactNode {
+	const { t } = useTranslation();
+	const description = awdpPhaseDescription(phase, t);
 	return (
-		<TonePill tone={awdpPhaseTone(phase)} title={AWDP_PHASE_DESCRIPTION[phase ?? ""]}>
-			{awdpPhaseLabel(phase)}
+		<TonePill tone={awdpPhaseTone(phase)} title={description}>
+			{awdpPhaseLabel(phase, t)}
 		</TonePill>
 	);
 }
@@ -61,65 +97,87 @@ export function AwdpPhasePill({ phase }: { phase: string | null | undefined }): 
 
 export type AwdpAction = "start" | "breakToFix" | "finish";
 
-export const AWDP_ACTION_LABEL: Record<AwdpAction, string> = {
-	start: "开始比赛",
-	breakToFix: "攻破 → 修复",
-	finish: "结束比赛",
+export const AWDP_ACTION_ORDER: readonly AwdpAction[] = ["start", "breakToFix", "finish"];
+
+const ACTION_LABEL_KEY: Record<AwdpAction, string> = {
+	start: "adminAwdpOps.actions.start",
+	breakToFix: "adminAwdpOps.actions.breakToFix",
+	finish: "adminAwdpOps.actions.finish",
 };
+
+export function awdpActionLabel(action: AwdpAction, t: TFunction): string {
+	return t(ACTION_LABEL_KEY[action]);
+}
 
 export async function runAwdpAction(
 	client: FloatCTFClient,
 	eventId: string,
 	action: AwdpAction,
+	t: TFunction,
 ): Promise<void> {
 	const admin = client.awdp.admin;
+	const what = awdpActionLabel(action, t);
 	switch (action) {
 		case "start":
-			return callVoid(admin.start(eventId), "开始比赛");
+			return callVoid(admin.start(eventId), what);
 		case "breakToFix":
-			return callVoid(admin.breakToFix(eventId), "进入修复阶段");
+			return callVoid(admin.breakToFix(eventId), what);
 		case "finish":
-			return callVoid(admin.finish(eventId), "结束比赛");
+			return callVoid(admin.finish(eventId), what);
 	}
 }
 
-export const AWDP_ACTION_CONFIRM: Record<AwdpAction, ConfirmOptions> = {
-	start: {
-		title: "开始 AWDP 比赛？",
-		description: "创建本轮比赛 run 并立即进入攻破（Break）阶段。",
-		consequences: [
-			"以当前配置快照创建比赛 run（Break 时长、Fix 时长与分值）",
-			"立即进入 Break 并开始倒计时；Break 到期后自动进入准备修复 → 修复阶段",
-			"为所有已挂载且未隐藏的 GameBox 自动启动全部参与者的实例（幂等）",
-			"开赛后配置锁定；本赛事结束后不能重新启动",
-		],
-		tone: "danger",
-		confirmText: "开始比赛",
-	},
-	breakToFix: {
-		title: "推进到修复阶段？（会重置全部实例）",
-		description: "Break → 准备修复 → 修复；该动作会把所有实例恢复为初始状态。",
-		consequences: [
-			"把全部已启动实例重置为 pristine：runtime_generation +1，公开端口不变",
-			"重置期间赛事处于 preparing_fix 过渡态；全部成功后才进入修复阶段",
-			"任一实例重置失败会停留在 preparing_fix，可用同一按钮重试（重置幂等）",
-			"进入修复阶段后按回合 cutoff 自动评估并计分",
-		],
-		tone: "danger",
-		confirmText: "进入修复阶段",
-	},
-	finish: {
-		title: "结束 AWDP 比赛？",
-		description: "Fix → Ended：比赛立即结束。",
-		consequences: [
-			"赛事进入 ended：选手不能再提交 flag 或上传修正包",
-			"已在队列中的官方评估仍会继续结算并计分",
-			"会尽力停止本 run 的全部实例并清理赛事网络（best-effort；已提交的结束状态不会回滚）",
-		],
-		tone: "danger",
-		confirmText: "结束比赛",
-	},
-};
+/**
+ * 破坏性确认文案。三个生命周期动作全部是不可逆的高危操作，因此都带 `confirmPhrase`：
+ * - start：创建 run 并锁定配置，赛事结束后不能重开；
+ * - breakToFix：重置**全部**实例为 pristine；
+ * - finish：终态，不再接受提交。
+ */
+export function awdpActionConfirm(action: AwdpAction, t: TFunction): ConfirmOptions {
+	switch (action) {
+		case "start":
+			return {
+				title: t("adminAwdpOps.confirm.start.title"),
+				description: t("adminAwdpOps.confirm.start.description"),
+				consequences: [
+					t("adminAwdpOps.confirm.start.consequence1"),
+					t("adminAwdpOps.confirm.start.consequence2"),
+					t("adminAwdpOps.confirm.start.consequence3"),
+					t("adminAwdpOps.confirm.start.consequence4"),
+				],
+				tone: "danger",
+				confirmText: t("adminAwdpOps.confirm.start.confirmText"),
+				confirmPhrase: "start",
+			};
+		case "breakToFix":
+			return {
+				title: t("adminAwdpOps.confirm.breakToFix.title"),
+				description: t("adminAwdpOps.confirm.breakToFix.description"),
+				consequences: [
+					t("adminAwdpOps.confirm.breakToFix.consequence1"),
+					t("adminAwdpOps.confirm.breakToFix.consequence2"),
+					t("adminAwdpOps.confirm.breakToFix.consequence3"),
+					t("adminAwdpOps.confirm.breakToFix.consequence4"),
+				],
+				tone: "danger",
+				confirmText: t("adminAwdpOps.confirm.breakToFix.confirmText"),
+				confirmPhrase: "reset",
+			};
+		case "finish":
+			return {
+				title: t("adminAwdpOps.confirm.finish.title"),
+				description: t("adminAwdpOps.confirm.finish.description"),
+				consequences: [
+					t("adminAwdpOps.confirm.finish.consequence1"),
+					t("adminAwdpOps.confirm.finish.consequence2"),
+					t("adminAwdpOps.confirm.finish.consequence3"),
+				],
+				tone: "danger",
+				confirmText: t("adminAwdpOps.confirm.finish.confirmText"),
+				confirmPhrase: "finish",
+			};
+	}
+}
 
 export interface AwdpActionGate {
 	enabled: boolean;
@@ -132,59 +190,49 @@ export interface AwdpActionGate {
  * - breakToFix：`transition_break_to_fix` 从 break 推进，也允许从 preparing_fix 重试；
  * - finish：`finish_awdp_event` 只做 Fix → Ended。
  */
-export function buildAwdpGates(phase: string | null): Record<AwdpAction, AwdpActionGate> {
+export function buildAwdpGates(
+	phase: AwdpPhase | string | null,
+	t: TFunction,
+): Record<AwdpAction, AwdpActionGate> {
 	switch (phase) {
 		case "pending":
 			return {
 				start: { enabled: true, reason: null },
-				breakToFix: {
-					enabled: false,
-					reason: "尚未开始：需先开始比赛进入攻破阶段",
-				},
-				finish: { enabled: false, reason: "尚未开始：无法直接结束，需先开始比赛" },
+				breakToFix: { enabled: false, reason: t("adminAwdpOps.phase.gates.pending.breakToFix") },
+				finish: { enabled: false, reason: t("adminAwdpOps.phase.gates.pending.finish") },
 			};
 		case "break":
 			return {
-				start: { enabled: false, reason: "比赛已开始：重复开始是幂等的，但不会推进阶段" },
+				start: { enabled: false, reason: t("adminAwdpOps.phase.gates.break.start") },
 				breakToFix: { enabled: true, reason: null },
-				finish: {
-					enabled: false,
-					reason: "后端只接受 Fix → Ended：请先推进到修复阶段再结束",
-				},
+				finish: { enabled: false, reason: t("adminAwdpOps.phase.gates.break.finish") },
 			};
 		case "preparing_fix":
 			return {
-				start: { enabled: false, reason: "比赛已开始" },
-				breakToFix: {
-					enabled: true,
-					reason: null,
-				},
-				finish: {
-					enabled: false,
-					reason: "过渡态：需等待（或重试）实例重置完成并进入修复阶段后才能结束",
-				},
+				start: { enabled: false, reason: t("adminAwdpOps.phase.gates.preparingFix.start") },
+				breakToFix: { enabled: true, reason: null },
+				finish: { enabled: false, reason: t("adminAwdpOps.phase.gates.preparingFix.finish") },
 			};
 		case "fix":
 			return {
-				start: { enabled: false, reason: "比赛已开始" },
-				breakToFix: { enabled: false, reason: "已处于修复阶段，无法回到攻破阶段" },
+				start: { enabled: false, reason: t("adminAwdpOps.phase.gates.fix.start") },
+				breakToFix: { enabled: false, reason: t("adminAwdpOps.phase.gates.fix.breakToFix") },
 				finish: { enabled: true, reason: null },
 			};
 		case "ended":
 			return {
-				start: {
-					enabled: false,
-					reason: "赛事已结束：后端拒绝重新启动（已结束的赛事不能重开）",
-				},
-				breakToFix: { enabled: false, reason: "赛事已结束" },
-				finish: { enabled: false, reason: "赛事已结束（终态）" },
+				start: { enabled: false, reason: t("adminAwdpOps.phase.gates.ended.start") },
+				breakToFix: { enabled: false, reason: t("adminAwdpOps.phase.gates.ended.breakToFix") },
+				finish: { enabled: false, reason: t("adminAwdpOps.phase.gates.ended.finish") },
 			};
-		default:
+		default: {
+			const reason = t("adminAwdpOps.phase.gates.unknown");
 			return {
-				start: { enabled: false, reason: "阶段未知：请先刷新赛事配置" },
-				breakToFix: { enabled: false, reason: "阶段未知：请先刷新赛事配置" },
-				finish: { enabled: false, reason: "阶段未知：请先刷新赛事配置" },
+				start: { enabled: false, reason },
+				breakToFix: { enabled: false, reason },
+				finish: { enabled: false, reason },
 			};
+		}
 	}
 }
 
@@ -193,12 +241,80 @@ export function isAwdpConflict(error: unknown): boolean {
 	return isFloatCTFError(error) && error.httpStatus === 409;
 }
 
-/** 后端 `AwdpConfig::validate()` 的回合间隔 / 时长约束（客户端先校验，后端仍是权威）。 */
-export function validateFixTiming(fixDuration: number, interval: number): string | null {
-	if (!Number.isInteger(fixDuration) || fixDuration <= 0) return "Fix 时长必须为正整数秒";
-	if (!Number.isInteger(interval) || interval <= 0) return "回合间隔必须为正整数秒";
+/* ── 实例运行态（后端 `runtime_state`）────────────────────────────────────── */
+
+const RUNTIME_LABEL_KEY: Record<string, string> = {
+	running: "adminAwdpOps.instances.runtime.running",
+	resetting: "adminAwdpOps.instances.runtime.resetting",
+	pending: "adminAwdpOps.instances.runtime.pending",
+	stopped: "adminAwdpOps.instances.runtime.stopped",
+	exited: "adminAwdpOps.instances.runtime.exited",
+};
+
+const RUNTIME_TONE: Record<string, PillTone> = {
+	running: "success",
+	resetting: "warning",
+	pending: "warning",
+	stopped: "muted",
+	exited: "muted",
+};
+
+/** 未知运行态保持后端原文（技术标识不翻译）。 */
+export function awdpRuntimeLabel(state: string | null | undefined, t: TFunction): string {
+	if (!state) return "—";
+	const key = RUNTIME_LABEL_KEY[state];
+	return key ? t(key) : state;
+}
+
+export function awdpRuntimeTone(state: string | null | undefined): PillTone {
+	if (!state) return "muted";
+	return RUNTIME_TONE[state] ?? "neutral";
+}
+
+/* ── GameBox 构建状态（后端 `BUILD_STATUS_*`）────────────────────────────── */
+
+const BUILD_STATUS_LABEL_KEY: Record<string, string> = {
+	ready: "adminAwdpOps.gameboxes.buildStatus.ready",
+	building: "adminAwdpOps.gameboxes.buildStatus.building",
+	failed: "adminAwdpOps.gameboxes.buildStatus.failed",
+};
+
+const BUILD_STATUS_TONE: Record<string, PillTone> = {
+	ready: "success",
+	building: "warning",
+	failed: "danger",
+};
+
+/** 未知构建状态保持后端原文（技术标识不翻译）。 */
+export function awdpBuildStatusLabel(status: string | null | undefined, t: TFunction): string {
+	if (!status) return "—";
+	const key = BUILD_STATUS_LABEL_KEY[status];
+	return key ? t(key) : status;
+}
+
+export function awdpBuildStatusTone(status: string | null | undefined): PillTone {
+	if (!status) return "muted";
+	return BUILD_STATUS_TONE[status] ?? "neutral";
+}
+
+/* ── 配置校验（后端 `AwdpConfig::validate()` 的约束；后端仍是权威）────────── */
+
+export function validateFixTiming(
+	fixDuration: number,
+	interval: number,
+	t: TFunction,
+): string | null {
+	if (!Number.isInteger(fixDuration) || fixDuration <= 0) {
+		return t("adminAwdpOps.config.errors.durationPositive");
+	}
+	if (!Number.isInteger(interval) || interval <= 0) {
+		return t("adminAwdpOps.config.errors.intervalPositive");
+	}
 	if (fixDuration % interval !== 0) {
-		return `Fix 时长需能被回合间隔整除（当前 ${fixDuration} / ${interval}）`;
+		return t("adminAwdpOps.config.errors.notDivisible", {
+			duration: fixDuration,
+			interval,
+		});
 	}
 	return null;
 }

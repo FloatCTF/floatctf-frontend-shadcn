@@ -11,13 +11,18 @@
  * - `container_port` 为 null = 没有 docker 运行时（static / attachment-only）；
  * - `build` 不是重新构建，而是「确保当前版本 pin 的镜像在本地存在」（必要时按 digest 拉取），
  *   只对 `build_status=ready` 的题目生效。
+ *
+ * 所有用户可见文案走 `adminCore.challenges.*` / `adminCore.form.*` / `adminCore.ops.*`。
  */
 
 import { useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import type { TFunction } from "i18next";
 import {
 	FileUp,
 	Hammer,
+	Lock,
 	Pencil,
 	Plus,
 	RefreshCw,
@@ -99,33 +104,38 @@ const EMPTY_FORM: ChallengeFormState = {
 	pidsLimit: "",
 };
 
-const PORT_RANGE = "容器端口应为 1–65535 的整数；留空表示无 docker 运行时。";
-
-function validate(form: ChallengeFormState, mode: "create" | "edit"): ChallengeFormErrors {
+function validate(form: ChallengeFormState, mode: "create" | "edit", t: TFunction): ChallengeFormErrors {
 	const errors: ChallengeFormErrors = {};
-	if (!form.name.trim()) errors.name = "题目名称不能为空";
-	if (!form.category.trim()) errors.category = "分类不能为空";
+	if (!form.name.trim()) errors.name = t("adminCore.challenges.validation.nameRequired");
+	if (!form.category.trim()) {
+		errors.category = t("adminCore.challenges.validation.categoryRequired");
+	}
 	if (mode === "edit") {
 		const port = parseIntInput(form.containerPort);
-		if (port.kind === "invalid") errors.containerPort = PORT_RANGE;
-		else if (port.kind === "ok" && (port.value < 1 || port.value > 65535)) {
-			errors.containerPort = PORT_RANGE;
+		if (port.kind === "invalid") {
+			errors.containerPort = t("adminCore.challenges.validation.portRange");
+		} else if (port.kind === "ok" && (port.value < 1 || port.value > 65535)) {
+			errors.containerPort = t("adminCore.challenges.validation.portRange");
 		}
 		for (const [key, label] of [
-			["cpuMillis", "推荐 CPU"],
-			["memoryBytes", "推荐内存"],
-			["pidsLimit", "推荐 PID 上限"],
+			["cpuMillis", t("adminCore.form.labels.recommendedCpu")],
+			["memoryBytes", t("adminCore.form.labels.recommendedMemory")],
+			["pidsLimit", t("adminCore.form.labels.recommendedPids")],
 		] as const) {
 			const parsed = parseIntInput(form[key]);
-			if (parsed.kind === "invalid") errors[key] = `${label}应为整数；留空表示不修改。`;
-			else if (parsed.kind === "ok" && parsed.value <= 0) errors[key] = `${label}必须大于 0。`;
+			if (parsed.kind === "invalid") {
+				errors[key] = t("adminCore.form.integerField", { label });
+			} else if (parsed.kind === "ok" && parsed.value <= 0) {
+				errors[key] = t("adminCore.form.positiveField", { label });
+			}
 		}
 	}
 	return errors;
 }
 
 export function AdminChallengesPage(): ReactNode {
-	useDocumentTitle("题库管理 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminCore.challenges.documentTitle"));
 	const client = useClient();
 	const queryClient = useAppQueryClient();
 	const confirm = useConfirm();
@@ -174,7 +184,7 @@ export function AdminChallengesPage(): ReactNode {
 						description: body.description,
 						hidden: body.hidden,
 					}),
-					"创建题目",
+					t("adminCore.actions.createChallenge"),
 				);
 			}
 			const port = parseIntInput(body.containerPort);
@@ -197,26 +207,34 @@ export function AdminChallengesPage(): ReactNode {
 					...(memory.kind === "ok" ? { recommended_memory_bytes: memory.value } : {}),
 					...(pids.kind === "ok" ? { recommended_pids_limit: pids.value } : {}),
 				}),
-				"更新题目",
+				t("adminCore.actions.updateChallenge"),
 			);
 		},
 		onSuccess: (_data, input) => {
-			toast.success(input.mode === "create" ? "题目已创建" : "题目已更新");
+			toast.success(
+				input.mode === "create"
+					? t("adminCore.challenges.toasts.created")
+					: t("adminCore.challenges.toasts.updated"),
+			);
 			invalidate();
 			setEditing(null);
 			setErrors({});
 		},
-		onError: (error) => toast.apiError("保存题目失败", error),
+		onError: (error) => toast.apiError(t("adminCore.challenges.toasts.saveFailed"), error),
 	});
 
 	const remove = useMutation({
-		mutationFn: (ids: string[]) => call<number>(client.admin.challenges.remove(ids), "删除题目"),
+		mutationFn: (ids: string[]) =>
+			call<number>(client.admin.challenges.remove(ids), t("adminCore.actions.deleteChallenges")),
 		onSuccess: (count) => {
-			toast.success(`已删除 ${count} 道题目`, "题目包目录与镜像不会被自动清理，如需回收请手动处理。");
+			toast.success(
+				t("adminCore.challenges.toasts.deleted", { count }),
+				t("adminCore.challenges.toasts.deletedDescription"),
+			);
 			invalidate();
 			setSelectedIds([]);
 		},
-		onError: (error) => toast.apiError("删除题目失败", error),
+		onError: (error) => toast.apiError(t("adminCore.challenges.toasts.deleteFailed"), error),
 	});
 
 	const importMutation = useMutation({
@@ -233,59 +251,97 @@ export function AdminChallengesPage(): ReactNode {
 			setImported(data.challenge);
 			setFile(null);
 			setProgress(0);
-			toast.success("题目包导入完成", `题目：${data.challenge.name}`);
+			toast.success(
+				t("adminCore.challenges.toasts.imported"),
+				t("adminCore.challenges.toasts.importedDescription", { name: data.challenge.name }),
+			);
 			invalidate();
 		},
 		onError: (error) => {
 			setProgress(0);
-			toast.apiError("导入题目包失败", error);
+			toast.apiError(t("adminCore.challenges.toasts.importFailed"), error);
 		},
 	});
 
 	const scan = useMutation({
-		mutationFn: () => call<ChallengeScanItem[]>(client.admin.challenges.scanChallenges(), "扫描题目目录"),
+		mutationFn: () =>
+			call<ChallengeScanItem[]>(
+				client.admin.challenges.scanChallenges(),
+				t("adminCore.actions.scanChallenges"),
+			),
 		onSuccess: (items) => {
 			setScanItems(items);
 			const failed = items.filter((item) => item.status === "error").length;
-			if (failed > 0) toast.warning(`扫描完成：${items.length} 条，其中 ${failed} 条失败`);
-			else toast.success(`扫描完成：${items.length} 条结果`);
+			if (failed > 0) {
+				toast.warning(
+					t("adminCore.challenges.toasts.scanWarning", {
+						count: items.length,
+						failed,
+					}),
+				);
+			} else {
+				toast.success(
+					t("adminCore.challenges.toasts.scanSuccess", { count: items.length }),
+				);
+			}
 			invalidate();
 		},
-		onError: (error) => toast.apiError("扫描题目目录失败", error),
+		onError: (error) => toast.apiError(t("adminCore.challenges.toasts.scanFailed"), error),
 	});
 
 	const check = useMutation({
 		mutationFn: (ids?: string[]) =>
-			call<ChallengeCheckResult[]>(client.admin.challenges.checkChallenges(ids), "校验题目"),
+			call<ChallengeCheckResult[]>(
+				client.admin.challenges.checkChallenges(ids),
+				t("adminCore.actions.checkChallenges"),
+			),
 		onSuccess: (items) => {
 			setCheckItems(items);
 			const failed = items.filter((item) => !item.is_ok).length;
-			if (failed > 0) toast.warning(`校验完成：${items.length} 题，${failed} 题不可用`);
-			else toast.success(`校验完成：${items.length} 题全部可用`);
+			if (failed > 0) {
+				toast.warning(
+					t("adminCore.challenges.toasts.checkWarning", {
+						count: items.length,
+						failed,
+					}),
+				);
+			} else {
+				toast.success(
+					t("adminCore.challenges.toasts.checkSuccess", { count: items.length }),
+				);
+			}
 			invalidate();
 		},
-		onError: (error) => toast.apiError("校验题目失败", error),
+		onError: (error) => toast.apiError(t("adminCore.challenges.toasts.checkFailed"), error),
 	});
 
 	const build = useMutation({
 		mutationFn: (ids?: string[]) =>
-			call<BuildChallengeResult[]>(client.admin.challenges.buildChallenges(ids), "构建题目"),
+			call<BuildChallengeResult[]>(
+				client.admin.challenges.buildChallenges(ids),
+				t("adminCore.actions.buildChallenges"),
+			),
 		onSuccess: (items) => {
 			setBuildItems(items);
 			const failed = items.filter((item) => !item.is_ok);
 			if (items.length === 0) {
 				toast.warning(
-					"没有可构建的镜像",
-					"构建只对 build_status=ready（当前版本镜像已 pin）的题目生效；static / 仅附件题目没有镜像。",
+					t("adminCore.challenges.toasts.buildEmptyTitle"),
+					t("adminCore.challenges.toasts.buildEmptyDescription"),
 				);
 			} else if (failed.length > 0) {
-				toast.error(`${failed.length} 题构建失败`, failed[0]?.message);
+				toast.error(
+					t("adminCore.challenges.toasts.buildFailedTitle", { count: failed.length }),
+					failed[0]?.message,
+				);
 			} else {
-				toast.success(`${items.length} 题镜像已就绪`);
+				toast.success(
+					t("adminCore.challenges.toasts.buildSuccess", { count: items.length }),
+				);
 			}
 			invalidate();
 		},
-		onError: (error) => toast.apiError("构建题目失败", error),
+		onError: (error) => toast.apiError(t("adminCore.challenges.toasts.buildFailed"), error),
 	});
 
 	function openCreate(): void {
@@ -314,10 +370,10 @@ export function AdminChallengesPage(): ReactNode {
 
 	function submit(): void {
 		if (!editing) return;
-		const nextErrors = validate(form, editing.mode);
+		const nextErrors = validate(form, editing.mode, t);
 		setErrors(nextErrors);
 		if (Object.keys(nextErrors).length > 0) {
-			toast.warning("请先修正表单中的错误");
+			toast.warning(t("adminCore.form.fixErrors"));
 			return;
 		}
 		save.mutate({ mode: editing.mode, id: editing.row?.id, body: form });
@@ -325,14 +381,14 @@ export function AdminChallengesPage(): ReactNode {
 
 	async function confirmRemoveOne(row: ChallengesListItem): Promise<void> {
 		const ok = await confirm({
-			title: `删除题目「${row.name}」？`,
-			description: "该操作不可恢复。",
+			title: t("adminCore.challenges.confirm.deleteOneTitle", { name: row.name }),
+			description: t("adminCore.challenges.confirm.deleteDescription"),
 			consequences: [
-				"题目行被删除，该题在所有赛事中的挂题、解题记录与题解将级联失效",
-				"已启动的实例与镜像不会自动回收，需要人工清理",
+				t("adminCore.challenges.confirm.deleteConsequence1"),
+				t("adminCore.challenges.confirm.deleteConsequence2"),
 			],
 			tone: "danger",
-			confirmText: "删除",
+			confirmText: t("adminCore.challenges.confirm.delete"),
 			confirmPhrase: row.name,
 		});
 		if (ok) remove.mutate([row.id]);
@@ -340,18 +396,22 @@ export function AdminChallengesPage(): ReactNode {
 
 	async function confirmRemoveSelected(): Promise<void> {
 		if (selectedIds.length === 0) {
-			toast.warning("请先选择要删除的题目");
+			toast.warning(t("adminCore.challenges.toasts.selectForDelete"));
 			return;
 		}
 		const ok = await confirm({
-			title: `删除选中的 ${selectedIds.length} 道题目？`,
-			description: "该操作不可恢复。",
+			title: t("adminCore.challenges.confirm.deleteSelectedTitle", {
+				count: selectedIds.length,
+			}),
+			description: t("adminCore.challenges.confirm.deleteDescription"),
 			consequences: [
-				`${selectedIds.length} 道题目及其解题记录会被级联删除`,
-				"已构建的镜像与磁盘上的题目包目录不会被回收",
+				t("adminCore.challenges.confirm.deleteSelectedConsequence1", {
+					count: selectedIds.length,
+				}),
+				t("adminCore.challenges.confirm.deleteSelectedConsequence2"),
 			],
 			tone: "danger",
-			confirmText: "删除",
+			confirmText: t("adminCore.challenges.confirm.delete"),
 			confirmPhrase: "delete",
 		});
 		if (ok) remove.mutate(selectedIds);
@@ -359,30 +419,32 @@ export function AdminChallengesPage(): ReactNode {
 
 	async function confirmBuild(ids: string[]): Promise<void> {
 		const ok = await confirm({
-			title: ids.length === 1 ? "构建该题目的镜像？" : `构建选中的 ${ids.length} 道题目？`,
-			description:
-				"构建 = 确保当前版本 pin 的镜像在本地 Docker 中存在（缺失时按 digest 拉取），不是重新编译。",
+			title:
+				ids.length === 1
+					? t("adminCore.challenges.confirm.buildOneTitle")
+					: t("adminCore.challenges.confirm.buildSelectedTitle", { count: ids.length }),
+			description: t("adminCore.challenges.confirm.buildDescription"),
 			consequences: [
-				"会占用宿主 Docker / 网络资源，镜像较大时可能耗时数分钟",
-				"只对 build_status=ready 的题目生效；static / 仅附件题目没有镜像，会被跳过",
-				"失败原因（如 registry 不可达）会逐条列出",
+				t("adminCore.challenges.confirm.buildConsequence1"),
+				t("adminCore.challenges.confirm.buildConsequence2"),
+				t("adminCore.challenges.confirm.buildConsequence3"),
 			],
 			tone: "default",
-			confirmText: "开始构建",
+			confirmText: t("adminCore.challenges.confirm.buildConfirm"),
 		});
 		if (ok) build.mutate(ids.length > 0 ? ids : undefined);
 	}
 
 	async function confirmScan(): Promise<void> {
 		const ok = await confirm({
-			title: "扫描题目目录并登记未入库的题目包？",
-			description: "扫描后端配置的 CHALLENGES_DIR，把磁盘上存在但数据库里没有的题目包登记进来。",
+			title: t("adminCore.challenges.confirm.scanTitle"),
+			description: t("adminCore.challenges.confirm.scanDescription"),
 			consequences: [
-				"会向题库写入新题目行（已存在的包只会被 skipped，不会覆盖版本）",
-				"结果逐条列出 added / skipped / error 及原因",
+				t("adminCore.challenges.confirm.scanConsequence1"),
+				t("adminCore.challenges.confirm.scanConsequence2"),
 			],
 			tone: "default",
-			confirmText: "开始扫描",
+			confirmText: t("adminCore.challenges.confirm.scanConfirm"),
 		});
 		if (ok) scan.mutate();
 	}
@@ -390,15 +452,15 @@ export function AdminChallengesPage(): ReactNode {
 	async function confirmImport(): Promise<void> {
 		if (!file) return;
 		const ok = await confirm({
-			title: `导入题目包「${file.name}」？`,
-			description: "导入 = 解压 package + 按 manifest 同步构建镜像并 pin digest。",
+			title: t("adminCore.challenges.confirm.importTitle", { file: file.name }),
+			description: t("adminCore.challenges.confirm.importDescription"),
 			consequences: [
-				"会占用宿主 Docker / 网络资源，构建可能耗时数分钟",
-				"同名题目按严格递增版本号 upsert 身份行，可能出现 safe_name 冲突而失败",
-				"失败会写入 build_status=failed 与 build_error，可用「校验」查看",
+				t("adminCore.challenges.confirm.importConsequence1"),
+				t("adminCore.challenges.confirm.importConsequence2"),
+				t("adminCore.challenges.confirm.importConsequence3"),
 			],
 			tone: "default",
-			confirmText: "开始导入",
+			confirmText: t("adminCore.challenges.confirm.importConfirm"),
 		});
 		if (ok) importMutation.mutate(file);
 	}
@@ -406,7 +468,7 @@ export function AdminChallengesPage(): ReactNode {
 	const columns: DataTableColumn<ChallengesListItem>[] = [
 		{
 			id: "name",
-			header: "题目",
+			header: t("adminCore.challenges.columns.challenge"),
 			cell: (row) => (
 				<div className="min-w-0">
 					<p className="truncate text-sm font-medium">{row.name}</p>
@@ -420,7 +482,7 @@ export function AdminChallengesPage(): ReactNode {
 		},
 		{
 			id: "version",
-			header: "版本 / 构建",
+			header: t("adminCore.challenges.columns.versionBuild"),
 			cell: (row) => (
 				<div className="flex flex-wrap items-center gap-1">
 					<MonoText>{row.version ?? "—"}</MonoText>
@@ -431,43 +493,67 @@ export function AdminChallengesPage(): ReactNode {
 		},
 		{
 			id: "image",
-			header: "镜像",
+			header: t("adminCore.challenges.columns.image"),
 			cell: (row) =>
 				row.image_ref ? (
 					<div className="min-w-0">
 						<MonoText title={row.image_ref}>{row.image_ref}</MonoText>
 						{row.image_repo_digest ? (
-							<span className="ml-1 text-xs text-muted-foreground" title="已 pin 到 repo digest">
-								🔒
+							<span
+								className="ml-1 inline-flex text-muted-foreground"
+								role="img"
+								aria-label={t("adminCore.common.repositoryPinned")}
+								title={t("adminCore.common.repositoryPinned")}
+							>
+								<Lock className="size-4" aria-hidden="true" />
 							</span>
 						) : null}
 					</div>
 				) : (
-					<span className="text-xs text-muted-foreground">无镜像（static / 仅附件）</span>
+					<span className="text-xs text-muted-foreground">
+						{t("adminCore.challenges.noImage")}
+					</span>
 				),
 			hideBelow: "lg",
 		},
 		{
 			id: "runtime",
-			header: "运行时 / 资源",
+			header: t("adminCore.challenges.columns.runtime"),
 			cell: (row) => (
 				<div className="space-y-0.5">
 					<div className="text-xs">
 						{row.container_port === null || row.container_port === undefined ? (
-							<span className="text-muted-foreground">无容器端口</span>
+							<span className="text-muted-foreground">
+								{t("adminCore.common.noContainerPort")}
+							</span>
 						) : (
-							<MonoText>port {row.container_port}</MonoText>
+							<MonoText>
+								{t("adminCore.challenges.port", { port: row.container_port })}
+							</MonoText>
 						)}
 					</div>
 					<div className="tnum font-mono text-xs text-muted-foreground">
-						{row.recommended_cpu_millis ? `${row.recommended_cpu_millis}m` : "—"} /{" "}
-						{row.recommended_memory_bytes ? formatBytes(row.recommended_memory_bytes) : "—"} /{" "}
-						{row.recommended_pids_limit ?? "—"} pids
+						{t("adminCore.common.runtimeValue", {
+							cpu: row.recommended_cpu_millis ? `${row.recommended_cpu_millis}m` : "—",
+							memory: row.recommended_memory_bytes
+								? formatBytes(row.recommended_memory_bytes)
+								: "—",
+							pids: row.recommended_pids_limit ?? "—",
+						})}
 					</div>
 					{row.attachment ? (
-						<div className="max-w-48 truncate text-xs text-muted-foreground" title={row.attachment.path}>
-							附件 {row.attachment.name}
-							{row.attachment.size ? ` · ${formatBytes(row.attachment.size)}` : ""}
+						<div
+							className="max-w-48 truncate text-xs text-muted-foreground"
+							title={row.attachment.path}
+						>
+							{row.attachment.size
+								? t("adminCore.challenges.attachmentWithSize", {
+										name: row.attachment.name,
+										size: formatBytes(row.attachment.size),
+									})
+								: t("adminCore.challenges.attachment", {
+										name: row.attachment.name,
+									})}
 						</div>
 					) : null}
 				</div>
@@ -476,10 +562,13 @@ export function AdminChallengesPage(): ReactNode {
 		},
 		{
 			id: "flag",
-			header: "静态 Flag",
+			header: t("adminCore.challenges.columns.staticFlag"),
 			cell: (row) =>
 				row.static_flag_value ? (
-					<SecretValue value={row.static_flag_value} label="静态 flag" />
+					<SecretValue
+						value={row.static_flag_value}
+						label={t("adminCore.challenges.staticFlagValue")}
+					/>
 				) : (
 					<span className="text-xs text-muted-foreground">
 						{row.flag_type ? row.flag_type : "—"}
@@ -488,10 +577,12 @@ export function AdminChallengesPage(): ReactNode {
 		},
 		{
 			id: "hidden",
-			header: "可见性",
+			header: t("adminCore.challenges.columns.visibility"),
 			cell: (row) => (
 				<TonePill tone={row.hidden ? "muted" : "success"}>
-					{row.hidden ? "已隐藏" : "公开"}
+					{row.hidden
+						? t("adminCore.common.visibility.hidden")
+						: t("adminCore.common.visibility.public")}
 				</TonePill>
 			),
 			sortValue: (row) => (row.hidden ? 1 : 0),
@@ -499,9 +590,11 @@ export function AdminChallengesPage(): ReactNode {
 		},
 		{
 			id: "updated_at",
-			header: "最近更新",
+			header: t("adminCore.challenges.columns.updatedAt"),
 			cell: (row) => (
-				<span className="tnum text-xs text-muted-foreground">{formatDateTime(row.updated_at)}</span>
+				<span className="tnum text-xs text-muted-foreground">
+					{formatDateTime(row.updated_at)}
+				</span>
 			),
 			sortValue: (row) => Date.parse(row.updated_at),
 			hideBelow: "lg",
@@ -514,30 +607,33 @@ export function AdminChallengesPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="题库管理"
-				description="题目的身份字段可手工维护；版本内容、镜像与 flag 通过导入题目包进入。"
+				title={t("adminCore.challenges.title")}
+				description={t("adminCore.challenges.description")}
 				actions={
 					<Toolbar>
 						<Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
-							<RefreshCw className={query.isFetching ? "animate-spin" : undefined} />
-							刷新
+							<RefreshCw
+								className={query.isFetching ? "animate-spin" : undefined}
+								aria-hidden="true"
+							/>
+							{t("common.refresh")}
 						</Button>
 						<Button onClick={openCreate}>
-							<Plus /> 新建题目
+							<Plus aria-hidden="true" /> {t("adminCore.challenges.new")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
 			<SectionCard
-				title="题目列表"
-				description="搜索在题目名称 / safe_name / 分类上做服务端 OR 匹配。"
+				title={t("adminCore.challenges.listTitle")}
+				description={t("adminCore.challenges.listDescription")}
 				actions={
 					<Toolbar>
 						<SearchInput
 							value={list.search}
 							onChange={list.setSearch}
-							placeholder="搜索名称 / safe_name / 分类"
+							placeholder={t("adminCore.challenges.searchPlaceholder")}
 						/>
 						<Button
 							variant="outline"
@@ -545,7 +641,10 @@ export function AdminChallengesPage(): ReactNode {
 							onClick={() => void confirmScan()}
 							disabled={scan.isPending}
 						>
-							<ScanSearch /> {scan.isPending ? "扫描中…" : "扫描目录"}
+							<ScanSearch aria-hidden="true" />{" "}
+							{scan.isPending
+								? t("adminCore.challenges.scanning")
+								: t("adminCore.challenges.scan")}
 						</Button>
 						<Button
 							variant="outline"
@@ -553,7 +652,12 @@ export function AdminChallengesPage(): ReactNode {
 							onClick={() => check.mutate(selectedIds.length > 0 ? selectedIds : undefined)}
 							disabled={check.isPending}
 						>
-							<ShieldCheck /> {check.isPending ? "校验中…" : selectedIds.length > 0 ? "校验选中" : "校验全部"}
+							<ShieldCheck aria-hidden="true" />{" "}
+							{check.isPending
+								? t("adminCore.challenges.checking")
+								: selectedIds.length > 0
+									? t("adminCore.challenges.checkSelected")
+									: t("adminCore.challenges.checkAll")}
 						</Button>
 						<Button
 							variant="outline"
@@ -561,7 +665,7 @@ export function AdminChallengesPage(): ReactNode {
 							onClick={() => fileInputRef.current?.click()}
 							disabled={importMutation.isPending}
 						>
-							<FileUp /> 选择题目包
+							<FileUp aria-hidden="true" /> {t("adminCore.challenges.choosePackage")}
 						</Button>
 						{selectedIds.length > 0 ? (
 							<>
@@ -571,7 +675,8 @@ export function AdminChallengesPage(): ReactNode {
 									onClick={() => void confirmBuild(selectedIds)}
 									disabled={build.isPending}
 								>
-									<Hammer /> 构建选中（{selectedIds.length}）
+									<Hammer aria-hidden="true" />{" "}
+									{t("adminCore.challenges.buildSelected", { count: selectedIds.length })}
 								</Button>
 								<Button
 									variant="destructive"
@@ -579,7 +684,8 @@ export function AdminChallengesPage(): ReactNode {
 									onClick={() => void confirmRemoveSelected()}
 									disabled={remove.isPending}
 								>
-									<Trash2 /> 删除选中（{selectedIds.length}）
+									<Trash2 aria-hidden="true" />{" "}
+									{t("adminCore.challenges.deleteSelected", { count: selectedIds.length })}
 								</Button>
 							</>
 						) : null}
@@ -609,7 +715,10 @@ export function AdminChallengesPage(): ReactNode {
 						event.target.value = "";
 						if (!selected) return;
 						if (!selected.name.toLowerCase().endsWith(".zip")) {
-							toast.error("只支持 ZIP 题目包", "package zip 应为 meta.toml + src/** + attachment/**。");
+							toast.error(
+								t("adminCore.challenges.toasts.zipOnly"),
+								t("adminCore.challenges.toasts.zipOnlyDescription"),
+							);
 							return;
 						}
 						setFile(selected);
@@ -623,33 +732,47 @@ export function AdminChallengesPage(): ReactNode {
 							<div className="min-w-0">
 								<p className="truncate text-sm font-medium">{file.name}</p>
 								<p className="tnum text-xs text-muted-foreground">
-									{formatBytes(file.size)} · 导入为同步构建，可能耗时数分钟
+									{t("adminCore.common.syncBuildHint", { size: formatBytes(file.size) })}
 								</p>
 							</div>
 							<div className="flex items-center gap-2">
 								<Button variant="ghost" size="sm" onClick={() => setFile(null)}>
-									取消
+									{t("common.cancel")}
 								</Button>
-								<Button size="sm" onClick={() => void confirmImport()} disabled={importMutation.isPending}>
-									<FileUp /> {importMutation.isPending ? "导入中…" : "开始导入"}
+								<Button
+									size="sm"
+									onClick={() => void confirmImport()}
+									disabled={importMutation.isPending}
+								>
+									<FileUp aria-hidden="true" />{" "}
+									{importMutation.isPending
+										? t("adminCore.common.importing")
+										: t("adminCore.common.startImport")}
 								</Button>
 							</div>
 						</div>
 						{importMutation.isPending || progress > 0 ? (
 							<div className="space-y-1">
-								<Progress value={progress} aria-label="上传进度" />
-								<p className="tnum text-xs text-muted-foreground">上传进度 {progress}%</p>
+								<Progress
+									value={progress}
+									aria-label={t("adminCore.common.uploadProgressLabel")}
+								/>
+								<p className="tnum text-xs text-muted-foreground">
+									{t("adminCore.common.uploadProgress", { percent: progress })}
+								</p>
 							</div>
 						) : null}
 					</div>
 				) : null}
 
 				{imported ? (
-					<div className="flex flex-wrap items-center gap-3 border-b bg-emerald-500/10 px-4 py-2 text-sm">
-						<span className="font-medium">导入成功：</span>
+					<div className="flex flex-wrap items-center gap-3 border-b border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+						<span className="font-medium">{t("adminCore.common.importSuccess")}</span>
 						<span>{imported.name}</span>
 						<MonoText>{imported.safe_name}</MonoText>
-						<MonoText>v{imported.version ?? "—"}</MonoText>
+						<MonoText>
+							{t("adminCore.common.versionShort", { version: imported.version ?? "—" })}
+						</MonoText>
 						<BuildStatusPill status={imported.build_status} />
 						{imported.build_error ? (
 							<span className="text-xs text-destructive">{imported.build_error}</span>
@@ -660,22 +783,25 @@ export function AdminChallengesPage(): ReactNode {
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={5} />}
-					errorTitle="加载题库失败"
+					errorTitle={t("adminCore.challenges.error")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
 						list.filter ? (
 							<EmptyBlock
 								variant="filtered"
-								title="没有匹配的题目"
-								description={`没有名称 / safe_name / 分类匹配「${list.search}」的题目。`}
+								title={t("adminCore.challenges.filtered.title")}
+								description={t("adminCore.challenges.filtered.description", {
+									query: list.search,
+								})}
 							/>
 						) : (
 							<EmptyBlock
-								title="题库还是空的"
-								description="导入题目包（建议）或手工创建题目身份。"
+								title={t("adminCore.challenges.empty.title")}
+								description={t("adminCore.challenges.empty.description")}
 								action={
 									<Button size="sm" onClick={() => fileInputRef.current?.click()}>
-										<FileUp /> 选择题目包
+										<FileUp aria-hidden="true" />{" "}
+										{t("adminCore.challenges.choosePackage")}
 									</Button>
 								}
 							/>
@@ -697,12 +823,15 @@ export function AdminChallengesPage(): ReactNode {
 										<BuildStatusPill status={row.build_status} />
 									</div>
 									<MonoText className="text-muted-foreground">
-										{row.safe_name} · {row.category} · v{row.version ?? "—"}
+										{row.safe_name} · {row.category} ·{" "}
+										{t("adminCore.common.versionShort", {
+											version: row.version ?? "—",
+										})}
 									</MonoText>
 									{row.image_ref ? <MonoText>{row.image_ref}</MonoText> : null}
 									<div className="flex flex-wrap gap-2 pt-1">
 										<Button variant="outline" size="sm" onClick={() => openEdit(row)}>
-											<Pencil /> 编辑
+											<Pencil aria-hidden="true" /> {t("common.edit")}
 										</Button>
 										<Button
 											variant="outline"
@@ -710,7 +839,8 @@ export function AdminChallengesPage(): ReactNode {
 											onClick={() => check.mutate([row.id])}
 											disabled={check.isPending}
 										>
-											<ShieldCheck /> 校验
+											<ShieldCheck aria-hidden="true" />{" "}
+											{t("adminCore.challenges.check")}
 										</Button>
 										{canBuild(row) ? (
 											<Button
@@ -719,7 +849,8 @@ export function AdminChallengesPage(): ReactNode {
 												onClick={() => void confirmBuild([row.id])}
 												disabled={build.isPending}
 											>
-												<Hammer /> 构建
+												<Hammer aria-hidden="true" />{" "}
+												{t("adminCore.challenges.build")}
 											</Button>
 										) : null}
 										<Button
@@ -727,27 +858,34 @@ export function AdminChallengesPage(): ReactNode {
 											size="sm"
 											onClick={() => void confirmRemoveOne(row)}
 										>
-											<Trash2 /> 删除
+											<Trash2 aria-hidden="true" /> {t("common.delete")}
 										</Button>
 									</div>
 								</div>
 							)}
 							rowActions={(row) => (
-								<RowMenu label={`题目 ${row.name} 的操作`}>
+								<RowMenu
+									label={t("adminCore.challenges.rowMenu", { name: row.name })}
+								>
 									<DropdownMenuItem onSelect={() => openEdit(row)}>
-										<Pencil /> 编辑
+										<Pencil aria-hidden="true" /> {t("common.edit")}
 									</DropdownMenuItem>
 									<DropdownMenuItem onSelect={() => check.mutate([row.id])}>
-										<ShieldCheck /> 校验该题
+										<ShieldCheck aria-hidden="true" />{" "}
+										{t("adminCore.challenges.checkOne")}
 									</DropdownMenuItem>
 									{canBuild(row) ? (
 										<DropdownMenuItem onSelect={() => void confirmBuild([row.id])}>
-											<Hammer /> 构建镜像
+											<Hammer aria-hidden="true" />{" "}
+											{t("adminCore.challenges.buildImage")}
 										</DropdownMenuItem>
 									) : null}
 									<DropdownMenuSeparator />
-									<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemoveOne(row)}>
-										<Trash2 /> 删除
+									<DropdownMenuItem
+										variant="destructive"
+										onSelect={() => void confirmRemoveOne(row)}
+									>
+										<Trash2 aria-hidden="true" /> {t("common.delete")}
 									</DropdownMenuItem>
 								</RowMenu>
 							)}
@@ -758,8 +896,10 @@ export function AdminChallengesPage(): ReactNode {
 
 			{scanItems ? (
 				<ResultsCard
-					title="题目目录扫描结果"
-					description={`后端返回 ${scanItems.length} 条（added / skipped / error 原样展示）。`}
+					title={t("adminCore.challenges.results.scanTitle")}
+					description={t("adminCore.challenges.results.scanDescription", {
+						count: scanItems.length,
+					})}
 					onDismiss={() => setScanItems(null)}
 				>
 					<ScanResultTable items={scanItems} />
@@ -768,21 +908,32 @@ export function AdminChallengesPage(): ReactNode {
 
 			{checkItems ? (
 				<ResultsCard
-					title="校验结果"
-					description={`${checkItems.length} 题，${checkItems.filter((item) => !item.is_ok).length} 题不可用。`}
+					title={t("adminCore.challenges.results.checkTitle")}
+					description={t("adminCore.challenges.results.checkDescription", {
+						count: checkItems.length,
+						failed: checkItems.filter((item) => !item.is_ok).length,
+					})}
 					onDismiss={() => setCheckItems(null)}
 				>
-					<CheckResultTable items={checkItems} onBuild={(id) => void confirmBuild([id])} building={build.isPending} />
+					<CheckResultTable
+						items={checkItems}
+						onBuild={(id) => void confirmBuild([id])}
+						building={build.isPending}
+					/>
 				</ResultsCard>
 			) : null}
 
 			{buildItems ? (
 				<ResultsCard
-					title="构建结果"
-					description="逐题结果与后端消息（失败原因原样展示）。"
+					title={t("adminCore.challenges.results.buildTitle")}
+					description={t("adminCore.challenges.results.buildDescription")}
 					onDismiss={() => setBuildItems(null)}
 				>
-					<BuildResultTable items={buildItems} nameOf={(row) => row.challenge_name} label="题目" />
+					<BuildResultTable
+						items={buildItems}
+						nameOf={(row) => row.challenge_name}
+						label={t("adminCore.challenges.columns.challenge")}
+					/>
 				</ResultsCard>
 			) : null}
 
@@ -791,17 +942,25 @@ export function AdminChallengesPage(): ReactNode {
 				onOpenChange={(open) => {
 					if (!open) setEditing(null);
 				}}
-				title={editing?.mode === "edit" ? "编辑题目" : "新建题目"}
+				title={
+					editing?.mode === "edit"
+						? t("adminCore.challenges.sheet.editTitle")
+						: t("adminCore.challenges.sheet.createTitle")
+				}
 				description={
 					editing?.mode === "edit"
-						? "版本、镜像与附件由导入决定，这里只能维护身份字段、静态 flag 与运行时参数。"
-						: "手工创建只写入身份字段；要获得可运行的镜像请使用「选择题目包」导入。"
+						? t("adminCore.challenges.sheet.editDescription")
+						: t("adminCore.challenges.sheet.createDescription")
 				}
 				width="lg"
 				footer={
 					<FormFooter
 						onCancel={() => setEditing(null)}
-						submitLabel={editing?.mode === "edit" ? "保存修改" : "创建题目"}
+						submitLabel={
+							editing?.mode === "edit"
+								? t("adminCore.challenges.sheet.submitSave")
+								: t("adminCore.challenges.sheet.submitCreate")
+						}
 						isPending={save.isPending}
 						formId="admin-challenge-form"
 					/>
@@ -816,7 +975,12 @@ export function AdminChallengesPage(): ReactNode {
 					}}
 				>
 					<FormGrid columns={2}>
-						<Field label="题目名称" htmlFor="challenge-name" required error={errors.name}>
+						<Field
+							label={t("adminCore.challenges.sheet.name")}
+							htmlFor="challenge-name"
+							required
+							error={errors.name}
+						>
 							<Input
 								id="challenge-name"
 								value={form.name}
@@ -824,11 +988,11 @@ export function AdminChallengesPage(): ReactNode {
 							/>
 						</Field>
 						<Field
-							label="分类"
+							label={t("adminCore.challenges.sheet.category")}
 							htmlFor="challenge-category"
 							required
 							error={errors.category}
-							hint="如 web / pwn / misc。"
+							hint={t("adminCore.challenges.sheet.categoryHint")}
 						>
 							<Input
 								id="challenge-category"
@@ -837,7 +1001,11 @@ export function AdminChallengesPage(): ReactNode {
 							/>
 						</Field>
 					</FormGrid>
-					<Field label="描述" htmlFor="challenge-description" hint="Markdown 文本。">
+					<Field
+						label={t("adminCore.challenges.sheet.description")}
+						htmlFor="challenge-description"
+						hint={t("adminCore.challenges.sheet.descriptionHint")}
+					>
 						<Textarea
 							id="challenge-description"
 							rows={4}
@@ -847,83 +1015,95 @@ export function AdminChallengesPage(): ReactNode {
 					</Field>
 					<div className="flex items-center justify-between rounded-lg border px-3 py-2">
 						<div>
-							<p className="text-sm font-medium">隐藏题目</p>
-							<p className="text-xs text-muted-foreground">隐藏后选手端不可见，管理员始终可见。</p>
+							<p className="text-sm font-medium">{t("adminCore.challenges.sheet.hidden")}</p>
+							<p className="text-xs text-muted-foreground">
+								{t("adminCore.challenges.sheet.hiddenHint")}
+							</p>
 						</div>
 						<Switch
 							checked={form.hidden}
 							onCheckedChange={(checked) => setForm({ ...form, hidden: checked })}
-							aria-label="隐藏题目"
+							aria-label={t("adminCore.challenges.sheet.hiddenAria")}
 						/>
 					</div>
 
 					{editing?.mode === "edit" ? (
 						<>
 							<Field
-								label="静态 Flag（明文）"
+								label={t("adminCore.challenges.sheet.staticFlag")}
 								htmlFor="challenge-static-flag"
 								error={errors.staticFlagValue}
-								hint="仅 flag_type=static 时生效；留空表示清空。此处填写的内容会以明文提交到后端。"
+								hint={t("adminCore.challenges.sheet.staticFlagHint")}
 							>
 								<Input
 									id="challenge-static-flag"
 									autoComplete="off"
 									className="font-mono text-xs"
 									value={form.staticFlagValue}
-									onChange={(event) => setForm({ ...form, staticFlagValue: event.target.value })}
+									onChange={(event) =>
+										setForm({ ...form, staticFlagValue: event.target.value })
+									}
 								/>
 							</Field>
 							<FormGrid columns={2}>
 								<Field
-									label="容器端口"
+									label={t("adminCore.challenges.sheet.port")}
 									htmlFor="challenge-port"
 									error={errors.containerPort}
-									hint={PORT_RANGE}
+									hint={t("adminCore.challenges.sheet.portHint")}
 								>
 									<Input
 										id="challenge-port"
 										inputMode="numeric"
 										value={form.containerPort}
-										onChange={(event) => setForm({ ...form, containerPort: event.target.value })}
+										onChange={(event) =>
+											setForm({ ...form, containerPort: event.target.value })
+										}
 									/>
 								</Field>
 								<Field
-									label="推荐 CPU（毫核）"
+									label={t("adminCore.challenges.sheet.cpu")}
 									htmlFor="challenge-cpu"
 									error={errors.cpuMillis}
-									hint="留空表示不修改。"
+									hint={t("adminCore.challenges.sheet.leaveEmptyHint")}
 								>
 									<Input
 										id="challenge-cpu"
 										inputMode="numeric"
 										value={form.cpuMillis}
-										onChange={(event) => setForm({ ...form, cpuMillis: event.target.value })}
+										onChange={(event) =>
+											setForm({ ...form, cpuMillis: event.target.value })
+										}
 									/>
 								</Field>
 								<Field
-									label="推荐内存（字节）"
+									label={t("adminCore.challenges.sheet.memory")}
 									htmlFor="challenge-memory"
 									error={errors.memoryBytes}
-									hint="留空表示不修改。"
+									hint={t("adminCore.challenges.sheet.leaveEmptyHint")}
 								>
 									<Input
 										id="challenge-memory"
 										inputMode="numeric"
 										value={form.memoryBytes}
-										onChange={(event) => setForm({ ...form, memoryBytes: event.target.value })}
+										onChange={(event) =>
+											setForm({ ...form, memoryBytes: event.target.value })
+										}
 									/>
 								</Field>
 								<Field
-									label="推荐 PID 上限"
+									label={t("adminCore.challenges.sheet.pids")}
 									htmlFor="challenge-pids"
 									error={errors.pidsLimit}
-									hint="留空表示不修改。"
+									hint={t("adminCore.challenges.sheet.leaveEmptyHint")}
 								>
 									<Input
 										id="challenge-pids"
 										inputMode="numeric"
 										value={form.pidsLimit}
-										onChange={(event) => setForm({ ...form, pidsLimit: event.target.value })}
+										onChange={(event) =>
+											setForm({ ...form, pidsLimit: event.target.value })
+										}
 									/>
 								</Field>
 							</FormGrid>
@@ -945,24 +1125,27 @@ function CheckResultTable({
 	onBuild: (id: string) => void;
 	building: boolean;
 }): ReactNode {
+	const { t } = useTranslation();
 	const columns: DataTableColumn<ChallengeCheckResult>[] = [
 		{
 			id: "challenge_name",
-			header: "题目",
+			header: t("adminCore.challenges.checkTable.challenge"),
 			cell: (row) => <span className="text-sm font-medium">{row.challenge_name}</span>,
 			sortValue: (row) => row.challenge_name,
 		},
 		{
 			id: "docker_image",
-			header: "镜像",
+			header: t("adminCore.challenges.checkTable.image"),
 			cell: (row) => {
 				if (row.static_content) {
-					return <TonePill tone="muted">static / 仅附件</TonePill>;
+					return <TonePill tone="muted">{t("adminCore.challenges.checkTable.staticOnly")}</TonePill>;
 				}
-				if (row.docker_image) return <TonePill tone="success">就绪</TonePill>;
+				if (row.docker_image) {
+					return <TonePill tone="success">{t("adminCore.challenges.checkTable.ready")}</TonePill>;
+				}
 				return (
 					<Button variant="outline" size="xs" onClick={() => onBuild(row.id)} disabled={building}>
-						<Hammer /> 构建
+						<Hammer aria-hidden="true" /> {t("adminCore.challenges.build")}
 					</Button>
 				);
 			},
@@ -970,10 +1153,12 @@ function CheckResultTable({
 		},
 		{
 			id: "attachment",
-			header: "附件",
+			header: t("adminCore.challenges.checkTable.attachment"),
 			cell: (row) => (
 				<TonePill tone={row.attachment ? "success" : "muted"}>
-					{row.attachment ? "存在" : "无"}
+					{row.attachment
+						? t("adminCore.challenges.checkTable.present")
+						: t("adminCore.challenges.checkTable.absent")}
 				</TonePill>
 			),
 			sortValue: (row) => (row.attachment ? 1 : 0),
@@ -981,9 +1166,13 @@ function CheckResultTable({
 		},
 		{
 			id: "is_ok",
-			header: "结论",
+			header: t("adminCore.challenges.checkTable.conclusion"),
 			cell: (row) => (
-				<TonePill tone={row.is_ok ? "success" : "danger"}>{row.is_ok ? "可用" : "不可用"}</TonePill>
+				<TonePill tone={row.is_ok ? "success" : "danger"}>
+					{row.is_ok
+						? t("adminCore.challenges.checkTable.ok")
+						: t("adminCore.challenges.checkTable.notOk")}
+				</TonePill>
 			),
 			sortValue: (row) => (row.is_ok ? 1 : 0),
 		},
@@ -999,16 +1188,34 @@ function CheckResultTable({
 					<div className="flex items-center justify-between gap-2">
 						<span className="text-sm font-medium">{row.challenge_name}</span>
 						<TonePill tone={row.is_ok ? "success" : "danger"}>
-							{row.is_ok ? "可用" : "不可用"}
+							{row.is_ok
+								? t("adminCore.challenges.checkTable.ok")
+								: t("adminCore.challenges.checkTable.notOk")}
 						</TonePill>
 					</div>
 					<p className="text-xs text-muted-foreground">
-						镜像 {row.docker_image ? "就绪" : "缺失"} · 附件 {row.attachment ? "存在" : "无"}
-						{row.static_content ? " · static / 仅附件" : ""}
+						{row.static_content
+							? t("adminCore.challenges.checkTable.mobileStatic", {
+									image: row.docker_image
+										? t("adminCore.challenges.checkTable.ready")
+										: t("adminCore.challenges.checkTable.missing"),
+									attachment: row.attachment
+										? t("adminCore.challenges.checkTable.present")
+										: t("adminCore.challenges.checkTable.absent"),
+									static: t("adminCore.challenges.checkTable.staticOnly"),
+								})
+							: t("adminCore.challenges.checkTable.mobile", {
+									image: row.docker_image
+										? t("adminCore.challenges.checkTable.ready")
+										: t("adminCore.challenges.checkTable.missing"),
+									attachment: row.attachment
+										? t("adminCore.challenges.checkTable.present")
+										: t("adminCore.challenges.checkTable.absent"),
+								})}
 					</p>
 				</div>
 			)}
-			empty={<span>后端未返回任何校验结果</span>}
+			empty={<span>{t("adminCore.challenges.checkTable.empty")}</span>}
 		/>
 	);
 }

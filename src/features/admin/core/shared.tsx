@@ -2,13 +2,15 @@
  * 管理端核心域的内部工具（列表状态 / 服务端过滤 / 数字与 JSON 输入 / 结果面板）。
  *
  * 这里**只**放本域复用的纯逻辑与小组件，不放任何业务数据：所有展示值都来自页面里的真实接口。
+ * 所有用户可见文案走 `adminCore` 命名空间；赛事状态 / 赛制 / 模式使用共享层的 i18n key。
  */
 
 import { useCallback, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { MoreHorizontal, Search, X } from "lucide-react";
 
-import { SectionCard } from "~/components/app/page";
 import { TonePill } from "~/components/app/badges";
+import { SectionCard } from "~/components/app/page";
 import { Button } from "~/components/ui/button";
 import {
 	DropdownMenu,
@@ -16,6 +18,13 @@ import {
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
+import {
+	EVENT_FAMILY_KEY,
+	EVENT_PURPOSE_KEY,
+	EVENT_STATUS_KEY,
+	PARTICIPANT_MODE_KEY,
+	type EventStatus,
+} from "~/lib/event-status";
 import { useDebouncedValue } from "~/lib/hooks";
 import { cn } from "~/lib/utils";
 
@@ -135,12 +144,12 @@ export function formatJsonText(value: unknown): string {
 
 export type JsonInput = { ok: true; value: unknown } | { ok: false; error: string };
 
-/** 校验 JSON 文本；失败时把解析器错误文案交给 `<Field error>` 显示。 */
+/** 校验 JSON 文本；失败时把解析器错误文案交给 `<Field error>` 显示（技术原因保持原文）。 */
 export function parseJsonInput(text: string): JsonInput {
 	try {
 		return { ok: true, value: JSON.parse(text) as unknown };
 	} catch (error) {
-		return { ok: false, error: error instanceof Error ? error.message : "JSON 解析失败" };
+		return { ok: false, error: error instanceof Error ? error.message : String(error) };
 	}
 }
 
@@ -151,20 +160,51 @@ export function parseJsonInput(text: string): JsonInput {
  *（`import_service::BUILD_STATUS_*`），其它值原样展示而不是硬塞进某个色调。
  */
 export function BuildStatusPill({ status }: { status?: string | null }) {
-	if (!status) return <span className="text-xs text-muted-foreground">未构建</span>;
-	const tone =
-		status === "ready"
-			? "success"
-			: status === "building"
-				? "info"
-				: status === "failed"
-					? "danger"
-					: "muted";
+	const { t } = useTranslation();
+	if (!status) {
+		return (
+			<TonePill tone="muted" title={t("adminCore.common.buildStatus.title", { status: "—" })}>
+				{t("adminCore.common.buildStatus.notBuilt")}
+			</TonePill>
+		);
+	}
+	let tone: "success" | "info" | "danger" | "muted" = "muted";
+	let label = status;
+	if (status === "ready") {
+		tone = "success";
+		label = t("adminCore.common.buildStatus.ready");
+	} else if (status === "building") {
+		tone = "info";
+		label = t("adminCore.common.buildStatus.building");
+	} else if (status === "failed") {
+		tone = "danger";
+		label = t("adminCore.common.buildStatus.failed");
+	}
 	return (
-		<TonePill tone={tone} title={`build_status = ${status}`}>
-			{status}
+		<TonePill tone={tone} title={t("adminCore.common.buildStatus.title", { status })}>
+			{label}
 		</TonePill>
 	);
+}
+
+// ── 赛事语义标签（共享 i18n key + t()，不在前端自造状态文案）────────────────
+
+export interface AdminEventLabels {
+	status: (status: EventStatus) => string;
+	family: (family: string) => string;
+	mode: (mode: string) => string;
+	purpose: (purpose: string) => string;
+}
+
+export function useAdminEventLabels(): AdminEventLabels {
+	const { t } = useTranslation();
+	return {
+		status: (status) => t(EVENT_STATUS_KEY[status]),
+		family: (family) => (EVENT_FAMILY_KEY[family] ? t(EVENT_FAMILY_KEY[family]) : family),
+		mode: (mode) => (PARTICIPANT_MODE_KEY[mode] ? t(PARTICIPANT_MODE_KEY[mode]) : mode),
+		purpose: (purpose) =>
+			EVENT_PURPOSE_KEY[purpose] ? t(EVENT_PURPOSE_KEY[purpose]) : purpose,
+	};
 }
 
 // ── 行内操作菜单 ────────────────────────────────────────────────────────────
@@ -208,6 +248,7 @@ export function ResultsCard({
 	children: ReactNode;
 	onDismiss: () => void;
 }) {
+	const { t } = useTranslation();
 	return (
 		<SectionCard
 			title={title}
@@ -215,7 +256,8 @@ export function ResultsCard({
 			contentClassName="p-0"
 			actions={
 				<Button variant="ghost" size="sm" onClick={onDismiss}>
-					<X /> 关闭
+					<X className="size-4" aria-hidden="true" />
+					{t("common.close")}
 				</Button>
 			}
 		>

@@ -14,6 +14,7 @@
  */
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MoreHorizontal, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 
@@ -22,6 +23,7 @@ import type { PermissionDto, RoleDto } from "@floatctf/sdk";
 import { call, callList, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
+import { TonePill } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import { FormSheet } from "~/components/app/form";
@@ -32,9 +34,14 @@ import {
 	SectionCard,
 	Toolbar,
 } from "~/components/app/page";
-import { EmptyBlock, QueryState, RefreshingBadge, TableSkeleton } from "~/components/app/states";
+import {
+	EmptyBlock,
+	InlineError,
+	QueryState,
+	RefreshingBadge,
+	TableSkeleton,
+} from "~/components/app/states";
 import { toast } from "~/components/app/toast";
-import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
 	DropdownMenu,
@@ -45,7 +52,10 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
+import { useDocumentTitle } from "~/lib/hooks";
 import { cn } from "~/lib/utils";
+
+import { SearchInput } from "./components";
 
 interface RoleFormState {
 	id?: string;
@@ -56,6 +66,8 @@ interface RoleFormState {
 }
 
 export function AdminRolesPage(): ReactNode {
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminPlatform.roles.documentTitle"));
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -85,14 +97,14 @@ export function AdminRolesPage(): ReactNode {
 					description: input.description.trim() || undefined,
 					permissions: [...input.permissions],
 				}),
-				"创建角色",
+				t("adminPlatform.roles.requests.create"),
 			),
 		onSuccess: () => {
-			toast.success("角色已创建");
+			toast.success(t("adminPlatform.roles.toasts.created"));
 			setForm(null);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("创建失败", error),
+		onError: (error) => toast.apiError(t("adminPlatform.roles.toasts.createFailed"), error),
 	});
 
 	const patch = useMutation({
@@ -103,35 +115,39 @@ export function AdminRolesPage(): ReactNode {
 					description: input.description.trim() || undefined,
 					permissions: [...input.permissions],
 				}),
-				"更新角色",
+				t("adminPlatform.roles.requests.update"),
 			),
 		onSuccess: () => {
-			toast.success("角色已更新");
+			toast.success(t("adminPlatform.roles.toasts.updated"));
 			setForm(null);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("更新失败", error),
+		onError: (error) => toast.apiError(t("adminPlatform.roles.toasts.updateFailed"), error),
 	});
 
 	const remove = useMutation({
-		mutationFn: (roleId: string) => callVoid(client.admin.roles.remove(roleId), "删除角色"),
+		mutationFn: (roleId: string) =>
+			callVoid(client.admin.roles.remove(roleId), t("adminPlatform.roles.requests.delete")),
 		onSuccess: () => {
-			toast.success("角色已删除");
+			toast.success(t("adminPlatform.roles.toasts.deleted"));
 			invalidate();
 		},
-		onError: (error) => toast.apiError("删除失败", error),
+		onError: (error) => toast.apiError(t("adminPlatform.roles.toasts.deleteFailed"), error),
 	});
 
 	async function confirmRemove(role: RoleDto) {
 		const ok = await confirm({
-			title: "删除角色",
-			description: `将删除角色「${role.name}」，当前有 ${role.user_count} 个账号持有它。`,
+			title: t("adminPlatform.roles.confirm.title"),
+			description: t("adminPlatform.roles.confirm.description", {
+				name: role.name,
+				count: role.user_count,
+			}),
 			consequences: [
-				"持有该角色的账号立即失去对应权限（后端每请求重新判定）。",
-				"删除不可恢复；账号本身不会被删除。",
+				t("adminPlatform.roles.confirm.consequence1"),
+				t("adminPlatform.roles.confirm.consequence2"),
 			],
 			tone: "danger",
-			confirmText: "删除",
+			confirmText: t("adminPlatform.roles.confirm.confirmText"),
 			confirmPhrase: role.key,
 		});
 		if (ok) remove.mutate(role.id);
@@ -156,10 +172,78 @@ export function AdminRolesPage(): ReactNode {
 		);
 	}, [roles.data, search]);
 
+	function renderFlags(row: RoleDto): ReactNode {
+		return (
+			<div className="flex flex-wrap items-center gap-1">
+				{row.protected ? (
+					<TonePill tone="muted">{t("adminPlatform.roles.flags.builtin")}</TonePill>
+				) : (
+					<TonePill tone="neutral">{t("adminPlatform.roles.flags.custom")}</TonePill>
+				)}
+				{row.grants_all ? (
+					<TonePill tone="warning">{t("adminPlatform.roles.flags.grantsAll")}</TonePill>
+				) : null}
+			</div>
+		);
+	}
+
+	function renderPermissions(row: RoleDto): ReactNode {
+		return (
+			<span className="tnum text-xs text-muted-foreground">
+				{row.grants_all
+					? t("adminPlatform.roles.permissionsAll")
+					: t("adminPlatform.common.countItems", { count: row.permissions.length })}
+			</span>
+		);
+	}
+
+	function renderRowMenu(row: RoleDto): ReactNode {
+		const actionsLabel = t("adminPlatform.common.rowActions", { name: row.name });
+		return (
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-label={actionsLabel}
+						title={actionsLabel}
+					>
+						<MoreHorizontal aria-hidden="true" />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuItem
+						onSelect={() =>
+							setForm({
+								id: row.id,
+								key: row.key,
+								name: row.name,
+								description: row.description,
+								permissions: new Set(row.grants_all ? [] : row.permissions),
+							})
+						}
+					>
+						<Pencil aria-hidden="true" /> {t("adminPlatform.roles.menu.edit")}
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						variant="destructive"
+						disabled={row.protected}
+						title={
+							row.protected ? t("adminPlatform.roles.menu.protectedDeleteHint") : undefined
+						}
+						onSelect={() => void confirmRemove(row)}
+					>
+						<Trash2 aria-hidden="true" /> {t("adminPlatform.roles.menu.delete")}
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		);
+	}
+
 	const columns: DataTableColumn<RoleDto>[] = [
 		{
 			id: "name",
-			header: "角色",
+			header: t("adminPlatform.roles.columns.role"),
 			cell: (row) => (
 				<div className="flex min-w-0 flex-col">
 					<span className="truncate text-sm font-medium">{row.name}</span>
@@ -170,33 +254,20 @@ export function AdminRolesPage(): ReactNode {
 		},
 		{
 			id: "flags",
-			header: "属性",
-			cell: (row) => (
-				<div className="flex flex-wrap gap-1">
-					{row.protected ? (
-						<Badge variant="outline">内置</Badge>
-					) : (
-						<Badge variant="secondary">自定义</Badge>
-					)}
-					{row.grants_all ? <Badge variant="default">全权</Badge> : null}
-				</div>
-			),
+			header: t("adminPlatform.roles.columns.flags"),
+			cell: (row) => renderFlags(row),
 			hideBelow: "sm",
 		},
 		{
 			id: "permissions",
-			header: "权限",
-			cell: (row) => (
-				<span className="text-xs text-muted-foreground">
-					{row.grants_all ? "全部权限（短路）" : `${row.permissions.length} 项`}
-				</span>
-			),
+			header: t("adminPlatform.roles.columns.permissions"),
+			cell: (row) => renderPermissions(row),
 			sortValue: (row) => (row.grants_all ? Number.MAX_SAFE_INTEGER : row.permissions.length),
 			hideBelow: "md",
 		},
 		{
 			id: "user_count",
-			header: "持有账号",
+			header: t("adminPlatform.roles.columns.holders"),
 			cell: (row) => <span className="tnum text-sm">{row.user_count}</span>,
 			sortValue: (row) => row.user_count,
 			hideBelow: "lg",
@@ -205,38 +276,7 @@ export function AdminRolesPage(): ReactNode {
 			id: "actions",
 			header: "",
 			align: "right",
-			cell: (row) => (
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant="ghost" size="icon-sm" aria-label={`操作：${row.name}`}>
-							<MoreHorizontal />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end">
-						<DropdownMenuItem
-							onSelect={() =>
-								setForm({
-									id: row.id,
-									key: row.key,
-									name: row.name,
-									description: row.description,
-									permissions: new Set(row.grants_all ? [] : row.permissions),
-								})
-							}
-						>
-							<Pencil /> 编辑
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							variant="destructive"
-							disabled={row.protected}
-							title={row.protected ? "内置角色不可删除（后端返回 409）" : undefined}
-							onSelect={() => void confirmRemove(row)}
-						>
-							<Trash2 /> 删除
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			),
+			cell: (row) => renderRowMenu(row),
 		},
 	];
 
@@ -245,8 +285,8 @@ export function AdminRolesPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="角色与权限"
-				description="平台 RBAC：角色是权限的集合，账号通过持有角色获得管理能力。"
+				title={t("adminPlatform.roles.title")}
+				description={t("adminPlatform.roles.description")}
 				actions={
 					<Toolbar>
 						<Button
@@ -257,28 +297,33 @@ export function AdminRolesPage(): ReactNode {
 							}}
 							disabled={roles.isFetching || permissions.isFetching}
 						>
-							<RefreshCw className={roles.isFetching ? "animate-spin" : undefined} />
-							刷新
+							<RefreshCw
+								className={roles.isFetching ? "animate-spin" : undefined}
+								aria-hidden="true"
+							/>
+							{t("adminPlatform.common.refresh")}
 						</Button>
-						<Button onClick={() => setForm({ key: "", name: "", description: "", permissions: new Set() })}>
-							<Plus /> 新建角色
+						<Button
+							onClick={() =>
+								setForm({ key: "", name: "", description: "", permissions: new Set() })
+							}
+						>
+							<Plus aria-hidden="true" /> {t("adminPlatform.roles.create")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
 			<SectionCard
-				title="角色列表"
-				description="内置角色不可删除、权限集不可修改；删除自定义角色前展示持有账号数。"
+				title={t("adminPlatform.roles.section.title")}
+				description={t("adminPlatform.roles.section.description")}
 				actions={
 					<Toolbar>
-						<RefreshingBadge active={roles.isFetching} />
-						<Input
+						<RefreshingBadge active={roles.isFetching && !roles.isPending} />
+						<SearchInput
 							value={search}
-							onChange={(e) => setSearch(e.target.value)}
-							placeholder="搜索角色名 / key"
-							aria-label="搜索角色"
-							className="max-w-xs"
+							onChange={setSearch}
+							placeholder={t("adminPlatform.roles.search.placeholder")}
 						/>
 					</Toolbar>
 				}
@@ -286,20 +331,54 @@ export function AdminRolesPage(): ReactNode {
 				<QueryState
 					query={roles}
 					skeleton={<TableSkeleton rows={5} columns={4} />}
+					errorTitle={t("adminPlatform.roles.errorTitle")}
+					isEmpty={(rows) => rows.length === 0}
 					empty={
 						<EmptyBlock
-							title="暂无角色"
-							description="平台启动时会补种内置角色；若为空请检查后端初始化。"
+							title={t("adminPlatform.roles.empty.title")}
+							description={t("adminPlatform.roles.empty.description")}
 						/>
 					}
 				>
-					{() => (
-						<DataTable
-							columns={columns}
-							data={filtered}
-							getRowId={(row) => row.id}
-						/>
-					)}
+					{() =>
+						filtered.length === 0 ? (
+							<EmptyBlock
+								variant="filtered"
+								title={t("adminPlatform.roles.filteredEmpty.title")}
+								description={t("adminPlatform.roles.filteredEmpty.description")}
+							/>
+						) : (
+							<DataTable
+								columns={columns}
+								data={filtered}
+								getRowId={(row) => row.id}
+								mobileCard={(row) => (
+									<div className="space-y-2">
+										<div className="flex items-start justify-between gap-2">
+											<div className="flex min-w-0 flex-col">
+												<span className="truncate text-sm font-medium">{row.name}</span>
+												<MonoText className="text-xs text-muted-foreground">
+													{row.key}
+												</MonoText>
+											</div>
+											{renderRowMenu(row)}
+										</div>
+										{renderFlags(row)}
+										<div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+											<span className="inline-flex items-center gap-1">
+												{t("adminPlatform.roles.columns.permissions")}
+												{renderPermissions(row)}
+											</span>
+											<span className="inline-flex items-center gap-1">
+												{t("adminPlatform.roles.columns.holders")}
+												<span className="tnum">{row.user_count}</span>
+											</span>
+										</div>
+									</div>
+								)}
+							/>
+						)
+					}
 				</QueryState>
 			</SectionCard>
 
@@ -341,6 +420,7 @@ function RoleFormSheet({
 	onClose: () => void;
 	onSubmit: () => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const isEdit = Boolean(form.id);
 	const selectedCount = form.permissions.size;
 
@@ -350,41 +430,51 @@ function RoleFormSheet({
 			onOpenChange={(open) => {
 				if (!open) onClose();
 			}}
-			title={isEdit ? `编辑角色：${form.name}` : "新建角色"}
+			title={
+				isEdit
+					? t("adminPlatform.roles.form.editTitle", { name: form.name })
+					: t("adminPlatform.roles.form.createTitle")
+			}
 			description={
 				isProtected
-					? "内置角色的权限集由平台定义，此处只能修改名称与描述。"
-					: "权限为整体替换语义：保存后角色的权限集就是下方勾选的集合。"
+					? t("adminPlatform.roles.form.protectedDescription")
+					: t("adminPlatform.roles.form.replaceDescription")
 			}
 			footer={
 				<div className="flex w-full flex-wrap items-center justify-end gap-2">
 					<Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
-						取消
+						{t("adminPlatform.roles.form.cancel")}
 					</Button>
 					<Button
 						type="button"
 						onClick={onSubmit}
 						disabled={submitting || !form.key.trim() || !form.name.trim()}
 					>
-						{isEdit ? "保存更改" : "创建角色"}
+						{isEdit
+							? t("adminPlatform.roles.form.save")
+							: t("adminPlatform.roles.form.create")}
 					</Button>
 				</div>
 			}
 		>
 			<div className="space-y-4">
 				<div className="space-y-2">
-					<Label htmlFor="role-key">角色 key</Label>
+					<Label htmlFor="role-key">{t("adminPlatform.roles.form.keyLabel")}</Label>
 					<Input
 						id="role-key"
+						className="font-mono text-xs"
+						autoComplete="off"
 						value={form.key}
 						disabled={isEdit}
-						placeholder="如 ops-lead"
+						placeholder={t("adminPlatform.roles.form.keyPlaceholder")}
 						onChange={(e) => onChange({ ...form, key: e.target.value })}
 					/>
-					<p className="text-xs text-muted-foreground">稳定标识，创建后不可修改。</p>
+					<p className="text-xs text-muted-foreground">
+						{t("adminPlatform.roles.form.keyHint")}
+					</p>
 				</div>
 				<div className="space-y-2">
-					<Label htmlFor="role-name">名称</Label>
+					<Label htmlFor="role-name">{t("adminPlatform.roles.form.nameLabel")}</Label>
 					<Input
 						id="role-name"
 						value={form.name}
@@ -392,7 +482,9 @@ function RoleFormSheet({
 					/>
 				</div>
 				<div className="space-y-2">
-					<Label htmlFor="role-desc">描述</Label>
+					<Label htmlFor="role-desc">
+						{t("adminPlatform.roles.form.descriptionLabel")}
+					</Label>
 					<Input
 						id="role-desc"
 						value={form.description}
@@ -401,19 +493,36 @@ function RoleFormSheet({
 				</div>
 
 				<div className="space-y-2">
-					<div className="flex items-center justify-between">
-						<Label>权限集{isProtected ? "（不可修改）" : ""}</Label>
-						<span className="tnum text-xs text-muted-foreground">已选 {selectedCount} 项</span>
+					<div className="flex items-center justify-between gap-2">
+						<Label>
+							{t("adminPlatform.roles.form.permissionsLabel")}
+							{isProtected ? t("adminPlatform.roles.form.permissionsLocked") : ""}
+						</Label>
+						<span className="tnum text-xs text-muted-foreground">
+							{t("adminPlatform.roles.form.selectedCount", { count: selectedCount })}
+						</span>
 					</div>
 					{permError ? (
-						<p className="text-sm text-destructive">权限目录加载失败：{permError.message}</p>
+						<InlineError
+							error={
+								new Error(
+									t("adminPlatform.roles.form.loadFailed", {
+										message: permError.message,
+									}),
+								)
+							}
+						/>
 					) : permLoading ? (
-						<p className="text-sm text-muted-foreground">正在加载权限目录…</p>
+						<p className="text-sm text-muted-foreground">
+							{t("adminPlatform.roles.form.loading")}
+						</p>
 					) : (
 						<div className="max-h-72 space-y-3 overflow-y-auto rounded-lg border p-3">
 							{grouped.map(([domain, perms]) => (
 								<section key={domain} className="space-y-1.5">
-									<h3 className="text-xs font-semibold text-muted-foreground">{domain}</h3>
+									<h3 className="text-xs font-semibold text-muted-foreground">
+										{domain}
+									</h3>
 									{perms.map((p) => (
 										<PermissionRow
 											key={p.key}
@@ -449,6 +558,7 @@ function PermissionRow({
 	disabled: boolean;
 	onToggle: (next: boolean) => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	return (
 		<label
 			className={cn(
@@ -459,9 +569,13 @@ function PermissionRow({
 			<span className="flex min-w-0 flex-col">
 				<span className="flex items-center gap-1.5 text-sm">
 					<MonoText className="text-xs">{permission.key}</MonoText>
-					{permission.high_risk ? <Badge variant="destructive">高危</Badge> : null}
+					{permission.high_risk ? (
+						<TonePill tone="danger">{t("adminPlatform.roles.form.highRisk")}</TonePill>
+					) : null}
 				</span>
-				<span className="truncate text-xs text-muted-foreground">{permission.description}</span>
+				<span className="truncate text-xs text-muted-foreground">
+					{permission.description}
+				</span>
 			</span>
 			<Switch
 				checked={checked}

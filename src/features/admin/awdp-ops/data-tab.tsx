@@ -3,48 +3,53 @@
  *
  * 该标签只在被选中时挂载（Radix Tabs 默认不渲染非激活内容），因此不会给页面首屏加请求。
  * 数据全部来自后端聚合（人数 / 战队数、每题攻破与修复计数、Top10、趋势、最近动态）。
+ *
+ * 文案全部走 i18n（`adminAwdpOps.data.*`）。
  */
 
+import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { RefreshCw } from "lucide-react";
 
-import type { AwdpDataGameBox, AwdpScoreRow } from "@floatctf/sdk";
+import type { AwdpDataActivity, AwdpDataGameBox, AwdpScoreRow } from "@floatctf/sdk";
 
 import { TrendChart } from "~/components/app/charts";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import { MonoText, SectionCard, StatCard } from "~/components/app/page";
 import { EmptyBlock, QueryState, TableSkeleton } from "~/components/app/states";
 import { Button } from "~/components/ui/button";
-import { formatInt, formatRelative, formatScore } from "~/lib/format";
+import { formatDelta, formatInt, formatRelative, formatScore, formatTime } from "~/lib/format";
 import { useNow } from "~/lib/hooks";
 
 import { useAwdpDataPresent } from "./queries";
 
-export function AwdpDataTab({ eventId }: { eventId: string }) {
+export function AwdpDataTab({ eventId }: { eventId: string }): ReactNode {
+	const { t } = useTranslation();
 	const dataQuery = useAwdpDataPresent(eventId, true);
 	const now = useNow(30_000);
 
 	const gameboxColumns: DataTableColumn<AwdpDataGameBox>[] = [
 		{
 			id: "name",
-			header: "GameBox",
+			header: t("adminAwdpOps.gameboxes.columns.gamebox"),
 			sortValue: (row) => row.name,
 			cell: (row) => (
 				<div className="min-w-0">
 					<p className="truncate font-medium">{row.name}</p>
-					<p className="text-xs text-muted-foreground">{row.category}</p>
+					<p className="truncate text-xs text-muted-foreground">{row.category}</p>
 				</div>
 			),
 		},
 		{
 			id: "break_count",
-			header: "被攻破次数",
+			header: t("adminAwdpOps.data.gameboxStats.breakCount"),
 			align: "right",
 			sortValue: (row) => row.break_count,
 			cell: (row) => <MonoText>{formatInt(row.break_count)}</MonoText>,
 		},
 		{
 			id: "fix_count",
-			header: "修复次数",
+			header: t("adminAwdpOps.data.gameboxStats.fixCount"),
 			align: "right",
 			sortValue: (row) => row.fix_count,
 			cell: (row) => <MonoText>{formatInt(row.fix_count)}</MonoText>,
@@ -54,20 +59,62 @@ export function AwdpDataTab({ eventId }: { eventId: string }) {
 	const topColumns: DataTableColumn<AwdpScoreRow>[] = [
 		{
 			id: "rank",
-			header: "排名",
+			header: t("adminAwdpOps.scores.columns.rank"),
 			align: "right",
-			cell: (row) => <MonoText>#{row.rank}</MonoText>,
+			sortValue: (row) => row.rank,
+			cell: (row) => <MonoText>#{formatInt(row.rank)}</MonoText>,
 		},
 		{
 			id: "subject_name",
-			header: "主体",
+			header: t("adminAwdpOps.scores.columns.subject"),
+			sortValue: (row) => row.subject_name,
 			cell: (row) => row.subject_name,
 		},
 		{
 			id: "total_score",
-			header: "总分",
+			header: t("adminAwdpOps.scores.columns.totalScore"),
 			align: "right",
-			cell: (row) => <MonoText className="font-semibold">{formatScore(row.total_score, 0)}</MonoText>,
+			sortValue: (row) => row.total_score,
+			cell: (row) => (
+				<MonoText className="font-semibold">{formatScore(row.total_score, 0)}</MonoText>
+			),
+		},
+	];
+
+	const activityColumns: DataTableColumn<AwdpDataActivity>[] = [
+		{
+			id: "activity",
+			header: t("adminAwdpOps.data.activity.columns.activity"),
+			sortValue: (row) => row.subject_name,
+			cell: (row) => (
+				<p className="truncate text-sm">
+					{t("adminAwdpOps.data.activity.line", {
+						subject: row.subject_name,
+						action:
+							row.action === "break"
+								? t("adminAwdpOps.data.activity.actionBreak")
+								: t("adminAwdpOps.data.activity.actionFix"),
+						gamebox: row.gamebox_name,
+					})}
+				</p>
+			),
+		},
+		{
+			id: "detail",
+			header: t("adminAwdpOps.data.activity.columns.detail"),
+			hideBelow: "sm",
+			cell: (row) => (
+				<span className="text-xs text-muted-foreground">
+					{row.gamebox_category} · {formatRelative(row.created_at, now)}
+				</span>
+			),
+		},
+		{
+			id: "delta",
+			header: t("adminAwdpOps.data.activity.columns.delta"),
+			align: "right",
+			sortValue: (row) => row.delta,
+			cell: (row) => <MonoText className="text-sm">{formatDelta(row.delta, 0)}</MonoText>,
 		},
 	];
 
@@ -75,63 +122,109 @@ export function AwdpDataTab({ eventId }: { eventId: string }) {
 		<QueryState
 			query={dataQuery}
 			skeleton={<TableSkeleton rows={5} columns={4} />}
-			errorTitle="加载赛事大屏数据失败"
+			errorTitle={t("adminAwdpOps.data.loadError")}
 		>
 			{(data) => (
-				<div className="space-y-5">
-					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-						<StatCard label="参与人数" value={formatInt(data.user_count)} />
-						<StatCard label="战队数" value={formatInt(data.team_count)} />
+				<div className="flex flex-col gap-4">
+					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 						<StatCard
-							label="题目数"
-							value={formatInt(data.gameboxes.length)}
-							hint="已挂载的 GameBox"
+							label={t("adminAwdpOps.data.stats.users")}
+							value={<span className="tnum">{formatInt(data.user_count)}</span>}
 						/>
 						<StatCard
-							label="最近动态"
-							value={formatInt(data.recent_activity.length)}
-							hint="后端返回的最新计分事件条数"
+							label={t("adminAwdpOps.data.stats.teams")}
+							value={<span className="tnum">{formatInt(data.team_count)}</span>}
+						/>
+						<StatCard
+							label={t("adminAwdpOps.data.stats.gameboxes")}
+							value={<span className="tnum">{formatInt(data.gameboxes.length)}</span>}
+							hint={t("adminAwdpOps.data.statsHint.gameboxes")}
+						/>
+						<StatCard
+							label={t("adminAwdpOps.data.stats.recent")}
+							value={<span className="tnum">{formatInt(data.recent_activity.length)}</span>}
+							hint={t("adminAwdpOps.data.statsHint.recent")}
 						/>
 					</div>
 
 					<SectionCard
-						title="Top10 积分"
-						description="与积分榜同源，按总分排序。"
+						title={t("adminAwdpOps.data.top.title")}
+						description={t("adminAwdpOps.data.top.description")}
 						actions={
 							<Button
-								variant="ghost"
+								variant="outline"
 								size="sm"
 								disabled={dataQuery.isFetching}
 								onClick={() => void dataQuery.refetch()}
 							>
-								<RefreshCw /> 刷新
+								<RefreshCw
+									className={dataQuery.isFetching ? "animate-spin" : undefined}
+									aria-hidden="true"
+								/>
+								{t("common.refresh")}
 							</Button>
 						}
 					>
 						{data.scoreboard_top10.length === 0 ? (
-							<EmptyBlock title="暂无积分数据" />
+							<EmptyBlock
+								title={t("adminAwdpOps.data.top.emptyTitle")}
+								description={t("adminAwdpOps.data.top.emptyDescription")}
+							/>
 						) : (
 							<DataTable
 								data={data.scoreboard_top10}
 								getRowId={(row) => row.subject_id}
 								columns={topColumns}
+								mobileCard={(row) => (
+									<div className="flex items-center justify-between gap-2">
+										<p className="min-w-0 truncate text-sm font-medium">
+											{t("adminAwdpOps.scores.mobileRankSubject", {
+												rank: formatInt(row.rank),
+												name: row.subject_name,
+											})}
+										</p>
+										<MonoText className="font-semibold">
+											{formatScore(row.total_score, 0)}
+										</MonoText>
+									</div>
+								)}
 							/>
 						)}
 					</SectionCard>
 
-					<SectionCard title="每题攻防统计" description="被攻破次数与修复成功次数。">
+					<SectionCard
+						title={t("adminAwdpOps.data.gameboxStats.title")}
+						description={t("adminAwdpOps.data.gameboxStats.description")}
+					>
 						{data.gameboxes.length === 0 ? (
-							<EmptyBlock title="暂无题目统计" />
+							<EmptyBlock
+								title={t("adminAwdpOps.data.gameboxStats.emptyTitle")}
+								description={t("adminAwdpOps.data.gameboxStats.emptyDescription")}
+							/>
 						) : (
 							<DataTable
 								data={data.gameboxes}
 								getRowId={(row) => row.id}
 								columns={gameboxColumns}
+								mobileCard={(row) => (
+									<div className="space-y-1">
+										<p className="truncate text-sm font-medium">{row.name}</p>
+										<p className="text-xs text-muted-foreground">
+											{t("adminAwdpOps.data.gameboxStats.mobileCounts", {
+												breakCount: formatInt(row.break_count),
+												fixCount: formatInt(row.fix_count),
+											})}
+										</p>
+									</div>
+								)}
 							/>
 						)}
 					</SectionCard>
 
-					<SectionCard title="得分趋势" description="后端聚合的分数时间序列。">
+					<SectionCard
+						title={t("adminAwdpOps.data.trend.title")}
+						description={t("adminAwdpOps.data.trend.description")}
+					>
 						<TrendChart
 							series={data.trend.map((item) => ({
 								name: item.name,
@@ -141,41 +234,47 @@ export function AwdpDataTab({ eventId }: { eventId: string }) {
 								})),
 							}))}
 							formatY={(value) => formatScore(value, 0)}
-							formatX={(value) =>
-								new Date(value).toLocaleTimeString("zh-CN", { hour12: false })
-							}
+							formatX={(value) => formatTime(value)}
 						/>
 					</SectionCard>
 
-					<SectionCard title="最近计分动态" description="最新的攻破与修复事件。">
+					<SectionCard
+						title={t("adminAwdpOps.data.activity.title")}
+						description={t("adminAwdpOps.data.activity.description")}
+					>
 						{data.recent_activity.length === 0 ? (
-							<EmptyBlock title="暂无计分动态" />
+							<EmptyBlock
+								title={t("adminAwdpOps.data.activity.emptyTitle")}
+								description={t("adminAwdpOps.data.activity.emptyDescription")}
+							/>
 						) : (
-							<ul className="divide-y">
-								{data.recent_activity.map((activity, index) => (
-									<li
-										key={`${activity.subject_name}-${activity.gamebox_name}-${activity.created_at}-${index}`}
-										className="flex flex-wrap items-center justify-between gap-2 py-2.5"
-									>
+							<DataTable
+								data={data.recent_activity}
+								getRowId={(row, index) =>
+									`${row.subject_name}-${row.gamebox_name}-${row.created_at}-${index}`
+								}
+								columns={activityColumns}
+								mobileCard={(row) => (
+									<div className="flex items-center justify-between gap-2">
 										<div className="min-w-0">
 											<p className="truncate text-sm">
-												<span className="font-medium">{activity.subject_name}</span>
-												<span className="text-muted-foreground">
-													{activity.action === "break" ? " 攻破 " : " 修复 "}
-												</span>
-												<span>{activity.gamebox_name}</span>
+												{t("adminAwdpOps.data.activity.line", {
+													subject: row.subject_name,
+													action:
+														row.action === "break"
+															? t("adminAwdpOps.data.activity.actionBreak")
+															: t("adminAwdpOps.data.activity.actionFix"),
+													gamebox: row.gamebox_name,
+												})}
 											</p>
-											<p className="text-xs text-muted-foreground">
-												{activity.gamebox_category} · {formatRelative(activity.created_at, now)}
+											<p className="truncate text-xs text-muted-foreground">
+												{row.gamebox_category} · {formatRelative(row.created_at, now)}
 											</p>
 										</div>
-										<span className="tnum font-mono text-sm">
-											{activity.delta > 0 ? "+" : ""}
-											{formatScore(activity.delta, 0)}
-										</span>
-									</li>
-								))}
-							</ul>
+										<MonoText className="text-sm">{formatDelta(row.delta, 0)}</MonoText>
+									</div>
+								)}
+							/>
 						)}
 					</SectionCard>
 				</div>

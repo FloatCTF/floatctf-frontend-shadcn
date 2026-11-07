@@ -7,9 +7,12 @@
  * - 编辑：title / description / hidden / allow_join / rules / flag_prefix / start_time / end_time
  *   （**family / participant_mode / purpose 创建后不可变更** —— 后端 PATCH 请求体里没有这三个字段，
  *   发过去也会被忽略，因此这里只读展示，不做「看似能改」的假交互）。
+ *
+ * 文案全部走 `adminEvents.form` 命名空间。
  */
 
 import { useId, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Wand2 } from "lucide-react";
 
@@ -17,6 +20,7 @@ import { call } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { Field, FormFooter, FormGrid, FormSheet } from "~/components/app/form";
+import { InlineError } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -32,30 +36,8 @@ import { Textarea } from "~/components/ui/textarea";
 import { EventFamily, EventPurpose, ParticipantMode } from "@floatctf/sdk/entity";
 import type { Events } from "@floatctf/sdk/entity";
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from "~/lib/format";
-import { EVENT_FAMILY_LABEL, PARTICIPANT_MODE_LABEL } from "~/lib/event-status";
 
-import { EventFamilyPill, ParticipantModePill } from "./shared";
-
-/** 赛事规则模板（仅作为「填充模板」按钮的内容，不是数据）。 */
-const RULES_TEMPLATE = `# 赛事规则
-
-## 一、比赛时间
-- 开始 / 结束时间以赛事详情页公布为准
-
-## 二、参赛说明
-- 请使用真实信息参赛，报名截止后成员与报名信息不可修改
-
-## 三、计分规则
-- 每道题按赛事分值计分，重复提交不重复计分
-- 排行榜按总分排序，同分时按达到分数的先后排名
-
-## 四、Flag 格式
-- Flag 形如 \`flag{...}\`，提交时请勿携带多余空格或换行
-
-## 五、公平竞赛
-- 禁止攻击比赛平台、其他参赛者或比赛基础设施
-- 禁止共享 Flag / 答案 / WriteUp，违者取消资格与成绩
-`;
+import { EventFamilyPill, ParticipantModePill, useEventLabels } from "./shared";
 
 interface EventFormState {
 	title: string;
@@ -109,6 +91,8 @@ export function EventFormSheet({
 	/** 有值 = 编辑；`null` = 新建。 */
 	event: Events | null;
 }) {
+	const { t } = useTranslation();
+	const labels = useEventLabels();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const formId = useId();
@@ -126,27 +110,36 @@ export function EventFormSheet({
 	const save = useMutation({
 		mutationFn: (input: { id: string | null; payload: Partial<Events> }) =>
 			input.id === null
-				? call<Events>(client.admin.events.create(input.payload), "创建赛事")
-				: call<Events>(client.admin.events.patch(input.payload), "保存赛事"),
+				? call<Events>(client.admin.events.create(input.payload), t("adminEvents.actions.createEvent"))
+				: call<Events>(client.admin.events.patch(input.payload), t("adminEvents.actions.saveEvent")),
 		onSuccess: (saved, input) => {
-			toast.success(input.id === null ? "赛事已创建" : "赛事已更新");
+			toast.success(
+				input.id === null
+					? t("adminEvents.form.toast.created")
+					: t("adminEvents.form.toast.updated"),
+			);
 			// `qk.admin.events()` 的 `{}` 在 TanStack 的 partial match 中匹配全部参数组合。
 			void queryClient.invalidateQueries({ queryKey: qk.admin.events() });
 			void queryClient.invalidateQueries({ queryKey: qk.admin.event(saved.id) });
 			onOpenChange(false);
 		},
-		onError: (error) => toast.apiError(isEdit ? "保存赛事失败" : "创建赛事失败", error),
+		onError: (error) =>
+			toast.apiError(
+				isEdit ? t("adminEvents.form.toast.saveFailed") : t("adminEvents.form.toast.createFailed"),
+				error,
+			),
 	});
 
 	function submit() {
 		const nextErrors: typeof errors = {};
-		if (form.title.trim() === "") nextErrors.title = "赛事标题不能为空";
+		if (form.title.trim() === "") nextErrors.title = t("adminEvents.form.validation.titleRequired");
 		const startIso = fromDatetimeLocalValue(form.start_time);
 		const endIso = fromDatetimeLocalValue(form.end_time);
-		if (startIso === null) nextErrors.start_time = "请选择开始时间";
-		if (endRequired && endIso === null) nextErrors.end_time = "正式赛事必须设置结束时间";
+		if (startIso === null) nextErrors.start_time = t("adminEvents.form.validation.startRequired");
+		if (endRequired && endIso === null)
+			nextErrors.end_time = t("adminEvents.form.validation.endRequired");
 		if (startIso !== null && endIso !== null && startIso >= endIso) {
-			nextErrors.end_time = "结束时间必须晚于开始时间";
+			nextErrors.end_time = t("adminEvents.form.validation.endBeforeStart");
 		}
 		setErrors(nextErrors);
 		if (Object.keys(nextErrors).length > 0) return;
@@ -195,18 +188,20 @@ export function EventFormSheet({
 			open={open}
 			onOpenChange={onOpenChange}
 			width="lg"
-			title={isEdit ? "编辑赛事" : "新建赛事"}
+			title={isEdit ? t("adminEvents.form.titleEdit") : t("adminEvents.form.titleCreate")}
 			description={
 				isEdit
-					? "家族 / 参赛模式在创建后不可变更；其余字段保存后立即生效。"
-					: "创建后家族与参赛模式不可变更，请先确认赛制。"
+					? t("adminEvents.form.descriptionEdit")
+					: t("adminEvents.form.descriptionCreate")
 			}
 			footer={
 				<FormFooter
 					formId={formId}
 					onCancel={() => onOpenChange(false)}
 					isPending={save.isPending}
-					submitLabel={isEdit ? "保存" : "创建赛事"}
+					submitLabel={
+						isEdit ? t("adminEvents.form.submitSave") : t("adminEvents.form.submitCreate")
+					}
 				/>
 			}
 		>
@@ -218,20 +213,26 @@ export function EventFormSheet({
 					submit();
 				}}
 			>
-				<Field label="赛事标题" htmlFor={`${formId}-title`} required error={errors.title}>
+				{save.isError ? <InlineError error={save.error} /> : null}
+				<Field
+					label={t("adminEvents.form.field.title")}
+					htmlFor={`${formId}-title`}
+					required
+					error={errors.title}
+				>
 					<Input
 						id={`${formId}-title`}
 						value={form.title}
 						maxLength={200}
 						onChange={(changeEvent) => setForm({ ...form, title: changeEvent.target.value })}
-						placeholder="例如：2026 春季校内赛"
+						placeholder={t("adminEvents.form.field.titlePlaceholder")}
 					/>
 				</Field>
 
 				<Field
-					label="赛事描述"
+					label={t("adminEvents.form.field.description")}
 					htmlFor={`${formId}-description`}
-					hint="最多 10000 字符，支持 Markdown。"
+					hint={t("adminEvents.form.field.descriptionHint")}
 				>
 					<Textarea
 						id={`${formId}-description`}
@@ -242,22 +243,26 @@ export function EventFormSheet({
 				</Field>
 
 				{isEdit ? (
-					<div className="space-y-2 rounded-md border bg-muted/30 px-3 py-2">
+					<div className="space-y-2 rounded-lg border bg-muted/30 px-3 py-2">
 						<p className="text-xs text-muted-foreground">
-							家族与参赛模式创建后不可变更（后端 PATCH 请求体不接收这两个字段）。
+							{t("adminEvents.form.readonlyNote")}
 						</p>
 						<div className="flex flex-wrap items-center gap-2">
 							<EventFamilyPill family={form.family} />
 							<ParticipantModePill mode={form.participant_mode} />
 							<span className="text-xs text-muted-foreground">
-								{EVENT_FAMILY_LABEL[form.family] ?? form.family} ·{" "}
-								{PARTICIPANT_MODE_LABEL[form.participant_mode] ?? form.participant_mode}
+								{labels.family(form.family)} · {labels.mode(form.participant_mode)}
 							</span>
 						</div>
 					</div>
 				) : (
 					<FormGrid>
-						<Field label="家族（赛制）" required hint="AWD 固定为战队赛。">
+						<Field
+							label={t("adminEvents.form.field.family")}
+							htmlFor={`${formId}-family`}
+							required
+							hint={t("adminEvents.form.field.familyHint")}
+						>
 							<Select
 								value={form.family}
 								onValueChange={(value) => {
@@ -270,23 +275,28 @@ export function EventFormSheet({
 									});
 								}}
 							>
-								<SelectTrigger className="w-full">
+								<SelectTrigger id={`${formId}-family`} className="w-full">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value={EventFamily.Jeopardy}>
-										{EVENT_FAMILY_LABEL[EventFamily.Jeopardy]}
+										{labels.family(EventFamily.Jeopardy)}
 									</SelectItem>
 									<SelectItem value={EventFamily.Awd}>
-										{EVENT_FAMILY_LABEL[EventFamily.Awd]}
+										{labels.family(EventFamily.Awd)}
 									</SelectItem>
 									<SelectItem value={EventFamily.Awdp}>
-										{EVENT_FAMILY_LABEL[EventFamily.Awdp]}
+										{labels.family(EventFamily.Awdp)}
 									</SelectItem>
 								</SelectContent>
 							</Select>
 						</Field>
-						<Field label="参赛模式" required hint="创建后不可变更。">
+						<Field
+							label={t("adminEvents.form.field.participantMode")}
+							htmlFor={`${formId}-participant-mode`}
+							required
+							hint={t("adminEvents.form.field.participantModeHint")}
+						>
 							<Select
 								value={form.participant_mode}
 								disabled={form.family === EventFamily.Awd}
@@ -294,21 +304,21 @@ export function EventFormSheet({
 									setForm({ ...form, participant_mode: value as ParticipantMode })
 								}
 							>
-								<SelectTrigger className="w-full">
+								<SelectTrigger id={`${formId}-participant-mode`} className="w-full">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
 									{form.family === EventFamily.Awd ? (
 										<SelectItem value={ParticipantMode.Team}>
-											{PARTICIPANT_MODE_LABEL[ParticipantMode.Team]}
+											{labels.mode(ParticipantMode.Team)}
 										</SelectItem>
 									) : (
 										<>
 											<SelectItem value={ParticipantMode.Individual}>
-												{PARTICIPANT_MODE_LABEL[ParticipantMode.Individual]}
+												{labels.mode(ParticipantMode.Individual)}
 											</SelectItem>
 											<SelectItem value={ParticipantMode.Team}>
-												{PARTICIPANT_MODE_LABEL[ParticipantMode.Team]}
+												{labels.mode(ParticipantMode.Team)}
 											</SelectItem>
 										</>
 									)}
@@ -319,7 +329,12 @@ export function EventFormSheet({
 				)}
 
 				<FormGrid>
-					<Field label="开始时间" htmlFor={`${formId}-start`} required error={errors.start_time}>
+					<Field
+						label={t("adminEvents.form.field.startTime")}
+						htmlFor={`${formId}-start`}
+						required
+						error={errors.start_time}
+					>
 						<Input
 							id={`${formId}-start`}
 							type="datetime-local"
@@ -328,10 +343,12 @@ export function EventFormSheet({
 						/>
 					</Field>
 					<Field
-						label="结束时间"
+						label={t("adminEvents.form.field.endTime")}
 						htmlFor={`${formId}-end`}
 						required={endRequired}
-						hint={endRequired ? undefined : "练习（虚拟）赛事可以留空。"}
+						hint={
+							endRequired ? undefined : t("adminEvents.form.field.endTimeHintPractice")
+						}
 						error={errors.end_time}
 					>
 						<Input
@@ -344,7 +361,11 @@ export function EventFormSheet({
 				</FormGrid>
 
 				<FormGrid>
-					<Field label="Flag 前缀" htmlFor={`${formId}-prefix`} hint="最多 32 字符，例如 flag。">
+					<Field
+						label={t("adminEvents.form.field.flagPrefix")}
+						htmlFor={`${formId}-prefix`}
+						hint={t("adminEvents.form.field.flagPrefixHint")}
+					>
 						<Input
 							id={`${formId}-prefix`}
 							value={form.flag_prefix}
@@ -355,41 +376,47 @@ export function EventFormSheet({
 					<div className="flex flex-col gap-3">
 						<label className="flex items-center justify-between gap-3 text-sm">
 							<span>
-								隐藏赛事
-								<span className="ml-2 text-xs text-muted-foreground">选手端列表不可见</span>
+								{t("adminEvents.form.field.hidden")}
+								<span className="ml-2 text-xs text-muted-foreground">
+									{t("adminEvents.form.field.hiddenHint")}
+								</span>
 							</span>
 							<Switch
 								checked={form.hidden}
 								onCheckedChange={(checked) => setForm({ ...form, hidden: checked })}
-								aria-label="隐藏赛事"
+								aria-label={t("adminEvents.form.field.hidden")}
 							/>
 						</label>
 						<label className="flex items-center justify-between gap-3 text-sm">
 							<span>
-								允许加入
-								<span className="ml-2 text-xs text-muted-foreground">选手可自行报名</span>
+								{t("adminEvents.form.field.allowJoin")}
+								<span className="ml-2 text-xs text-muted-foreground">
+									{t("adminEvents.form.field.allowJoinHint")}
+								</span>
 							</span>
 							<Switch
 								checked={form.allow_join}
 								onCheckedChange={(checked) => setForm({ ...form, allow_join: checked })}
-								aria-label="允许加入"
+								aria-label={t("adminEvents.form.field.allowJoin")}
 							/>
 						</label>
 					</div>
 				</FormGrid>
 
 				<Field
-					label="赛事规则"
+					label={t("adminEvents.form.field.rules")}
 					htmlFor={`${formId}-rules`}
-					hint="支持 Markdown，最多 50000 字符。"
+					hint={t("adminEvents.form.field.rulesHint")}
 					actions={
 						<Button
 							type="button"
 							variant="ghost"
 							size="xs"
-							onClick={() => setForm({ ...form, rules: RULES_TEMPLATE })}
+							onClick={() =>
+								setForm({ ...form, rules: t("adminEvents.form.rulesTemplate") })
+							}
 						>
-							<Wand2 /> 填充模板
+							<Wand2 /> {t("adminEvents.form.field.templateButton")}
 						</Button>
 					}
 				>

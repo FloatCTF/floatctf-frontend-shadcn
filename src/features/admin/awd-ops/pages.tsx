@@ -7,10 +7,13 @@
  *
  * 状态机驱动：所有按钮的可用性只由后端字段（status / phase / final_settlement /
  * 赛事网络是否已分配）决定，禁用时把原因写在按钮 title 与状态条里。
+ *
+ * 文案全部走 `adminAwdOps.*`（CONVENTIONS §10.2）；数据逻辑与后端语义保持不变。
  */
 
 import { useCallback } from "react";
 import { Link, useParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Boxes, RefreshCw } from "lucide-react";
 
@@ -19,7 +22,7 @@ import type { AwdEventStatus } from "@floatctf/sdk";
 import { useBindings, useClient } from "~/api/client";
 import { errorText } from "~/api/errors";
 import { qk } from "~/api/keys";
-import { RealtimePill } from "~/components/app/badges";
+import { RealtimePill, TonePill } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import {
 	KeyValueList,
@@ -33,7 +36,6 @@ import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { formatDateTime } from "~/lib/format";
-import { EVENT_FAMILY_LABEL, EVENT_PURPOSE_LABEL } from "~/lib/event-status";
 import { useDocumentTitle } from "~/lib/hooks";
 
 import { AwdConfigTab } from "./config-tab";
@@ -44,11 +46,14 @@ import { AwdPrecheckTab } from "./precheck-tab";
 import { useAwdEvent, useAwdEventNetwork, useAwdStatus } from "./queries";
 import { AwdScoresTab } from "./scores-tab";
 import {
-	AWD_ACTION_CONFIRM,
-	AWD_ACTION_LABEL,
-	AwdStatusPill,
+	awdActionConfirm,
+	awdActionLabel,
+	awdPhaseLabel,
 	awdStatusLabel,
+	AwdStatusPill,
 	buildAwdGates,
+	eventFamilyLabel,
+	eventPurposeLabel,
 	runAwdAction,
 	type AwdAction,
 } from "./shared";
@@ -65,16 +70,19 @@ const ACTION_ORDER: AwdAction[] = [
 	"rotateTokens",
 ];
 
-const DANGER_ACTIONS: AwdAction[] = ["deploy", "start", "finish", "archive", "rotateTokens"];
+/** 真正不可逆 / 高危的动作才用 destructive 视觉；部署、开赛等用次级按钮。 */
+const DANGER_ACTIONS: AwdAction[] = ["finish", "archive", "rotateTokens"];
 
 export function AwdOpsPage() {
-	useDocumentTitle("AWD 运维 · FloatCTF");
+	const { t } = useTranslation();
 	const { eventId = "" } = useParams<{ eventId: string }>();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const { useAdminAwdEventStream } = useBindings();
 	const stream = useAdminAwdEventStream({ eventId, enabled: eventId !== "" });
+
+	useDocumentTitle(t("adminAwdOps.documentTitle"));
 
 	const eventQuery = useAwdEvent(eventId);
 	const statusQuery = useAwdStatus(eventId);
@@ -83,6 +91,8 @@ export function AwdOpsPage() {
 	const status: AwdEventStatus | null = statusQuery.data ?? null;
 	const event = eventQuery.data;
 	const networkAllocated = networkQuery.data !== null && networkQuery.data !== undefined;
+	const eventTitle = event?.title ?? t("adminAwdOps.page.titleFallback");
+	const breadcrumbTitle = event?.title ?? eventId;
 
 	/** 手动刷新：既失效 SSE 覆盖的键，也覆盖 SSE 未包含的赛事 GameBox / 赛事网络 / 赛事本体。 */
 	const refreshAll = useCallback(() => {
@@ -97,25 +107,42 @@ export function AwdOpsPage() {
 	}, [queryClient, eventId, stream]);
 
 	const lifecycle = useMutation({
-		mutationFn: (action: AwdAction) => runAwdAction(client, eventId, action),
+		mutationFn: (action: AwdAction) => runAwdAction(client, eventId, action, t),
 		onSuccess: (_result, action) => {
-			toast.success(`${AWD_ACTION_LABEL[action]}已提交`, "赛事状态已更新。");
+			toast.success(
+				t("adminAwdOps.lifecycle.submitSuccess", { action: awdActionLabel(action, t) }),
+				t("adminAwdOps.lifecycle.submitSuccessDescription"),
+			);
 			refreshAll();
 		},
-		onError: (error, action) => toast.apiError(`${AWD_ACTION_LABEL[action]}失败`, error),
+		onError: (error, action) =>
+			toast.apiError(
+				t("adminAwdOps.lifecycle.submitFailed", { action: awdActionLabel(action, t) }),
+				error,
+			),
 	});
 
-	const gates = buildAwdGates({
-		status: status?.status ?? null,
-		networkAllocated,
-		finalSettlement: status?.final_settlement ?? false,
-	});
+	const gates = buildAwdGates(
+		{
+			status: status?.status ?? null,
+			networkAllocated,
+			finalSettlement: status?.final_settlement ?? false,
+		},
+		t,
+	);
+
+	const unavailableActions = ACTION_ORDER.filter((action) => !gates[action].enabled);
+	const statusPending = statusQuery.isPending;
+	const statusError = statusQuery.isError;
 
 	if (eventQuery.isPending) {
 		return (
 			<PageBody>
-				<PageHeader title="AWD 赛事运维" description="加载赛事信息…" />
-				<LoadingBlock label="加载赛事…" />
+				<PageHeader
+					title={t("adminAwdOps.page.titleFallback")}
+					description={t("adminAwdOps.page.loadingEvent")}
+				/>
+				<LoadingBlock label={t("adminAwdOps.page.loadingLabel")} />
 			</PageBody>
 		);
 	}
@@ -123,11 +150,16 @@ export function AwdOpsPage() {
 	if (eventQuery.isError) {
 		return (
 			<PageBody>
-				<PageHeader title="AWD 赛事运维" />
-				<ErrorBlock error={eventQuery.error} title="加载赛事失败" onRetry={() => eventQuery.refetch()} />
+				<PageHeader title={t("adminAwdOps.page.titleFallback")} />
+				<ErrorBlock
+					error={eventQuery.error}
+					title={t("adminAwdOps.page.loadFailed")}
+					onRetry={() => eventQuery.refetch()}
+				/>
 				<Button variant="outline" size="sm" asChild>
 					<Link to="/admin/events">
-						<ArrowLeft /> 返回赛事列表
+						<ArrowLeft data-icon="inline-start" />
+						{t("adminAwdOps.page.backToList")}
 					</Link>
 				</Button>
 			</PageBody>
@@ -137,39 +169,58 @@ export function AwdOpsPage() {
 	return (
 		<PageBody>
 			<PageHeader
-				title={`${event?.title ?? "赛事"} · AWD 运维`}
-				description="AWD 全流程运维：配置、网络、部署、预检、生命周期、判罚与实例。"
+				title={t("adminAwdOps.page.title", { event: eventTitle })}
+				description={t("adminAwdOps.page.description")}
 				breadcrumbs={
-					<span className="inline-flex items-center gap-1.5">
-						<Link className="hover:text-foreground" to="/admin/events">
-							赛事
+					<nav
+						aria-label={t("adminAwdOps.breadcrumbs.label")}
+						className="flex flex-wrap items-center gap-1.5 text-xs"
+					>
+						<Link
+							className="min-w-0 truncate hover:text-foreground hover:underline"
+							to="/admin/events"
+						>
+							{t("adminAwdOps.breadcrumbs.events")}
 						</Link>
-						<span>/</span>
-						<Link className="hover:text-foreground" to={`/admin/events/${eventId}`}>
-							{event?.title ?? eventId}
+						<span aria-hidden="true" className="text-border">
+							/
+						</span>
+						<Link
+							className="min-w-0 truncate hover:text-foreground hover:underline"
+							to={`/admin/events/${eventId}`}
+						>
+							{breadcrumbTitle}
 						</Link>
-						<span>/</span>
-						<span>AWD 运维</span>
-					</span>
+						<span aria-hidden="true" className="text-border">
+							/
+						</span>
+						<span className="min-w-0 truncate font-medium text-foreground">
+							{t("adminAwdOps.breadcrumbs.current")}
+						</span>
+					</nav>
 				}
 				badge={
-					<AwdStatusPill
-						status={status?.status ?? null}
-						phase={status?.phase ?? null}
-						finalSettlement={status?.final_settlement ?? false}
-					/>
+					statusQuery.isPending || statusQuery.isError ? null : (
+						<AwdStatusPill
+							status={status?.status ?? null}
+							phase={status?.phase ?? null}
+							finalSettlement={status?.final_settlement ?? false}
+						/>
+					)
 				}
 				actions={
 					<>
 						<RealtimePill state={stream.connectionState} onRefresh={refreshAll} />
-						<Button variant="outline" size="sm" asChild title="GameBox 库">
+						<Button variant="outline" size="sm" asChild>
 							<Link to="/admin/gameboxes">
-								<Boxes /> GameBox 库
+								<Boxes data-icon="inline-start" />
+								{t("adminAwdOps.page.gameboxLibrary")}
 							</Link>
 						</Button>
 						<Button variant="outline" size="sm" asChild>
 							<Link to={`/admin/events/${eventId}`}>
-								<ArrowLeft /> 赛事控制台
+								<ArrowLeft data-icon="inline-start" />
+								{t("adminAwdOps.page.backToConsole")}
 							</Link>
 						</Button>
 					</>
@@ -177,20 +228,21 @@ export function AwdOpsPage() {
 			/>
 
 			<SectionCard
-				title="生命周期操作"
-				description="按钮可用性由后端状态决定；禁用原因写在按钮悬浮提示与下方说明里。"
+				title={t("adminAwdOps.lifecycle.title")}
+				description={t("adminAwdOps.lifecycle.description")}
 				actions={
 					<Button
-						variant="ghost"
+						variant="outline"
 						size="sm"
 						disabled={statusQuery.isFetching}
 						onClick={() => void statusQuery.refetch()}
 					>
-						<RefreshCw /> 刷新状态
+						<RefreshCw data-icon="inline-start" />
+						{t("adminAwdOps.lifecycle.refresh")}
 					</Button>
 				}
 			>
-				<div className="space-y-3">
+				<div className="space-y-4">
 					<div className="flex flex-wrap items-center gap-2">
 						{ACTION_ORDER.map((action) => {
 							const gate = gates[action];
@@ -199,89 +251,159 @@ export function AwdOpsPage() {
 									key={action}
 									variant={DANGER_ACTIONS.includes(action) ? "destructive" : "outline"}
 									size="sm"
-									disabled={!gate.enabled || lifecycle.isPending}
-									title={gate.reason ?? AWD_ACTION_LABEL[action]}
+									disabled={statusPending || statusError || !gate.enabled || lifecycle.isPending}
+									title={
+										statusError
+											? t("adminAwdOps.lifecycle.statusLoadFailed")
+											: statusPending
+												? t("adminAwdOps.lifecycle.loadingStatus")
+												: (gate.reason ?? awdActionLabel(action, t))
+									}
 									onClick={async () => {
-										const ok = await confirm(AWD_ACTION_CONFIRM[action]);
+										const ok = await confirm(awdActionConfirm(t, action));
 										if (ok) lifecycle.mutate(action);
 									}}
 								>
-									{AWD_ACTION_LABEL[action]}
+									{awdActionLabel(action, t)}
 								</Button>
 							);
 						})}
 					</div>
 
-					{ACTION_ORDER.filter((action) => !gates[action].enabled).length > 0 ? (
-						<details className="text-xs text-muted-foreground">
-							<summary className="cursor-pointer">
-								当前不可用的操作（
-								{ACTION_ORDER.filter((action) => !gates[action].enabled).length}）
+					{!statusPending && !statusError && status !== null && unavailableActions.length > 0 ? (
+						<details className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+							<summary className="cursor-pointer text-foreground">
+								{t("adminAwdOps.lifecycle.unavailableSummary", {
+									count: unavailableActions.length,
+								})}
 							</summary>
 							<ul className="mt-2 space-y-1">
-								{ACTION_ORDER.filter((action) => !gates[action].enabled).map((action) => (
+								{unavailableActions.map((action) => (
 									<li key={action}>
-										<span className="text-foreground">{AWD_ACTION_LABEL[action]}</span>
-										<span> · {gates[action].reason}</span>
+										<span className="font-medium text-foreground">
+											{awdActionLabel(action, t)}
+										</span>
+										<span aria-hidden="true"> · </span>
+										<span>{gates[action].reason}</span>
 									</li>
 								))}
 							</ul>
 						</details>
 					) : null}
 
-					{status === null ? (
+					{statusError ? (
+						<ErrorBlock
+							error={statusQuery.error}
+							title={t("adminAwdOps.lifecycle.statusLoadFailed")}
+							onRetry={() => void statusQuery.refetch()}
+						/>
+					) : statusPending ? (
+						<LoadingBlock label={t("adminAwdOps.lifecycle.loadingStatus")} />
+					) : status === null ? (
 						<EmptyBlock
-							title="尚未开通 AWD"
-							description="在「配置」标签页开通 AWD 后，这里会出现部署 / 预检 / 开赛等操作。"
+							title={t("adminAwdOps.lifecycle.notEnabledTitle")}
+							description={t("adminAwdOps.lifecycle.notEnabledDescription")}
 						/>
 					) : (
 						<KeyValueList
 							columns={3}
 							items={[
-								{ key: "赛事状态", value: awdStatusLabel(status.status) },
-								{ key: "当前阶段", value: status.phase },
 								{
-									key: "总轮次",
-									value: status.round_count === null ? "未配置" : status.round_count,
-								},
-								{ key: "单轮时长", value: `${status.round_duration_secs} 秒` },
-								{ key: "初始分数", value: status.initial_score },
-								{
-									key: "免费重置 / 额外罚分",
-									value: `${status.free_reset_count} 次 / ${status.extra_reset_penalty} 分`,
+									key: t("adminAwdOps.lifecycle.fields.status"),
+									value: awdStatusLabel(status.status, t),
 								},
 								{
-									key: "计划开赛",
-									value: status.planned_start_at
-										? formatDateTime(status.planned_start_at, { seconds: true })
-										: "手动开赛",
+									key: t("adminAwdOps.lifecycle.fields.phase"),
+									value: awdPhaseLabel(status.phase, t),
 								},
 								{
-									key: "预检通过",
-									value: status.verified_at
-										? formatDateTime(status.verified_at, { seconds: true })
-										: "未通过",
+									key: t("adminAwdOps.lifecycle.fields.roundCount"),
+									value:
+										status.round_count === null ? (
+											<span className="text-muted-foreground">
+												{t("adminAwdOps.lifecycle.fields.notConfigured")}
+											</span>
+										) : (
+											<span className="tnum">{status.round_count}</span>
+										),
 								},
 								{
-									key: "实际开赛",
-									value: status.started_at
-										? formatDateTime(status.started_at, { seconds: true })
-										: "未开赛",
-								},
-								{
-									key: "终局结算",
-									value: status.final_settlement ? "进行中（竞赛操作已关闭）" : "未进入",
-								},
-								{
-									key: "赛事网络",
-									value: networkAllocated ? (
-										"已分配"
-									) : (
-										<span className="text-destructive">未分配</span>
+									key: t("adminAwdOps.lifecycle.fields.roundDuration"),
+									value: (
+										<span className="tnum">
+											{t("adminAwdOps.units.seconds", {
+												count: status.round_duration_secs,
+											})}
+										</span>
 									),
 								},
 								{
-									key: "配置版本（乐观锁）",
+									key: t("adminAwdOps.lifecycle.fields.initialScore"),
+									value: <span className="tnum">{status.initial_score}</span>,
+								},
+								{
+									key: t("adminAwdOps.lifecycle.fields.resetPolicy"),
+									value: (
+										<span className="tnum">
+											{t("adminAwdOps.lifecycle.fields.resetPolicyValue", {
+												free: status.free_reset_count,
+												penalty: status.extra_reset_penalty,
+											})}
+										</span>
+									),
+								},
+								{
+									key: t("adminAwdOps.lifecycle.fields.plannedStart"),
+									value: status.planned_start_at ? (
+										<span className="tnum whitespace-nowrap">{formatDateTime(status.planned_start_at, { seconds: true })}</span>
+									) : (
+										<span className="text-muted-foreground">
+											{t("adminAwdOps.lifecycle.fields.manualStart")}
+										</span>
+									),
+								},
+								{
+									key: t("adminAwdOps.lifecycle.fields.verifiedAt"),
+									value: status.verified_at ? (
+										<span className="tnum whitespace-nowrap">{formatDateTime(status.verified_at, { seconds: true })}</span>
+									) : (
+										<span className="text-muted-foreground">
+											{t("adminAwdOps.lifecycle.fields.notVerified")}
+										</span>
+									),
+								},
+								{
+									key: t("adminAwdOps.lifecycle.fields.startedAt"),
+									value: status.started_at ? (
+										<span className="tnum whitespace-nowrap">{formatDateTime(status.started_at, { seconds: true })}</span>
+									) : (
+										<span className="text-muted-foreground">
+											{t("adminAwdOps.lifecycle.fields.notStarted")}
+										</span>
+									),
+								},
+								{
+									key: t("adminAwdOps.lifecycle.fields.finalSettlement"),
+									value: (
+										<TonePill tone={status.final_settlement ? "warning" : "muted"}>
+											{status.final_settlement
+												? t("adminAwdOps.lifecycle.fields.settlementActive")
+												: t("adminAwdOps.lifecycle.fields.settlementInactive")}
+										</TonePill>
+									),
+								},
+								{
+									key: t("adminAwdOps.lifecycle.fields.network"),
+									value: (
+										<TonePill tone={networkAllocated ? "success" : "danger"}>
+											{networkAllocated
+												? t("adminAwdOps.lifecycle.fields.networkAllocated")
+												: t("adminAwdOps.lifecycle.fields.networkNotAllocated")}
+										</TonePill>
+									),
+								},
+								{
+									key: t("adminAwdOps.lifecycle.fields.configVersion"),
 									value: <MonoText>{status.updated_at}</MonoText>,
 								},
 							]}
@@ -289,17 +411,21 @@ export function AwdOpsPage() {
 					)}
 
 					{networkQuery.isError ? (
-						<p className="text-xs text-destructive">
-							赛事网络状态读取失败（不是「未分配」）：{errorText(networkQuery.error)}。部署与预检的可用性判断可能不准确。
+						<p className="text-xs text-destructive" role="alert">
+							{t("adminAwdOps.lifecycle.networkError", {
+								error: errorText(networkQuery.error),
+							})}
 						</p>
 					) : null}
 
 					{event ? (
-						<p className="text-xs text-muted-foreground">
-							赛制：{EVENT_FAMILY_LABEL[event.family] ?? event.family} · 用途：
-							{EVENT_PURPOSE_LABEL[event.purpose] ?? event.purpose} · 时间窗：
-							{formatDateTime(event.start_time, { seconds: true })} –{" "}
-							{formatDateTime(event.end_time, { seconds: true })}
+						<p className="tnum text-xs text-muted-foreground">
+							{t("adminAwdOps.lifecycle.eventMeta", {
+								family: eventFamilyLabel(event.family, t),
+								purpose: eventPurposeLabel(event.purpose, t),
+								start: formatDateTime(event.start_time, { seconds: true }),
+								end: formatDateTime(event.end_time, { seconds: true }),
+							})}
 						</p>
 					) : null}
 				</div>
@@ -307,33 +433,33 @@ export function AwdOpsPage() {
 
 			<Tabs defaultValue="config">
 				<TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto">
-					<TabsTrigger value="config">配置</TabsTrigger>
-					<TabsTrigger value="precheck">预检与轮换</TabsTrigger>
-					<TabsTrigger value="scores">积分与判罚</TabsTrigger>
-					<TabsTrigger value="teams">战队</TabsTrigger>
-					<TabsTrigger value="gameboxes">GameBox 挂载</TabsTrigger>
-					<TabsTrigger value="network">网络</TabsTrigger>
-					<TabsTrigger value="instances">实例</TabsTrigger>
+					<TabsTrigger value="config">{t("adminAwdOps.tabs.config")}</TabsTrigger>
+					<TabsTrigger value="precheck">{t("adminAwdOps.tabs.precheck")}</TabsTrigger>
+					<TabsTrigger value="scores">{t("adminAwdOps.tabs.scores")}</TabsTrigger>
+					<TabsTrigger value="teams">{t("adminAwdOps.tabs.teams")}</TabsTrigger>
+					<TabsTrigger value="gameboxes">{t("adminAwdOps.tabs.gameboxes")}</TabsTrigger>
+					<TabsTrigger value="network">{t("adminAwdOps.tabs.network")}</TabsTrigger>
+					<TabsTrigger value="instances">{t("adminAwdOps.tabs.instances")}</TabsTrigger>
 				</TabsList>
-				<TabsContent value="config" className="mt-4">
+				<TabsContent value="config" className="mt-6">
 					<AwdConfigTab eventId={eventId} />
 				</TabsContent>
-				<TabsContent value="precheck" className="mt-4">
+				<TabsContent value="precheck" className="mt-6">
 					<AwdPrecheckTab eventId={eventId} />
 				</TabsContent>
-				<TabsContent value="scores" className="mt-4">
+				<TabsContent value="scores" className="mt-6">
 					<AwdScoresTab eventId={eventId} />
 				</TabsContent>
-				<TabsContent value="teams" className="mt-4">
+				<TabsContent value="teams" className="mt-6">
 					<AwdTeamsTab eventId={eventId} />
 				</TabsContent>
-				<TabsContent value="gameboxes" className="mt-4">
+				<TabsContent value="gameboxes" className="mt-6">
 					<AwdGameboxesTab eventId={eventId} />
 				</TabsContent>
-				<TabsContent value="network" className="mt-4">
+				<TabsContent value="network" className="mt-6">
 					<AwdNetworkTab eventId={eventId} />
 				</TabsContent>
-				<TabsContent value="instances" className="mt-4">
+				<TabsContent value="instances" className="mt-6">
 					<AwdInstancesTab eventId={eventId} />
 				</TabsContent>
 			</Tabs>

@@ -8,13 +8,16 @@
  * - Break 时长不是独立可配置项：后端按「赛事总时长 − Fix 时长」推导，并把 `events.end_time`
  *   重算为 `start_time + Break + Fix`，因此本表单不提交 break_duration_secs；
  * - Fix 时长会被后端向下取整到回合间隔的整数倍（无 partial round），间隔不能整除会报错。
+ *
+ * 文案全部走 i18n（`adminAwdpOps.config.*`）。
  */
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Settings2 } from "lucide-react";
 
-import type { AwdpConfigPatchInput, AwdpEventConfigDto } from "@floatctf/sdk";
+import type { AwdpConfigPatchInput, AwdpEventConfigDto, AwdpPhase } from "@floatctf/sdk";
 
 import { call } from "~/api/call";
 import { useClient } from "~/api/client";
@@ -26,13 +29,18 @@ import { QueryState, TableSkeleton } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { formatDateTime, formatDuration } from "~/lib/format";
+import { formatDateTime, formatDuration, formatInt } from "~/lib/format";
 
 import { useAwdpConfig } from "./queries";
-import { AWDP_PHASE_DESCRIPTION, isAwdpConflict, validateFixTiming } from "./shared";
+import {
+	awdpPhaseDescription,
+	awdpPhaseLabel,
+	isAwdpConflict,
+	validateFixTiming,
+} from "./shared";
 
 /** 存在 active run 的阶段：后端 `update_config` 在这些阶段锁定配置。 */
-const LOCKED_PHASES = ["break", "preparing_fix", "fix"];
+const LOCKED_PHASES: readonly AwdpPhase[] = ["break", "preparing_fix", "fix"];
 
 interface ConfigForm {
 	fix_duration_secs: string;
@@ -58,7 +66,8 @@ function EditAwdpConfigSheet({
 	eventId: string;
 	config: AwdpEventConfigDto;
 	onClose: () => void;
-}) {
+}): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const [form, setForm] = useState<ConfigForm>(() => formFromConfig(config));
@@ -66,27 +75,36 @@ function EditAwdpConfigSheet({
 
 	const mutation = useMutation({
 		mutationFn: (patch: AwdpConfigPatchInput) =>
-			call<AwdpEventConfigDto>(client.awdp.admin.updateConfig(eventId, patch), "保存 AWDP 配置"),
+			call<AwdpEventConfigDto>(
+				client.awdp.admin.updateConfig(eventId, patch),
+				t("adminAwdpOps.calls.updateConfig"),
+			),
 		onSuccess: () => {
-			toast.success("AWDP 配置已保存", "赛事结束时间已按 开始时间 + Break + Fix 重算。");
+			toast.success(
+				t("adminAwdpOps.config.toasts.saved"),
+				t("adminAwdpOps.config.toasts.savedDescription"),
+			);
 			void queryClient.invalidateQueries({ queryKey: qk.awdp.adminConfig(eventId) });
 			void queryClient.invalidateQueries({ queryKey: qk.admin.event(eventId) });
 			onClose();
 		},
 		onError: (error) => {
 			if (isAwdpConflict(error)) {
-				toast.error("配置已被他人修改", "请核对最新配置后重试（已自动重新加载最新配置）。");
+				toast.error(
+					t("adminAwdpOps.config.toasts.conflict"),
+					t("adminAwdpOps.config.toasts.conflictDescription"),
+				);
 				void queryClient.invalidateQueries({ queryKey: qk.awdp.adminConfig(eventId) });
 				return;
 			}
-			toast.apiError("保存 AWDP 配置失败", error);
+			toast.apiError(t("adminAwdpOps.config.toasts.saveFailed"), error);
 		},
 	});
 
 	const fixDuration = Number(form.fix_duration_secs);
 	const interval = Number(form.fix_round_interval_secs);
 	const fixScore = Number(form.fix_round_score);
-	const timingError = validateFixTiming(fixDuration, interval);
+	const timingError = validateFixTiming(fixDuration, interval, t);
 	const rounds = timingError === null ? Math.floor(fixDuration / interval) : null;
 	const derivedBreakScore =
 		rounds === null ? null : Math.floor((fixScore * rounds * 3) / 5);
@@ -96,10 +114,10 @@ function EditAwdpConfigSheet({
 		const nextErrors: Partial<Record<keyof ConfigForm, string>> = {};
 		if (timingError) {
 			if (form.fix_duration_secs.trim() === "" || fixDuration <= 0) {
-				nextErrors.fix_duration_secs = "Fix 时长必须为正整数秒";
+				nextErrors.fix_duration_secs = t("adminAwdpOps.config.errors.durationPositive");
 			}
 			if (form.fix_round_interval_secs.trim() === "" || interval <= 0) {
-				nextErrors.fix_round_interval_secs = "回合间隔必须为正整数秒";
+				nextErrors.fix_round_interval_secs = t("adminAwdpOps.config.errors.intervalPositive");
 			}
 			if (!nextErrors.fix_duration_secs && !nextErrors.fix_round_interval_secs) {
 				nextErrors.fix_duration_secs = timingError;
@@ -108,10 +126,12 @@ function EditAwdpConfigSheet({
 		for (const key of ["break_score", "fix_round_score"] as const) {
 			const raw = form[key].trim();
 			if (raw === "" || !/^\d+$/.test(raw)) {
-				nextErrors[key] = "必须是非负整数";
+				nextErrors[key] = t("adminAwdpOps.config.errors.scoreInteger");
 				continue;
 			}
-			if (Number(raw) > 1_000_000_000) nextErrors[key] = "不能超过 1e9";
+			if (Number(raw) > 1_000_000_000) {
+				nextErrors[key] = t("adminAwdpOps.config.errors.scoreMax");
+			}
 		}
 		setErrors(nextErrors);
 		if (Object.keys(nextErrors).length > 0) return;
@@ -126,7 +146,7 @@ function EditAwdpConfigSheet({
 		}
 		if (fixScore !== config.fix_round_score) patch.fix_round_score = fixScore;
 		if (Object.keys(patch).length === 0) {
-			toast.warning("没有需要保存的修改");
+			toast.warning(t("adminAwdpOps.config.toasts.noChanges"));
 			return;
 		}
 		mutation.mutate({ ...patch, expected_updated_at: config.updated_at });
@@ -138,36 +158,48 @@ function EditAwdpConfigSheet({
 			onOpenChange={(open) => {
 				if (!open) onClose();
 			}}
-			title="修改 AWDP 配置"
-			description={`乐观锁版本：${formatDateTime(config.updated_at, { seconds: true })}（提交时一并回传）`}
+			title={t("adminAwdpOps.config.sheet.title")}
+			description={t("adminAwdpOps.config.sheet.description", {
+				time: formatDateTime(config.updated_at, { seconds: true }),
+			})}
 			width="lg"
-			footer={<FormFooter onCancel={onClose} formId="awdp-config-form" isPending={mutation.isPending} />}
+			footer={
+				<FormFooter
+					onCancel={onClose}
+					formId="awdp-config-form"
+					submitLabel={t("common.saveChanges")}
+					isPending={mutation.isPending}
+				/>
+			}
 		>
 			<form id="awdp-config-form" onSubmit={submit} className="space-y-4">
 				<FormGrid columns={2}>
 					<Field
-						label="Break 时长（后端推导）"
+						label={t("adminAwdpOps.config.sheet.breakDuration")}
 						htmlFor="awdp-break-duration"
-						hint="= 赛事总时长 − Fix 时长；不可直接指定"
+						hint={t("adminAwdpOps.config.sheet.breakDurationHint")}
 					>
 						<Input
 							id="awdp-break-duration"
 							value={formatDuration(config.break_duration_secs)}
 							readOnly
 							disabled
+							className="tnum"
 						/>
 					</Field>
 					<Field
-						label="Fix 时长（秒）"
+						label={t("adminAwdpOps.config.sheet.fixDuration")}
 						htmlFor="awdp-fix-duration"
 						required
 						error={errors.fix_duration_secs}
-						hint="保存后会被向下取整到回合间隔的整数倍"
+						hint={t("adminAwdpOps.config.sheet.fixDurationHint")}
 					>
 						<Input
 							id="awdp-fix-duration"
 							type="number"
 							inputMode="numeric"
+							className="tnum"
+							aria-invalid={Boolean(errors.fix_duration_secs)}
 							value={form.fix_duration_secs}
 							onChange={(event) =>
 								setForm((prev) => ({ ...prev, fix_duration_secs: event.target.value }))
@@ -175,16 +207,18 @@ function EditAwdpConfigSheet({
 						/>
 					</Field>
 					<Field
-						label="回合间隔（秒）"
+						label={t("adminAwdpOps.config.sheet.roundInterval")}
 						htmlFor="awdp-fix-interval"
 						required
 						error={errors.fix_round_interval_secs}
-						hint="每个回合的 cutoff 间隔"
+						hint={t("adminAwdpOps.config.sheet.roundIntervalHint")}
 					>
 						<Input
 							id="awdp-fix-interval"
 							type="number"
 							inputMode="numeric"
+							className="tnum"
+							aria-invalid={Boolean(errors.fix_round_interval_secs)}
 							value={form.fix_round_interval_secs}
 							onChange={(event) =>
 								setForm((prev) => ({ ...prev, fix_round_interval_secs: event.target.value }))
@@ -192,35 +226,47 @@ function EditAwdpConfigSheet({
 						/>
 					</Field>
 					<Field
-						label="Break 分值"
+						label={t("adminAwdpOps.config.sheet.breakScore")}
 						htmlFor="awdp-break-score"
 						required
 						error={errors.break_score}
 						hint={
 							derivedBreakScore === null
-								? "全部防守成功时的 Break 满分"
-								: `按派生规则当前应为 ${derivedBreakScore}（fix_round_score × 回合数 × 0.6）`
+								? t("adminAwdpOps.config.sheet.breakScoreHint")
+								: t("adminAwdpOps.config.sheet.breakScoreDerived", {
+										value: formatInt(derivedBreakScore),
+									})
 						}
 					>
 						<Input
 							id="awdp-break-score"
 							type="number"
 							inputMode="numeric"
+							className="tnum"
+							aria-invalid={Boolean(errors.break_score)}
 							value={form.break_score}
-							onChange={(event) => setForm((prev) => ({ ...prev, break_score: event.target.value }))}
+							onChange={(event) =>
+								setForm((prev) => ({ ...prev, break_score: event.target.value }))
+							}
 						/>
 					</Field>
 					<Field
-						label="每回合 Fix 分值"
+						label={t("adminAwdpOps.config.sheet.fixRoundScore")}
 						htmlFor="awdp-fix-score"
 						required
 						error={errors.fix_round_score}
-						hint={rounds === null ? "每个修复回合的得分" : `当前共 ${rounds} 个修复回合`}
+						hint={
+							rounds === null
+								? t("adminAwdpOps.config.sheet.fixRoundScoreHint")
+								: t("adminAwdpOps.config.sheet.fixRoundScoreRounds", { count: rounds })
+						}
 					>
 						<Input
 							id="awdp-fix-score"
 							type="number"
 							inputMode="numeric"
+							className="tnum"
+							aria-invalid={Boolean(errors.fix_round_score)}
 							value={form.fix_round_score}
 							onChange={(event) =>
 								setForm((prev) => ({ ...prev, fix_round_score: event.target.value }))
@@ -228,16 +274,14 @@ function EditAwdpConfigSheet({
 						/>
 					</Field>
 				</FormGrid>
-				<p className="text-xs text-muted-foreground">
-					保存会重算赛事结束时间（开始时间 + Break + Fix），并使配置代数 +1；
-					新配置只影响之后的比赛，不会改变已产生的成绩。
-				</p>
+				<p className="text-xs text-muted-foreground">{t("adminAwdpOps.config.sheet.note")}</p>
 			</form>
 		</FormSheet>
 	);
 }
 
-export function AwdpConfigTab({ eventId }: { eventId: string }) {
+export function AwdpConfigTab({ eventId }: { eventId: string }): ReactNode {
+	const { t } = useTranslation();
 	const configQuery = useAwdpConfig(eventId);
 	const [editing, setEditing] = useState(false);
 
@@ -245,7 +289,7 @@ export function AwdpConfigTab({ eventId }: { eventId: string }) {
 		<QueryState
 			query={configQuery}
 			skeleton={<TableSkeleton rows={6} columns={3} />}
-			errorTitle="加载 AWDP 配置失败（后端要求赛事赛制为 AWDP）"
+			errorTitle={t("adminAwdpOps.config.loadError")}
 		>
 			{(config) => {
 				if (!config) return null;
@@ -253,8 +297,8 @@ export function AwdpConfigTab({ eventId }: { eventId: string }) {
 				return (
 					<>
 						<SectionCard
-							title="AWDP 配置与运行态"
-							description={AWDP_PHASE_DESCRIPTION[config.phase] ?? ""}
+							title={t("adminAwdpOps.config.sectionTitle")}
+							description={awdpPhaseDescription(config.phase, t)}
 							actions={
 								<Button
 									variant="outline"
@@ -262,75 +306,147 @@ export function AwdpConfigTab({ eventId }: { eventId: string }) {
 									disabled={locked}
 									title={
 										locked
-											? `比赛进行中（${config.phase}）：后端锁定配置`
-											: "修改配置（乐观锁）"
+											? t("adminAwdpOps.config.editLockedTitle", {
+													phase: awdpPhaseLabel(config.phase, t),
+												})
+											: t("adminAwdpOps.config.editHint")
 									}
 									onClick={() => setEditing(true)}
 								>
-									<Settings2 /> 修改配置
+									<Settings2 aria-hidden="true" />
+									{t("adminAwdpOps.config.edit")}
 								</Button>
 							}
 						>
 							<div className="space-y-4">
 								<div className="flex flex-wrap items-center gap-2">
 									<TonePill tone={locked ? "warning" : "success"}>
-										{locked ? "配置已锁定（存在进行中的 run）" : "配置可修改"}
+										{locked
+											? t("adminAwdpOps.config.locked")
+											: t("adminAwdpOps.config.editable")}
 									</TonePill>
-									<TonePill tone="neutral">配置代数 {config.configuration_generation}</TonePill>
-									<span className="text-xs text-muted-foreground">
-										乐观锁版本 updated_at：{formatDateTime(config.updated_at, { seconds: true })}
+									<TonePill tone="neutral">
+										{t("adminAwdpOps.config.generation", {
+											count: formatInt(config.configuration_generation),
+										})}
+									</TonePill>
+									<span className="tnum text-xs text-muted-foreground">
+										{t("adminAwdpOps.config.updatedAt", {
+											time: formatDateTime(config.updated_at, { seconds: true }),
+										})}
 									</span>
 								</div>
 								<KeyValueList
 									columns={3}
 									items={[
-										{ key: "Break 时长", value: formatDuration(config.break_duration_secs) },
-										{ key: "Fix 时长", value: formatDuration(config.fix_duration_secs) },
 										{
-											key: "回合间隔",
-											value: formatDuration(config.fix_round_interval_secs),
-										},
-										{ key: "总回合数", value: config.total_rounds },
-										{ key: "Break 分值", value: config.break_score },
-										{ key: "每回合 Fix 分值", value: config.fix_round_score },
-										{ key: "当前回合", value: config.current_round },
-										{
-											key: "开始时间",
-											value: config.started_at
-												? formatDateTime(config.started_at, { seconds: true })
-												: "未开始",
+											key: t("adminAwdpOps.config.fields.breakDuration"),
+											value: (
+												<span className="tnum">
+													{formatDuration(config.break_duration_secs)}
+												</span>
+											),
 										},
 										{
-											key: "Break 结束",
-											value: config.break_ends_at
-												? formatDateTime(config.break_ends_at, { seconds: true })
-												: "—",
+											key: t("adminAwdpOps.config.fields.fixDuration"),
+											value: (
+												<span className="tnum">
+													{formatDuration(config.fix_duration_secs)}
+												</span>
+											),
 										},
 										{
-											key: "Fix 开始",
-											value: config.fix_started_at
-												? formatDateTime(config.fix_started_at, { seconds: true })
-												: "—",
+											key: t("adminAwdpOps.config.fields.roundInterval"),
+											value: (
+												<span className="tnum">
+													{formatDuration(config.fix_round_interval_secs)}
+												</span>
+											),
 										},
 										{
-											key: "Fix 结束",
-											value: config.fix_ends_at
-												? formatDateTime(config.fix_ends_at, { seconds: true })
-												: "—",
+											key: t("adminAwdpOps.config.fields.totalRounds"),
+											value: <span className="tnum">{formatInt(config.total_rounds)}</span>,
 										},
 										{
-											key: "结束时间",
-											value: config.finished_at
-												? formatDateTime(config.finished_at, { seconds: true })
-												: "未结束",
+											key: t("adminAwdpOps.config.fields.breakScore"),
+											value: <span className="tnum">{formatInt(config.break_score)}</span>,
 										},
 										{
-											key: "下一动作时间",
-											value: config.next_action_at
-												? formatDateTime(config.next_action_at, { seconds: true })
-												: "—",
+											key: t("adminAwdpOps.config.fields.fixRoundScore"),
+											value: (
+												<span className="tnum">{formatInt(config.fix_round_score)}</span>
+											),
 										},
-										{ key: "赛事 ID", value: <MonoText>{config.event_id}</MonoText> },
+										{
+											key: t("adminAwdpOps.config.fields.currentRound"),
+											value: (
+												<span className="tnum">{formatInt(config.current_round)}</span>
+											),
+										},
+										{
+											key: t("adminAwdpOps.config.fields.startedAt"),
+											value: config.started_at ? (
+												<span className="tnum">
+													{formatDateTime(config.started_at, { seconds: true })}
+												</span>
+											) : (
+												t("adminAwdpOps.config.values.notStarted")
+											),
+										},
+										{
+											key: t("adminAwdpOps.config.fields.breakEndsAt"),
+											value: config.break_ends_at ? (
+												<span className="tnum">
+													{formatDateTime(config.break_ends_at, { seconds: true })}
+												</span>
+											) : (
+												t("common.empty")
+											),
+										},
+										{
+											key: t("adminAwdpOps.config.fields.fixStartedAt"),
+											value: config.fix_started_at ? (
+												<span className="tnum">
+													{formatDateTime(config.fix_started_at, { seconds: true })}
+												</span>
+											) : (
+												t("common.empty")
+											),
+										},
+										{
+											key: t("adminAwdpOps.config.fields.fixEndsAt"),
+											value: config.fix_ends_at ? (
+												<span className="tnum">
+													{formatDateTime(config.fix_ends_at, { seconds: true })}
+												</span>
+											) : (
+												t("common.empty")
+											),
+										},
+										{
+											key: t("adminAwdpOps.config.fields.finishedAt"),
+											value: config.finished_at ? (
+												<span className="tnum">
+													{formatDateTime(config.finished_at, { seconds: true })}
+												</span>
+											) : (
+												t("adminAwdpOps.config.values.notFinished")
+											),
+										},
+										{
+											key: t("adminAwdpOps.config.fields.nextActionAt"),
+											value: config.next_action_at ? (
+												<span className="tnum">
+													{formatDateTime(config.next_action_at, { seconds: true })}
+												</span>
+											) : (
+												t("common.empty")
+											),
+										},
+										{
+											key: t("adminAwdpOps.config.fields.eventId"),
+											value: <MonoText>{config.event_id}</MonoText>,
+										},
 									]}
 								/>
 							</div>
@@ -348,5 +464,3 @@ export function AwdpConfigTab({ eventId }: { eventId: string }) {
 		</QueryState>
 	);
 }
-
-/** 非 AWDP 赛制时后端返回 400：这里给出更明确的解释（避免看起来像「加载失败」）。 */

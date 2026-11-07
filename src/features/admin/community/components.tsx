@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Search, Trash2 } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
@@ -18,7 +19,7 @@ import { cn } from "~/lib/utils";
 export function SearchInput({
 	value,
 	onChange,
-	placeholder = "搜索",
+	placeholder,
 	className,
 }: {
 	value: string;
@@ -26,14 +27,19 @@ export function SearchInput({
 	placeholder?: string;
 	className?: string;
 }): ReactNode {
+	const { t } = useTranslation();
+	const text = placeholder ?? t("adminCommunity.common.searchPlaceholder");
 	return (
 		<div className={cn("relative w-full sm:max-w-72", className)}>
-			<Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+			<Search
+				className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+				aria-hidden="true"
+			/>
 			<Input
 				value={value}
 				onChange={(event) => onChange(event.target.value)}
-				placeholder={placeholder}
-				aria-label={placeholder}
+				placeholder={text}
+				aria-label={text}
 				className="pl-8"
 			/>
 		</div>
@@ -88,28 +94,38 @@ export function sanitizeFilterValue(value: string): string {
 	return value.replace(/[&|]/g, " ").trim();
 }
 
-/** 批量删除按钮：显示已选数量，空选禁用。 */
+/** 批量删除按钮：显示已选数量，空选禁用（禁用原因放在 `title` 里）。 */
 export function DeleteSelectedButton({
 	count,
 	isPending = false,
 	onClick,
-	label = "删除所选",
 }: {
 	count: number;
 	isPending?: boolean;
 	onClick: () => void;
-	label?: string;
 }): ReactNode {
+	const { t } = useTranslation();
+	const label =
+		count > 0
+			? t("adminCommunity.common.deleteSelectedCount", { count })
+			: t("adminCommunity.common.deleteSelected");
 	return (
-		<Button
-			variant="destructive"
-			size="sm"
-			disabled={count === 0 || isPending}
-			onClick={onClick}
-		>
-			{isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
-			{label}
-			{count > 0 ? `（${count}）` : ""}
-		</Button>
+		<span className="inline-flex" title={count === 0 ? t("adminCommunity.common.deleteSelectedHint") : label}>
+			<Button
+				variant="destructive"
+				size="sm"
+				className="tnum"
+				disabled={count === 0 || isPending}
+				onClick={onClick}
+				title={count === 0 ? t("adminCommunity.common.deleteSelectedHint") : label}
+			>
+				{isPending ? (
+					<Loader2 className="size-4 animate-spin" aria-hidden="true" />
+				) : (
+					<Trash2 className="size-4" aria-hidden="true" />
+				)}
+				{label}
+			</Button>
+		</span>
 	);
 }

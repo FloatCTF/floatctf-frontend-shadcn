@@ -9,6 +9,7 @@ export default {
 	forbidden: "没有访问权限",
 	notFound: "资源不存在",
 	technicalDetails: "技术细节",
+	whatFailed: "{{what}}失败",
 	requestFailed: "请求失败",
 	unexpected: "发生未知错误",
 	fallback: "操作失败，请稍后重试",

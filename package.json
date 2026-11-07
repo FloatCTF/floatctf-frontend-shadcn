@@ -8,11 +8,12 @@
 	"scripts": {
 		"dev": "vite --port 13400",
 		"start": "vite --port 13400",
-		"build": "vite build && tsc --noEmit && node scripts/i18n-check.mjs",
+		"build": "vite build && tsc --noEmit && node scripts/i18n-check.mjs && node scripts/theme-audit.mjs",
 		"build:artifact": "vite build",
 		"typecheck": "tsc --noEmit",
 		"preview": "vite preview",
-		"i18n:check": "node scripts/i18n-check.mjs"
+		"i18n:check": "node scripts/i18n-check.mjs",
+		"theme:audit": "node scripts/theme-audit.mjs"
 	},
 	"dependencies": {
 		"@floatctf/frontend-runtime": "workspace:*",

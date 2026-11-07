@@ -6,9 +6,12 @@
  * - `POST .../awd/precheck` 实际返回 `{ run_id, status, error_msg, failed_checks, checks }`
  *   对象（SDK 把它标注成 `string`，见交付报告 PUBLIC SDK GAP），这里按对象解析并做兜底；
  * - `AwdPrecheckRun.error_msg` 是 JSON 字符串，需 `JSON.parse` 后展示 errors / notes。
+ *
+ * 文案全部走 `adminAwdOps.*`；状态判定仍只看后端字段。
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, ShieldCheck, ShieldX } from "lucide-react";
 
@@ -22,17 +25,17 @@ import { TonePill } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import { KeyValueList, MonoText, SectionCard } from "~/components/app/page";
-import { EmptyBlock, QueryState, TableSkeleton } from "~/components/app/states";
+import { EmptyBlock, InlineError, QueryState, TableSkeleton } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { formatDateTime } from "~/lib/format";
 
 import { useAwdEventNetwork, useAwdStatus } from "./queries";
 import {
-	AWD_ACTION_CONFIRM,
+	awdActionConfirm,
 	buildAwdGates,
 	parsePrecheckReport,
-	PRECHECK_STATUS_LABEL,
+	precheckStatusLabel,
 	precheckStatusTone,
 	runAwdAction,
 } from "./shared";
@@ -46,6 +49,7 @@ interface AwdPrecheckResult {
 }
 
 export function AwdPrecheckTab({ eventId }: { eventId: string }) {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -55,16 +59,23 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 
 	const runsQuery = useQuery({
 		queryKey: qk.awd.prechecks(eventId),
-		queryFn: () => call<AwdPrecheckRun[]>(client.awd.admin.prechecks(eventId), "预检历史"),
+		queryFn: () =>
+			call<AwdPrecheckRun[]>(
+				client.awd.admin.prechecks(eventId),
+				t("adminAwdOps.actionNames.precheckHistory"),
+			),
 		enabled: eventId !== "",
 	});
 
 	const status = statusQuery.data ?? null;
-	const gates = buildAwdGates({
-		status: status?.status ?? null,
-		networkAllocated: networkQuery.data !== null && networkQuery.data !== undefined,
-		finalSettlement: status?.final_settlement ?? false,
-	});
+	const gates = buildAwdGates(
+		{
+			status: status?.status ?? null,
+			networkAllocated: networkQuery.data !== null && networkQuery.data !== undefined,
+			finalSettlement: status?.final_settlement ?? false,
+		},
+		t,
+	);
 
 	const invalidate = () => {
 		void queryClient.invalidateQueries({ queryKey: qk.awd.prechecks(eventId) });
@@ -73,36 +84,47 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 	};
 
 	const precheck = useMutation({
-		mutationFn: () => call<AwdPrecheckResult>(client.awd.admin.precheck(eventId), "预检"),
+		mutationFn: () =>
+			call<AwdPrecheckResult>(
+				client.awd.admin.precheck(eventId),
+				t("adminAwdOps.actions.precheck"),
+			),
 		onSuccess: (result) => {
-			const status = result?.status ?? "";
+			const nextStatus = result?.status ?? "";
 			const failed = result?.failed_checks ?? [];
-			if (status === "passed") {
-				toast.success("预检通过", "赛事状态已变为「预检通过」，可以开赛。");
+			if (nextStatus === "passed") {
+				toast.success(
+					t("adminAwdOps.precheck.successTitle"),
+					t("adminAwdOps.precheck.successDescription"),
+				);
 			} else {
 				const detail =
 					failed.length > 0
-						? `未通过项：${failed.join("、")}`
+						? t("adminAwdOps.precheck.failedChecks", { checks: failed.join(" · ") })
 						: result?.error_msg
-							? "后端已记录失败原因，见下方最新预检报告。"
-							: "后端未返回失败明细，见下方预检历史。";
-				toast.error("预检未通过", detail);
+							? t("adminAwdOps.precheck.failedRecorded")
+							: t("adminAwdOps.precheck.failedNoDetail");
+				toast.error(t("adminAwdOps.precheck.failedTitle"), detail);
 			}
 			invalidate();
 		},
-		onError: (error) => toast.apiError("预检失败", error),
+		onError: (error) => toast.apiError(t("adminAwdOps.precheck.errorTitle"), error),
 	});
 
 	const rotate = useMutation({
-		mutationFn: () => runAwdAction(client, eventId, "rotateTokens"),
+		mutationFn: () => runAwdAction(client, eventId, "rotateTokens", t),
 		onSuccess: () => {
-			toast.success("内部令牌已轮换", "FlagServer / JudgeServer 容器已按新令牌重建。");
+			toast.success(
+				t("adminAwdOps.precheck.rotateSuccessTitle"),
+				t("adminAwdOps.precheck.rotateSuccessDescription"),
+			);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("轮换内部令牌失败", error),
+		onError: (error) => toast.apiError(t("adminAwdOps.precheck.rotateFailed"), error),
 	});
 
 	const runs = runsQuery.data ?? [];
+	const statusPending = statusQuery.isPending;
 	const selected =
 		runs.find((run) => run.id === selectedRunId) ?? (runs.length > 0 ? runs[0] : null);
 	const report = parsePrecheckReport(selected?.error_msg);
@@ -110,42 +132,47 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 	const columns: DataTableColumn<AwdPrecheckRun>[] = [
 		{
 			id: "status",
-			header: "结果",
+			header: t("adminAwdOps.precheck.columns.result"),
 			sortValue: (row) => row.status,
 			cell: (row) => (
 				<TonePill tone={precheckStatusTone(row.status)}>
-					{PRECHECK_STATUS_LABEL[row.status] ?? row.status}
+					{precheckStatusLabel(row.status, t)}
 				</TonePill>
 			),
 		},
 		{
 			id: "trigger",
-			header: "触发方式",
+			header: t("adminAwdOps.precheck.columns.trigger"),
 			cell: (row) => row.trigger ?? "—",
 			hideBelow: "sm",
 		},
 		{
 			id: "revision",
-			header: "网络修订",
+			header: t("adminAwdOps.precheck.columns.revision"),
 			align: "right",
-			cell: (row) => (row.revision === null || row.revision === undefined ? "—" : row.revision),
+			cell: (row) =>
+				row.revision === null || row.revision === undefined ? (
+					<span className="text-muted-foreground">—</span>
+				) : (
+					<span className="tnum">{row.revision}</span>
+				),
 			hideBelow: "md",
 		},
 		{
 			id: "started_at",
-			header: "开始",
-			cell: (row) => formatDateTime(row.started_at, { seconds: true }),
+			header: t("adminAwdOps.precheck.columns.startedAt"),
+			cell: (row) => (<span className="tnum whitespace-nowrap">{formatDateTime(row.started_at, { seconds: true })}</span>),
 			sortValue: (row) => row.started_at ?? "",
 		},
 		{
 			id: "completed_at",
-			header: "完成",
-			cell: (row) => formatDateTime(row.completed_at, { seconds: true }),
+			header: t("adminAwdOps.precheck.columns.completedAt"),
+			cell: (row) => (<span className="tnum whitespace-nowrap">{formatDateTime(row.completed_at, { seconds: true })}</span>),
 			hideBelow: "md",
 		},
 		{
 			id: "errors",
-			header: "失败项",
+			header: t("adminAwdOps.precheck.columns.errors"),
 			align: "right",
 			cell: (row) => {
 				const parsed = parsePrecheckReport(row.error_msg);
@@ -156,53 +183,86 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 	];
 
 	return (
-		<div className="space-y-5">
+		<div className="space-y-6">
 			<SectionCard
-				title="预检"
-				description="检查配置 / 容器 / WireGuard / 网络 / flag / 判题链路；通过后状态变为「预检通过」。"
+				title={t("adminAwdOps.precheck.title")}
+				description={t("adminAwdOps.precheck.description")}
 				actions={
 					<Button
 						size="sm"
-						disabled={!gates.precheck.enabled || precheck.isPending}
-						title={gates.precheck.reason ?? "运行一次预检"}
+						disabled={
+							statusPending ||
+							statusQuery.isError ||
+							!gates.precheck.enabled ||
+							precheck.isPending
+						}
+						title={
+							statusQuery.isError
+								? t("adminAwdOps.lifecycle.statusLoadFailed")
+								: statusPending
+									? t("adminAwdOps.lifecycle.loadingStatus")
+									: (gates.precheck.reason ?? t("adminAwdOps.precheck.runTitle"))
+						}
 						onClick={async () => {
-							const ok = await confirm(AWD_ACTION_CONFIRM.precheck);
+							const ok = await confirm(awdActionConfirm(t, "precheck"));
 							if (ok) precheck.mutate();
 						}}
 					>
-						<ShieldCheck /> 运行预检
+						<ShieldCheck data-icon="inline-start" />
+						{t("adminAwdOps.precheck.run")}
 					</Button>
 				}
 			>
 				<div className="space-y-3">
+					{statusQuery.isError ? <InlineError error={statusQuery.error} /> : null}
 					<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
 						<TonePill tone={gates.precheck.enabled ? "success" : "warning"}>
-							{gates.precheck.enabled ? "可以预检" : "当前不可预检"}
+							{gates.precheck.enabled
+								? t("adminAwdOps.precheck.available")
+								: t("adminAwdOps.precheck.unavailable")}
 						</TonePill>
-						{gates.precheck.reason ? <span>{gates.precheck.reason}</span> : null}
+						{gates.precheck.reason ? (
+							<span>
+								{statusQuery.isError
+									? t("adminAwdOps.lifecycle.statusLoadFailed")
+									: statusPending
+										? t("adminAwdOps.lifecycle.loadingStatus")
+										: gates.precheck.reason}
+							</span>
+						) : null}
 					</div>
 					<KeyValueList
 						columns={2}
 						items={[
 							{
-								key: "赛事网络",
+								key: t("adminAwdOps.precheck.network"),
 								value: networkQuery.isPending ? (
-									<span className="text-muted-foreground">读取中…</span>
+									<span className="text-muted-foreground">
+										{t("adminAwdOps.precheck.networkReading")}
+									</span>
 								) : networkQuery.isError ? (
-									<span className="text-destructive">读取失败</span>
+									<span className="text-destructive">
+										{t("adminAwdOps.precheck.networkReadFailed")}
+									</span>
 								) : networkQuery.data == null ? (
-									<span className="text-destructive">未分配（预检前置条件）</span>
+									<span className="text-destructive">
+										{t("adminAwdOps.precheck.networkMissing")}
+									</span>
 								) : (
-									<TonePill tone="success">已分配</TonePill>
+									<TonePill tone="success">
+										{t("adminAwdOps.precheck.networkAllocated")}
+									</TonePill>
 								),
 								hint: networkQuery.isError ? errorText(networkQuery.error) : undefined,
 							},
 							{
-								key: "预检通过时间",
+								key: t("adminAwdOps.precheck.verifiedAt"),
 								value: status?.verified_at ? (
 									formatDateTime(status.verified_at, { seconds: true })
 								) : (
-									<span className="text-muted-foreground">未通过</span>
+									<span className="text-muted-foreground">
+										{t("adminAwdOps.precheck.notVerified")}
+									</span>
 								),
 							},
 						]}
@@ -211,16 +271,17 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 			</SectionCard>
 
 			<SectionCard
-				title="预检历史"
-				description="按开始时间倒序；点击一行查看该次预检的失败原因与提示。"
+				title={t("adminAwdOps.precheck.historyTitle")}
+				description={t("adminAwdOps.precheck.historyDescription")}
 				actions={
 					<Button
-						variant="ghost"
+						variant="outline"
 						size="sm"
 						disabled={runsQuery.isFetching}
 						onClick={() => void runsQuery.refetch()}
 					>
-						<RefreshCw /> 刷新
+						<RefreshCw data-icon="inline-start" />
+						{t("adminAwdOps.precheck.refresh")}
 					</Button>
 				}
 			>
@@ -230,8 +291,9 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 					isEmpty={(data) => data.length === 0}
 					empty={
 						<EmptyBlock
-							title="还没有预检记录"
-							description="运行一次预检后，这里会显示每次预检的结果与失败原因。"
+							title={t("adminAwdOps.precheck.emptyTitle")}
+							description={t("adminAwdOps.precheck.emptyDescription")}
+							icon={<ShieldCheck className="size-6" />}
 						/>
 					}
 				>
@@ -243,30 +305,53 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 								columns={columns}
 								onRowClick={(row) => setSelectedRunId(row.id)}
 								mobileCard={(row) => (
-									<div className="space-y-1">
-										<TonePill tone={precheckStatusTone(row.status)}>
-											{PRECHECK_STATUS_LABEL[row.status] ?? row.status}
-										</TonePill>
-										<p className="text-xs text-muted-foreground">
-											{formatDateTime(row.started_at, { seconds: true })} · {row.trigger ?? "—"}
-										</p>
+									<div className="flex items-start justify-between gap-2">
+										<div className="min-w-0 space-y-1">
+											<TonePill tone={precheckStatusTone(row.status)}>
+												{precheckStatusLabel(row.status, t)}
+											</TonePill>
+											<p className="tnum text-xs text-muted-foreground">
+												{formatDateTime(row.started_at, { seconds: true })}
+												{row.trigger ? ` · ${row.trigger}` : ""}
+											</p>
+										</div>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => setSelectedRunId(row.id)}
+										>
+											{t("adminAwdOps.precheck.viewReport")}
+										</Button>
 									</div>
 								)}
 							/>
 							{selected ? (
-								<div className="space-y-3 rounded-md border p-3">
+								<div className="space-y-3 rounded-lg border bg-muted/30 p-3">
 									<div className="flex flex-wrap items-center gap-2">
 										<TonePill tone={precheckStatusTone(selected.status)}>
-											{PRECHECK_STATUS_LABEL[selected.status] ?? selected.status}
+											{precheckStatusLabel(selected.status, t)}
 										</TonePill>
-										<span className="text-xs text-muted-foreground">
+										<span className="tnum text-xs text-muted-foreground">
 											{formatDateTime(selected.completed_at ?? selected.started_at, {
 												seconds: true,
 											})}
-											{selected.revision !== null && selected.revision !== undefined
-												? ` · 网络修订 ${selected.revision}`
-												: ""}
 										</span>
+										{selected.revision !== null &&
+										selected.revision !== undefined ? (
+											<>
+												<span
+													aria-hidden="true"
+													className="text-xs text-muted-foreground"
+												>
+													·
+												</span>
+												<span className="text-xs text-muted-foreground">
+													{t("adminAwdOps.precheck.revision", {
+														revision: selected.revision,
+													})}
+												</span>
+											</>
+										) : null}
 										<MonoText>{selected.id}</MonoText>
 									</div>
 
@@ -277,28 +362,37 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 													key={`${entry.component}-${index}`}
 													className="flex items-start gap-2 text-sm"
 												>
-													<ShieldX className="mt-0.5 size-4 shrink-0 text-destructive" />
-													<span>
-														<span className="font-mono text-xs">{entry.component}</span>
+													<ShieldX className="mt-1 size-4 shrink-0 text-destructive" />
+													<span className="min-w-0 break-words">
+														<span className="font-mono text-xs">
+															{entry.component}
+														</span>
 														<span className="text-muted-foreground"> · </span>
-														{entry.error ?? "（后端未提供原因）"}
+														{entry.error ??
+															t("adminAwdOps.precheck.backendNoReason")}
 													</span>
 												</li>
 											))}
 										</ul>
 									) : (
-										<p className="text-sm text-muted-foreground">该次预检没有失败项。</p>
+										<p className="text-sm text-muted-foreground">
+											{t("adminAwdOps.precheck.noFailures")}
+										</p>
 									)}
 
 									{report.notes.length > 0 ? (
 										<details className="text-sm">
 											<summary className="cursor-pointer text-muted-foreground">
-												提示信息（{report.notes.length}）
+												{t("adminAwdOps.precheck.notesSummary", {
+													count: report.notes.length,
+												})}
 											</summary>
 											<ul className="mt-2 space-y-1">
 												{report.notes.map((entry, index) => (
 													<li key={`${entry.component}-${index}`}>
-														<span className="font-mono text-xs">{entry.component}</span>
+														<span className="font-mono text-xs">
+															{entry.component}
+														</span>
 														<span className="text-muted-foreground"> · </span>
 														{entry.note}
 													</li>
@@ -314,28 +408,46 @@ export function AwdPrecheckTab({ eventId }: { eventId: string }) {
 			</SectionCard>
 
 			<SectionCard
-				title="内部令牌轮换"
-				description="key_version +1 并替换 FlagServer / JudgeServer 的内部调用令牌（会原地重建这两个容器）。"
+				title={t("adminAwdOps.precheck.rotateTitle")}
+				description={t("adminAwdOps.precheck.rotateDescription")}
 				actions={
 					<Button
 						variant="destructive"
 						size="sm"
-						disabled={!gates.rotateTokens.enabled || rotate.isPending}
-						title={gates.rotateTokens.reason ?? "轮换内部令牌"}
+						disabled={
+							statusPending ||
+							statusQuery.isError ||
+							!gates.rotateTokens.enabled ||
+							rotate.isPending
+						}
+						title={
+							statusQuery.isError
+								? t("adminAwdOps.lifecycle.statusLoadFailed")
+								: statusPending
+									? t("adminAwdOps.lifecycle.loadingStatus")
+									: (gates.rotateTokens.reason ??
+										t("adminAwdOps.precheck.rotateTitleAttr"))
+						}
 						onClick={async () => {
-							const ok = await confirm(AWD_ACTION_CONFIRM.rotateTokens);
+							const ok = await confirm(awdActionConfirm(t, "rotateTokens"));
 							if (ok) rotate.mutate();
 						}}
 					>
-						轮换内部令牌
+						{t("adminAwdOps.precheck.rotateAction")}
 					</Button>
 				}
 			>
 				<div className="space-y-2 text-sm text-muted-foreground">
-					<p>轮换只影响平台内部调用令牌，不改变题目 flag 本身（赛事密钥未变）。</p>
-					<p>重建期间判题与 flag 结算短暂不可用；失败可重试，数据库令牌更新是原子的。</p>
+					<p>{t("adminAwdOps.precheck.rotateNoteToken")}</p>
+					<p>{t("adminAwdOps.precheck.rotateNoteDowntime")}</p>
 					{gates.rotateTokens.reason ? (
-						<p className="text-xs text-destructive">{gates.rotateTokens.reason}</p>
+						<p className="text-xs text-destructive">
+							{statusQuery.isError
+								? t("adminAwdOps.lifecycle.statusLoadFailed")
+								: statusPending
+									? t("adminAwdOps.lifecycle.loadingStatus")
+									: gates.rotateTokens.reason}
+						</p>
 					) : null}
 				</div>
 			</SectionCard>

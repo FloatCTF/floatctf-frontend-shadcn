@@ -8,9 +8,12 @@
  * - detach 是直接删除挂载行：`awdp_instances` / `awdp_breaks` / `awdp_score_events` 都以
  *   `event_gamebox_id` 外键 **ON DELETE CASCADE**，因此该题的实例、Break 记录与计分账本
  *   会一并消失。
+ *
+ * 文案全部走 i18n（`adminAwdpOps.gameboxes.*`）。
  */
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Boxes, Link2, Plus, Trash2 } from "lucide-react";
 
@@ -19,7 +22,7 @@ import type { AwdpAdminEventGameBoxDto } from "@floatctf/sdk";
 import { call, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
-import { BooleanPill } from "~/components/app/badges";
+import { BooleanPill, TonePill } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import { Field, FormFooter, FormSheet } from "~/components/app/form";
@@ -38,6 +41,7 @@ import { Switch } from "~/components/ui/switch";
 import { formatBytes } from "~/lib/format";
 
 import { useAwdpEventGameboxes, useAwdpGameboxLibrary } from "./queries";
+import { awdpBuildStatusLabel, awdpBuildStatusTone } from "./shared";
 
 function AttachGameboxSheet({
 	eventId,
@@ -47,7 +51,8 @@ function AttachGameboxSheet({
 	eventId: string;
 	attachedIds: Set<string>;
 	onClose: () => void;
-}) {
+}): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -59,15 +64,15 @@ function AttachGameboxSheet({
 		mutationFn: (input: { gameboxId: string; hidden: boolean }) =>
 			call<AwdpAdminEventGameBoxDto>(
 				client.awdp.admin.attachGamebox(eventId, input.gameboxId, input.hidden),
-				"挂载 GameBox",
+				t("adminAwdpOps.calls.attach"),
 			),
 		onSuccess: (row) => {
-			toast.success(`已挂载「${row.name}」`);
+			toast.success(t("adminAwdpOps.gameboxes.attachToast", { name: row.name }));
 			void queryClient.invalidateQueries({ queryKey: qk.awdp.adminGameboxes(eventId) });
 			void queryClient.invalidateQueries({ queryKey: qk.awdp.adminInstances(eventId) });
 			onClose();
 		},
-		onError: (error) => toast.apiError("挂载 GameBox 失败", error),
+		onError: (error) => toast.apiError(t("adminAwdpOps.gameboxes.attachFailed"), error),
 	});
 
 	const ready = (libraryQuery.data?.items ?? []).filter(
@@ -79,15 +84,17 @@ function AttachGameboxSheet({
 		if (gameboxId === "") return;
 		const selected = ready.find((item) => item.id === gameboxId);
 		const ok = await confirm({
-			title: `挂载「${selected?.name ?? gameboxId}」？`,
-			description: "挂载后该 GameBox 出现在本赛事（选手端与实例视图）。",
+			title: t("adminAwdpOps.gameboxes.attachConfirm.title", {
+				name: selected?.name ?? gameboxId,
+			}),
+			description: t("adminAwdpOps.gameboxes.attachConfirm.description"),
 			consequences: [
-				"复制 GameBox 推荐资源（CPU / 内存 / PIDs）到赛事挂载行",
-				"若比赛正在进行（Break / Fix）且未隐藏，会为全部参与者自动启动该 GameBox 实例",
-				"标记为隐藏则不为参与者启动，也不会出现在选手端",
-				"后端要求 GameBox 已构建完成且具备完整 [awdp] capability，否则会拒绝并给出原因",
+				t("adminAwdpOps.gameboxes.attachConfirm.consequence1"),
+				t("adminAwdpOps.gameboxes.attachConfirm.consequence2"),
+				t("adminAwdpOps.gameboxes.attachConfirm.consequence3"),
+				t("adminAwdpOps.gameboxes.attachConfirm.consequence4"),
 			],
-			confirmText: "挂载",
+			confirmText: t("adminAwdpOps.gameboxes.attachConfirm.confirmText"),
 		});
 		if (ok) mutation.mutate({ gameboxId, hidden });
 	};
@@ -98,30 +105,40 @@ function AttachGameboxSheet({
 			onOpenChange={(open) => {
 				if (!open) onClose();
 			}}
-			title="挂载 GameBox"
-			description="仅列出已构建成功（ready）且尚未挂载的 GameBox；[awdp] capability 由后端校验。"
+			title={t("adminAwdpOps.gameboxes.attachTitle")}
+			description={t("adminAwdpOps.gameboxes.attachDescription")}
 			footer={
 				<FormFooter
 					onCancel={onClose}
 					formId="awdp-attach-form"
-					submitLabel="挂载"
+					submitLabel={t("adminAwdpOps.gameboxes.attach")}
 					isPending={mutation.isPending}
 					disabled={gameboxId === ""}
 				/>
 			}
 		>
 			<form id="awdp-attach-form" onSubmit={(event) => void submit(event)} className="space-y-4">
-				<Field label="GameBox" htmlFor="awdp-attach-gamebox" required>
+				<Field label={t("adminAwdpOps.gameboxes.fieldGamebox")} htmlFor="awdp-attach-gamebox" required>
 					<Select value={gameboxId} onValueChange={setGameboxId} disabled={libraryQuery.isPending}>
-						<SelectTrigger id="awdp-attach-gamebox" aria-label="选择 GameBox">
+						<SelectTrigger
+							id="awdp-attach-gamebox"
+							aria-label={t("adminAwdpOps.gameboxes.fieldGameboxAria")}
+						>
 							<SelectValue
-								placeholder={libraryQuery.isPending ? "加载 GameBox 库…" : "选择 GameBox…"}
+								placeholder={
+									libraryQuery.isPending
+										? t("adminAwdpOps.gameboxes.loadingLibrary")
+										: t("adminAwdpOps.gameboxes.selectPlaceholder")
+								}
 							/>
 						</SelectTrigger>
 						<SelectContent>
 							{ready.map((item) => (
 								<SelectItem key={item.id} value={item.id}>
-									{item.name}（{item.safe_name}）
+									{t("adminAwdpOps.gameboxes.option", {
+										name: item.name,
+										safeName: item.safe_name,
+									})}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -130,14 +147,12 @@ function AttachGameboxSheet({
 				{libraryQuery.isError ? (
 					<InlineError error={libraryQuery.error} />
 				) : !libraryQuery.isPending && ready.length === 0 ? (
-					<p className="text-xs text-muted-foreground">
-						没有可挂载的 GameBox：库中没有 ready 状态的靶机（或全部已挂载）。
-					</p>
+					<p className="text-xs text-muted-foreground">{t("adminAwdpOps.gameboxes.noReady")}</p>
 				) : null}
 				<Field
-					label="对选手隐藏"
+					label={t("adminAwdpOps.gameboxes.hiddenLabel")}
 					htmlFor="awdp-attach-hidden"
-					hint="隐藏的 GameBox 不会为参与者自动启动实例"
+					hint={t("adminAwdpOps.gameboxes.hiddenHint")}
 				>
 					<Switch id="awdp-attach-hidden" checked={hidden} onCheckedChange={setHidden} />
 				</Field>
@@ -146,73 +161,123 @@ function AttachGameboxSheet({
 	);
 }
 
-export function AwdpGameboxesTab({ eventId }: { eventId: string }) {
+export function AwdpGameboxesTab({ eventId }: { eventId: string }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const gameboxesQuery = useAwdpEventGameboxes(eventId);
 	const [attaching, setAttaching] = useState(false);
+	// 空态把「挂载」主操作放在空态块里，避免同一张卡片出现两个主按钮。
+	const hasRows = (gameboxesQuery.data ?? []).length > 0;
 
 	const detach = useMutation({
 		mutationFn: (row: AwdpAdminEventGameBoxDto) =>
-			callVoid(client.awdp.admin.detachGamebox(eventId, row.id), "解除挂载"),
+			callVoid(
+				client.awdp.admin.detachGamebox(eventId, row.id),
+				t("adminAwdpOps.calls.detach"),
+			),
 		onSuccess: (_result, row) => {
-			toast.success(`已解除「${row.name}」的挂载`);
+			toast.success(t("adminAwdpOps.gameboxes.detachToast", { name: row.name }));
 			void queryClient.invalidateQueries({ queryKey: qk.awdp.adminGameboxes(eventId) });
 			void queryClient.invalidateQueries({ queryKey: qk.awdp.adminInstances(eventId) });
 			void queryClient.invalidateQueries({ queryKey: qk.awdp.adminScores(eventId) });
 		},
-		onError: (error) => toast.apiError("解除挂载失败", error),
+		onError: (error) => toast.apiError(t("adminAwdpOps.gameboxes.detachFailed"), error),
 	});
+
+	const askDetach = async (row: AwdpAdminEventGameBoxDto) => {
+		const ok = await confirm({
+			title: t("adminAwdpOps.gameboxes.detachConfirm.title", { name: row.name }),
+			description: t("adminAwdpOps.gameboxes.detachConfirm.description"),
+			consequences: [
+				t("adminAwdpOps.gameboxes.detachConfirm.consequence1"),
+				t("adminAwdpOps.gameboxes.detachConfirm.consequence2"),
+				t("adminAwdpOps.gameboxes.detachConfirm.consequence3"),
+			],
+			tone: "danger",
+			confirmText: t("adminAwdpOps.gameboxes.detachConfirm.confirmText"),
+			confirmPhrase: "detach",
+		});
+		if (ok) detach.mutate(row);
+	};
+
+	const detachButton = (row: AwdpAdminEventGameBoxDto) => (
+		<Button
+			variant="ghost"
+			size="icon-sm"
+			disabled={detach.isPending}
+			aria-label={t("adminAwdpOps.gameboxes.detachAria", { name: row.name })}
+			title={t("adminAwdpOps.gameboxes.detachTitle")}
+			onClick={() => void askDetach(row)}
+		>
+			<Trash2 className="text-destructive" aria-hidden="true" />
+		</Button>
+	);
 
 	const columns: DataTableColumn<AwdpAdminEventGameBoxDto>[] = [
 		{
 			id: "name",
-			header: "GameBox",
+			header: t("adminAwdpOps.gameboxes.columns.gamebox"),
 			sortValue: (row) => row.name,
 			cell: (row) => (
 				<div className="min-w-0">
 					<p className="truncate font-medium">{row.name}</p>
-					<p className="text-xs text-muted-foreground">
-						{row.safe_name} · {row.category}
+					<p className="truncate text-xs text-muted-foreground">
+						<MonoText>{row.safe_name}</MonoText> · {row.category}
 					</p>
 				</div>
 			),
 		},
 		{
 			id: "awdp_capable",
-			header: "[awdp] 能力",
+			header: t("adminAwdpOps.gameboxes.columns.capability"),
 			cell: (row) => (
 				<BooleanPill
 					value={row.awdp_capable}
-					trueText="完整"
-					falseText="缺失"
+					trueText={t("adminAwdpOps.gameboxes.capabilityComplete")}
+					falseText={t("adminAwdpOps.gameboxes.capabilityMissing")}
 					falseTone="danger"
 				/>
 			),
 		},
 		{
 			id: "build_status",
-			header: "构建状态",
-			cell: (row) => row.build_status ?? "—",
+			header: t("adminAwdpOps.gameboxes.columns.buildStatus"),
+			cell: (row) => (
+				<TonePill tone={awdpBuildStatusTone(row.build_status)} title={row.build_status ?? undefined}>
+					{awdpBuildStatusLabel(row.build_status, t)}
+				</TonePill>
+			),
 			hideBelow: "md",
 		},
 		{
 			id: "enabled",
-			header: "启用",
-			cell: (row) => <BooleanPill value={row.enabled} trueText="启用" falseText="停用" />,
+			header: t("adminAwdpOps.gameboxes.columns.enabled"),
+			cell: (row) => (
+				<BooleanPill
+					value={row.enabled}
+					trueText={t("adminAwdpOps.gameboxes.enabledTrue")}
+					falseText={t("adminAwdpOps.gameboxes.enabledFalse")}
+				/>
+			),
 			hideBelow: "md",
 		},
 		{
 			id: "hidden",
-			header: "选手可见",
+			header: t("adminAwdpOps.gameboxes.columns.visible"),
 			cell: (row) => (
-				<BooleanPill value={!row.hidden} trueText="可见" falseText="已隐藏" falseTone="warning" />
+				<BooleanPill
+					value={!row.hidden}
+					trueText={t("adminAwdpOps.gameboxes.visibleTrue")}
+					falseText={t("adminAwdpOps.gameboxes.visibleFalse")}
+					falseTone="warning"
+				/>
 			),
 		},
 		{
 			id: "resources",
-			header: "资源（CPU / 内存 / PIDs）",
+			header: t("adminAwdpOps.gameboxes.columns.resources"),
 			hideBelow: "lg",
 			cell: (row) => (
 				<MonoText>
@@ -222,34 +287,39 @@ export function AwdpGameboxesTab({ eventId }: { eventId: string }) {
 		},
 		{
 			id: "awdp_source_code_dir",
-			header: "源码目录",
+			header: t("adminAwdpOps.gameboxes.columns.sourceDir"),
 			hideBelow: "xl",
-			cell: (row) => <MonoText>{row.awdp_source_code_dir ?? "—"}</MonoText>,
+			cell: (row) => <MonoText>{row.awdp_source_code_dir ?? t("common.empty")}</MonoText>,
 		},
 	];
 
 	return (
 		<SectionCard
-			title="赛事 GameBox 挂载"
-			description="AWDP 需要完整 [awdp] capability 的 GameBox；比赛进行中新挂载会为参与者自动启动实例。"
+			title={t("adminAwdpOps.gameboxes.sectionTitle")}
+			description={t("adminAwdpOps.gameboxes.sectionDescription")}
 			actions={
-				<Button size="sm" onClick={() => setAttaching(true)}>
-					<Plus /> 挂载 GameBox
-				</Button>
+				hasRows ? (
+					<Button size="sm" onClick={() => setAttaching(true)}>
+						<Plus aria-hidden="true" />
+						{t("adminAwdpOps.gameboxes.attach")}
+					</Button>
+				) : undefined
 			}
 		>
 			<QueryState
 				query={gameboxesQuery}
 				skeleton={<TableSkeleton rows={4} columns={5} />}
 				isEmpty={(rows) => rows.length === 0}
+				errorTitle={t("adminAwdpOps.gameboxes.loadError")}
 				empty={
 					<EmptyBlock
-						title="尚未挂载任何 GameBox"
-						description="AWDP 赛事的题目就是 GameBox：挂载后参与者才会看到并启动实例。"
-						icon={<Boxes className="size-5" />}
+						title={t("adminAwdpOps.gameboxes.emptyTitle")}
+						description={t("adminAwdpOps.gameboxes.emptyDescription")}
+						icon={<Boxes className="size-6" aria-hidden="true" />}
 						action={
 							<Button size="sm" onClick={() => setAttaching(true)}>
-								<Plus /> 挂载 GameBox
+								<Plus aria-hidden="true" />
+								{t("adminAwdpOps.gameboxes.attach")}
 							</Button>
 						}
 					/>
@@ -260,48 +330,37 @@ export function AwdpGameboxesTab({ eventId }: { eventId: string }) {
 						data={rows}
 						getRowId={(row) => row.id}
 						columns={columns}
+						rowActions={detachButton}
 						mobileCard={(row) => (
-							<div className="space-y-1">
-								<p className="text-sm font-medium">{row.name}</p>
-								<p className="text-xs text-muted-foreground">
-									{row.safe_name} · {row.category} · {row.build_status ?? "—"}
-								</p>
-								<div className="flex flex-wrap gap-1 pt-1">
+							<div className="space-y-2">
+								<div className="flex items-start justify-between gap-2">
+									<div className="min-w-0">
+										<p className="truncate text-sm font-medium">{row.name}</p>
+										<p className="truncate text-xs text-muted-foreground">
+											{t("adminAwdpOps.gameboxes.mobileMeta", {
+												safeName: row.safe_name,
+												category: row.category,
+												status: awdpBuildStatusLabel(row.build_status, t),
+											})}
+										</p>
+									</div>
+									{detachButton(row)}
+								</div>
+								<div className="flex flex-wrap gap-1">
 									<BooleanPill
 										value={row.awdp_capable}
-										trueText="[awdp] 完整"
-										falseText="[awdp] 缺失"
+										trueText={t("adminAwdpOps.gameboxes.capabilityCompleteShort")}
+										falseText={t("adminAwdpOps.gameboxes.capabilityMissingShort")}
 										falseTone="danger"
 									/>
-									<BooleanPill value={!row.hidden} trueText="可见" falseText="已隐藏" falseTone="warning" />
+									<BooleanPill
+										value={!row.hidden}
+										trueText={t("adminAwdpOps.gameboxes.visibleTrue")}
+										falseText={t("adminAwdpOps.gameboxes.visibleFalse")}
+										falseTone="warning"
+									/>
 								</div>
 							</div>
-						)}
-						rowActions={(row) => (
-							<Button
-								variant="ghost"
-								size="icon-sm"
-								disabled={detach.isPending}
-								aria-label={`解除 ${row.name} 的挂载`}
-								title="解除挂载"
-								onClick={async () => {
-									const ok = await confirm({
-										title: `解除「${row.name}」的挂载？（会级联删除数据）`,
-										description:
-											"挂载行被删除时，以 event_gamebox_id 为外键的数据会按 ON DELETE CASCADE 一并删除。",
-										consequences: [
-											"该 GameBox 在本赛事的实例记录被级联删除（容器不会自动停止）",
-											"该题的 Break 记录与计分账本（score_events）被级联删除，积分榜历史随之变化",
-											"选手端不再看到该题目；重新挂载不会恢复已删除的记录",
-										],
-										tone: "danger",
-										confirmText: "解除挂载",
-									});
-									if (ok) detach.mutate(row);
-								}}
-							>
-								<Trash2 className="text-destructive" />
-							</Button>
 						)}
 					/>
 				)}
@@ -316,8 +375,8 @@ export function AwdpGameboxesTab({ eventId }: { eventId: string }) {
 			) : null}
 
 			<p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-				<Link2 className="size-3" />
-				挂载只决定赛事可见的题目；实例由参与者启动（比赛进行中挂载会自动启动）。
+				<Link2 className="size-4 shrink-0" aria-hidden="true" />
+				{t("adminAwdpOps.gameboxes.footnote")}
 			</p>
 		</SectionCard>
 	);

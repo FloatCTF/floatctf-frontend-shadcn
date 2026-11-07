@@ -9,19 +9,21 @@
  */
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
 	keepPreviousData,
 	useMutation,
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import { MoreHorizontal, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Megaphone, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 
 import type { Announcements } from "@floatctf/sdk/entity";
 
 import { call, callList, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
+import { TonePill } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import { Field, FormFooter, FormSheet } from "~/components/app/form";
@@ -50,7 +52,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
-import { truncate } from "~/lib/format";
+import { formatInt, truncate } from "~/lib/format";
 import { useDocumentTitle } from "~/lib/hooks";
 
 import {
@@ -63,7 +65,8 @@ import {
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 export function AdminAnnouncementsPage(): ReactNode {
-	useDocumentTitle("公告治理 · FloatCTF 控制台");
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminCommunity.announcements.documentTitle"));
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -101,73 +104,112 @@ export function AdminAnnouncementsPage(): ReactNode {
 
 	const removeMutation = useMutation({
 		mutationFn: (ids: string[]) =>
-			callVoid(client.admin.announcements.remove(ids), "删除公告"),
+			callVoid(client.admin.announcements.remove(ids), t("adminCommunity.announcements.requests.delete")),
 		onSuccess: (_data, ids) => {
-			toast.success(`已删除 ${ids.length} 条公告`);
+			toast.success(t("adminCommunity.announcements.toasts.deleted", { count: ids.length }));
 			setSelected([]);
 			void queryClient.invalidateQueries({ queryKey: qk.admin.announcements() });
 			void queryClient.invalidateQueries({ queryKey: qk.announcements.all });
 		},
-		onError: (error) => toast.apiError("删除公告失败", error),
+		onError: (error) => toast.apiError(t("adminCommunity.announcements.toasts.deleteFailed"), error),
 	});
 
 	async function removeRows(rows: Announcements[]) {
 		if (rows.length === 0) return;
+		const titles = rows
+			.slice(0, 3)
+			.map((row) => row.title)
+			.join(t("adminCommunity.common.listSeparator"));
 		const ok = await confirm({
-			title: rows.length === 1 ? "删除这条公告？" : `删除 ${rows.length} 条公告？`,
+			title:
+				rows.length === 1
+					? t("adminCommunity.announcements.confirm.deleteTitleSingle")
+					: t("adminCommunity.announcements.confirm.deleteTitleMany", { count: rows.length }),
 			description:
 				rows.length === 1
 					? rows[0].title
-					: `包含：${rows.slice(0, 3).map((row) => row.title).join("、")}${
-							rows.length > 3 ? ` 等 ${rows.length} 条` : ""
-						}`,
+					: rows.length > 3
+						? t("adminCommunity.announcements.confirm.descriptionManyMore", {
+								titles,
+								count: rows.length,
+							})
+						: t("adminCommunity.announcements.confirm.descriptionMany", { titles }),
 			consequences: [
-				"选手端公告列表会立即移除这些内容，影响所有已登录用户",
-				"删除后不可恢复（公告正文不会保留）",
+				t("adminCommunity.announcements.confirm.consequenceVisibility"),
+				t("adminCommunity.announcements.confirm.consequenceIrreversible"),
 			],
 			tone: "danger",
-			confirmText: "删除",
+			confirmText: t("adminCommunity.announcements.confirm.confirm"),
 		});
 		if (!ok) return;
 		removeMutation.mutate(rows.map((row) => row.id));
 	}
 
+	/**
+	 * 公告发布者展示名：`publisher` 是发布时的展示名快照；`publisher_id` 为空
+	 * 表示该账号已被注销（后端 ON DELETE SET NULL），此时保留快照并标注。
+	 */
+	function publisherText(row: Announcements): string {
+		const name = row.publisher.trim();
+		if (row.publisher_id) return name || t("adminCommunity.announcements.publisher.deleted");
+		return name
+			? t("adminCommunity.announcements.publisher.deletedSuffix", { name })
+			: t("adminCommunity.announcements.publisher.deleted");
+	}
+
 	const columns: DataTableColumn<Announcements>[] = [
 		{
 			id: "title",
-			header: "标题",
+			header: t("adminCommunity.announcements.columns.title"),
 			sortValue: (row) => row.title,
-			cell: (row) => <span className="font-medium">{row.title}</span>,
+			cell: (row) => <span className="text-sm font-medium">{row.title}</span>,
 		},
 		{
 			id: "content",
-			header: "内容",
+			header: t("adminCommunity.announcements.columns.content"),
 			hideBelow: "md",
 			cell: (row) => (
-				<span className="text-muted-foreground">{truncate(row.content ?? "", 60) || "—"}</span>
+				<span
+					className="line-clamp-2 max-w-2xl text-sm break-words text-muted-foreground"
+					title={row.content ?? undefined}
+				>
+					{truncate(row.content ?? "", 80) || t("adminCommunity.common.noContent")}
+				</span>
 			),
 		},
 		{
 			id: "publisher",
-			header: "发布者",
+			header: t("adminCommunity.announcements.columns.publisher"),
 			hideBelow: "sm",
-			sortValue: (row) => row.publisher,
-			cell: (row) => <span>{row.publisher}</span>,
+			sortValue: (row) => publisherText(row),
+			cell: (row) => <span className="text-sm">{publisherText(row)}</span>,
+		},
+		{
+			id: "created_at",
+			header: t("adminCommunity.announcements.columns.createdAt"),
+			align: "right",
+			hideBelow: "sm",
+			sortValue: (row) => Date.parse(row.created_at),
+			cell: (row) => <AbsoluteTime value={row.created_at} />,
 		},
 		{
 			id: "updated_at",
-			header: "更新时间",
+			header: t("adminCommunity.announcements.columns.updatedAt"),
 			align: "right",
 			sortValue: (row) => Date.parse(row.updated_at),
 			cell: (row) => <AbsoluteTime value={row.updated_at} />,
 		},
 	];
 
+	const total = query.data?.meta.total ?? query.data?.items.length ?? 0;
+	const hasRows = total > 0;
+
 	return (
 		<PageBody>
 			<PageHeader
-				title="公告"
-				description="全站公告的创建、修订与删除。公告对所有用户可见。"
+				title={t("adminCommunity.announcements.title")}
+				description={t("adminCommunity.announcements.subtitle")}
+				badge={<TonePill tone="info">{t("adminCommunity.announcements.badge")}</TonePill>}
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
@@ -177,126 +219,173 @@ export function AdminAnnouncementsPage(): ReactNode {
 							onClick={() => void query.refetch()}
 							disabled={query.isFetching}
 						>
-							<RefreshCw />
-							刷新
+							<RefreshCw aria-hidden="true" />
+							{t("common.refresh")}
 						</Button>
-						<Button size="sm" onClick={() => setEditing(null)}>
-							<Plus />
-							新建公告
+						<Button onClick={() => setEditing(null)}>
+							<Plus aria-hidden="true" />
+							{t("adminCommunity.announcements.actions.create")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
 			<SectionCard
-				title="公告列表"
-				description="搜索命中标题或正文；按更新时间倒序。"
-				actions={
-					<div className="flex flex-wrap items-center gap-2">
-						<SearchInput
-							value={list.search}
-							onChange={list.setSearch}
-							placeholder="搜索标题 / 正文"
+				title={
+					<span className="flex items-center gap-2">
+						{t("adminCommunity.announcements.section.title")}
+						{query.data ? (
+							<MonoText className="text-muted-foreground">{formatInt(total)}</MonoText>
+						) : null}
+					</span>
+				}
+				description={t("adminCommunity.announcements.section.description")}
+				contentClassName="px-0"
+				footer={
+					hasRows && query.data ? (
+						<PaginationBar
+							page={list.page}
+							pageSize={list.pageSize}
+							total={total}
+							onPageChange={list.setPage}
+							onPageSizeChange={list.setPageSize}
+							pageSizeOptions={PAGE_SIZE_OPTIONS}
 						/>
-						<DeleteSelectedButton
-							count={selected.length}
-							isPending={removeMutation.isPending}
-							onClick={() =>
-								void removeRows(
-									(query.data?.items ?? []).filter((row) => selected.includes(row.id)),
-								)
-							}
-						/>
-					</div>
+					) : null
 				}
 			>
+				<div className="flex flex-col gap-2 px-4 pb-3 sm:flex-row sm:items-center sm:justify-between">
+					<SearchInput
+						value={list.search}
+						onChange={list.setSearch}
+						placeholder={t("adminCommunity.announcements.search.placeholder")}
+					/>
+					<DeleteSelectedButton
+						count={selected.length}
+						isPending={removeMutation.isPending}
+						onClick={() =>
+							void removeRows(
+								(query.data?.items ?? []).filter((row) => selected.includes(row.id)),
+							)
+						}
+					/>
+				</div>
 				<QueryState
 					query={query}
-					skeleton={<TableSkeleton rows={6} columns={4} />}
-					errorTitle="加载公告失败"
+					skeleton={<TableSkeleton rows={6} columns={5} />}
+					errorTitle={t("adminCommunity.announcements.errors.load")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
-						<EmptyBlock
-							variant={filter.length > 0 ? "filtered" : "empty"}
-							title={filter.length > 0 ? "没有匹配的公告" : "暂无公告"}
-							description={
-								filter.length > 0
-									? "试试调整搜索关键字。"
-									: "新建一条公告后，这里会显示它的发布时间与发布者。"
-							}
-						/>
+						keyword.length > 0 ? (
+							<EmptyBlock
+								className="mx-4"
+								variant="filtered"
+								title={t("adminCommunity.announcements.filtered.title")}
+								description={t("adminCommunity.announcements.filtered.description", {
+									query: keyword,
+								})}
+								action={
+									<Button size="sm" variant="outline" onClick={() => list.setSearch("")}>
+										{t("adminCommunity.announcements.filtered.clear")}
+									</Button>
+								}
+							/>
+						) : list.page > 1 ? (
+							<EmptyBlock
+								className="mx-4"
+								title={t("adminCommunity.common.pageOutOfRangeTitle")}
+								description={t("adminCommunity.common.pageOutOfRangeDescription")}
+								action={
+									<Button size="sm" variant="outline" onClick={() => list.setPage(1)}>
+										{t("adminCommunity.common.pageOutOfRangeAction")}
+									</Button>
+								}
+							/>
+						) : (
+							<EmptyBlock
+								className="mx-4"
+								title={t("adminCommunity.announcements.empty.title")}
+								description={t("adminCommunity.announcements.empty.description")}
+								icon={<Megaphone aria-hidden="true" />}
+								action={
+									<Button size="sm" onClick={() => setEditing(null)}>
+										{t("adminCommunity.announcements.empty.action")}
+									</Button>
+								}
+							/>
+						)
 					}
 				>
 					{(result) => (
-						<div className="space-y-3">
-							<DataTable
-								data={result.items}
-								getRowId={(row) => row.id}
-								columns={columns}
-								selectable
-								selectedIds={selected}
-								onSelectionChange={setSelected}
-								rowActions={(row) => (
-									<DropdownMenu>
-										<DropdownMenuTrigger asChild>
-											<Button variant="ghost" size="icon-sm" aria-label="公告操作">
-												<MoreHorizontal />
-											</Button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent align="end">
-											<DropdownMenuItem onSelect={() => setEditing(row)}>
+						<DataTable
+							data={result.items}
+							getRowId={(row) => row.id}
+							columns={columns}
+							selectable
+							selectedIds={selected}
+							onSelectionChange={setSelected}
+							rowActions={(row) => (
+								<DropdownMenu>
+									<DropdownMenuTrigger asChild>
+										<Button
+											variant="ghost"
+											size="icon-sm"
+											aria-label={t("adminCommunity.announcements.rowActions.aria")}
+											title={t("adminCommunity.announcements.rowActions.aria")}
+										>
+											<MoreHorizontal />
+										</Button>
+									</DropdownMenuTrigger>
+									<DropdownMenuContent align="end">
+										<DropdownMenuItem onSelect={() => setEditing(row)}>
+											<Pencil />
+											{t("adminCommunity.announcements.rowActions.edit")}
+										</DropdownMenuItem>
+										<DropdownMenuItem
+											variant="destructive"
+											onSelect={() => void removeRows([row])}
+										>
+											<Trash2 />
+											{t("adminCommunity.announcements.rowActions.delete")}
+										</DropdownMenuItem>
+									</DropdownMenuContent>
+								</DropdownMenu>
+							)}
+							mobileCard={(row) => (
+								<div className="space-y-2">
+									<div className="flex items-start justify-between gap-2">
+										<span className="min-w-0 text-sm font-medium break-words">
+											{row.title}
+										</span>
+										<AbsoluteTime value={row.updated_at} />
+									</div>
+									<p className="line-clamp-4 text-sm break-words text-muted-foreground">
+										{truncate(row.content ?? "", 160) ||
+											t("adminCommunity.common.noContent")}
+									</p>
+									<div className="flex flex-wrap items-center justify-between gap-2">
+										<span className="text-xs text-muted-foreground">
+											{publisherText(row)}
+										</span>
+										<div className="flex items-center gap-1">
+											<Button variant="ghost" size="sm" onClick={() => setEditing(row)}>
 												<Pencil />
-												编辑
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												variant="destructive"
-												onSelect={() => void removeRows([row])}
+												{t("adminCommunity.announcements.rowActions.edit")}
+											</Button>
+											<Button
+												variant="ghost"
+												size="sm"
+												className="text-destructive"
+												onClick={() => void removeRows([row])}
 											>
 												<Trash2 />
-												删除
-											</DropdownMenuItem>
-										</DropdownMenuContent>
-									</DropdownMenu>
-								)}
-								mobileCard={(row) => (
-									<div className="space-y-2">
-										<div className="flex items-start justify-between gap-2">
-											<span className="font-medium">{row.title}</span>
-											<AbsoluteTime value={row.updated_at} />
-										</div>
-										<p className="text-sm text-muted-foreground">
-											{truncate(row.content ?? "", 120) || "（无正文）"}
-										</p>
-										<div className="flex items-center justify-between gap-2">
-											<MonoText className="text-muted-foreground">{row.publisher}</MonoText>
-											<div className="flex items-center gap-1">
-												<Button variant="ghost" size="sm" onClick={() => setEditing(row)}>
-													<Pencil />
-													编辑
-												</Button>
-												<Button
-													variant="ghost"
-													size="sm"
-													className="text-destructive"
-													onClick={() => void removeRows([row])}
-												>
-													<Trash2 />
-													删除
-												</Button>
-											</div>
+												{t("adminCommunity.announcements.rowActions.delete")}
+											</Button>
 										</div>
 									</div>
-								)}
-							/>
-							<PaginationBar
-								page={list.page}
-								pageSize={list.pageSize}
-								total={result.meta.total ?? result.items.length}
-								onPageChange={list.setPage}
-								onPageSizeChange={list.setPageSize}
-								pageSizeOptions={PAGE_SIZE_OPTIONS}
-							/>
-						</div>
+								</div>
+							)}
+						/>
 					)}
 				</QueryState>
 			</SectionCard>
@@ -321,6 +410,7 @@ function AnnouncementFormSheet({
 	row: Announcements | null;
 	onOpenChange: (open: boolean) => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const [title, setTitle] = useState("");
@@ -341,24 +431,24 @@ function AnnouncementFormSheet({
 
 	const createMutation = useMutation({
 		mutationFn: (input: { title: string; content: string }) =>
-			call(client.admin.announcements.create(input), "创建公告"),
+			call(client.admin.announcements.create(input), t("adminCommunity.announcements.requests.create")),
 		onSuccess: () => {
-			toast.success("公告已创建");
+			toast.success(t("adminCommunity.announcements.toasts.created"));
 			invalidate();
 			onOpenChange(false);
 		},
-		onError: (err) => toast.apiError("创建公告失败", err),
+		onError: (err) => toast.apiError(t("adminCommunity.announcements.toasts.createFailed"), err),
 	});
 
 	const patchMutation = useMutation({
 		mutationFn: (input: { id: string; title: string; content: string }) =>
-			call(client.admin.announcements.patch(input), "更新公告"),
+			call(client.admin.announcements.patch(input), t("adminCommunity.announcements.requests.update")),
 		onSuccess: () => {
-			toast.success("公告已更新");
+			toast.success(t("adminCommunity.announcements.toasts.updated"));
 			invalidate();
 			onOpenChange(false);
 		},
-		onError: (err) => toast.apiError("更新公告失败", err),
+		onError: (err) => toast.apiError(t("adminCommunity.announcements.toasts.updateFailed"), err),
 	});
 
 	const isPending = createMutation.isPending || patchMutation.isPending;
@@ -367,7 +457,7 @@ function AnnouncementFormSheet({
 		event.preventDefault();
 		const nextTitle = title.trim();
 		if (nextTitle.length === 0) {
-			setError("标题不能为空");
+			setError(t("adminCommunity.announcements.form.titleRequired"));
 			return;
 		}
 		setError(null);
@@ -379,42 +469,65 @@ function AnnouncementFormSheet({
 		<FormSheet
 			open={open}
 			onOpenChange={onOpenChange}
-			title={row ? "编辑公告" : "新建公告"}
+			title={
+				row
+					? t("adminCommunity.announcements.form.editTitle")
+					: t("adminCommunity.announcements.form.createTitle")
+			}
 			description={
 				row
-					? "保存后所有用户刷新即可看到新内容；发布者与发布时间保持不变。"
-					: "公告发布后立即对所有用户可见。"
+					? t("adminCommunity.announcements.form.descriptionEdit")
+					: t("adminCommunity.announcements.form.descriptionCreate")
 			}
 			width="lg"
 			footer={
 				<FormFooter
 					formId="announcement-form"
 					isPending={isPending}
-					submitLabel={row ? "保存" : "发布"}
+					submitLabel={
+						row
+							? t("adminCommunity.announcements.form.submitEdit")
+							: t("adminCommunity.announcements.form.submitCreate")
+					}
 					onCancel={() => onOpenChange(false)}
-					hint={row ? `ID ${row.id}` : "标题为必填项"}
+					hint={
+						row ? (
+							<span className="tnum font-mono">
+								{t("adminCommunity.announcements.form.idHint", { id: row.id })}
+							</span>
+						) : (
+							t("adminCommunity.announcements.form.requiredHint")
+						)
+					}
 				/>
 			}
 		>
 			<form id="announcement-form" className="space-y-4" onSubmit={submit}>
-				<Field label="标题" htmlFor="announcement-title" required error={error}>
+				<Field
+					label={t("adminCommunity.announcements.form.titleLabel")}
+					htmlFor="announcement-title"
+					required
+					error={error}
+				>
 					<Input
 						id="announcement-title"
 						value={title}
+						aria-invalid={Boolean(error)}
 						onChange={(event) => setTitle(event.target.value)}
-						placeholder="一句话说明这次通知"
+						placeholder={t("adminCommunity.announcements.form.titlePlaceholder")}
 					/>
 				</Field>
 				<Field
-					label="正文"
+					label={t("adminCommunity.announcements.form.contentLabel")}
 					htmlFor="announcement-content"
-					hint="纯文本，保留换行（选手端按原文展示，不解析 Markdown）。"
+					hint={t("adminCommunity.announcements.form.contentHint")}
 				>
 					<Textarea
 						id="announcement-content"
 						value={content}
 						onChange={(event) => setContent(event.target.value)}
-						style={{ minHeight: 220 }}
+						placeholder={t("adminCommunity.announcements.form.contentPlaceholder")}
+						className="min-h-48 resize-y"
 					/>
 				</Field>
 			</form>

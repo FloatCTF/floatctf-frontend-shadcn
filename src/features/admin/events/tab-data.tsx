@@ -3,9 +3,11 @@
  *
  * 只渲染后端返回的聚合字段：参赛人数 / 战队数、挂题解出统计、Top10 积分榜、
  * 走势（`TrendItem[]`）与最近解出流水。30s 轮询（与平台积分榜 / 趋势语义一致）。
+ * 文案全部走 `adminEvents.data` 命名空间。
  */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, BarChart3, Puzzle, Users } from "lucide-react";
 
@@ -20,18 +22,19 @@ import { MonoText, SectionCard, StatCard } from "~/components/app/page";
 import { EmptyBlock, QueryState, TableSkeleton } from "~/components/app/states";
 import { UserAvatar } from "~/components/app/user-cell";
 import type { DataEventChallenge, DataEventChallengeSolve, DataPresent, ScoreboardItem } from "@floatctf/sdk";
-import { formatDateTime, formatPercent, formatRelative, formatScore } from "~/lib/format";
+import { formatDateTime, formatPercent, formatRelative, formatScore, formatTime } from "~/lib/format";
 import { useNow } from "~/lib/hooks";
 
 import { MobileFacts } from "./shared";
 
 export function EventDataTab({ eventId }: { eventId: string }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const now = useNow(30_000);
 
 	const query = useQuery({
 		queryKey: qk.admin.eventData(eventId),
-		queryFn: () => call<DataPresent>(client.admin.events.getData(eventId), "赛事数据大屏"),
+		queryFn: () => call<DataPresent>(client.admin.events.getData(eventId), t("adminEvents.actions.loadEventData")),
 		refetchInterval: 30_000,
 		refetchIntervalInBackground: false,
 	});
@@ -39,7 +42,7 @@ export function EventDataTab({ eventId }: { eventId: string }): ReactNode {
 	return (
 		<QueryState
 			query={query}
-			errorTitle="加载赛事数据失败"
+			errorTitle={t("adminEvents.data.loadError")}
 			skeleton={<TableSkeleton rows={6} columns={4} />}
 		>
 			{(data) => <DataPresentView data={data} now={now} />}
@@ -48,31 +51,41 @@ export function EventDataTab({ eventId }: { eventId: string }): ReactNode {
 }
 
 function DataPresentView({ data, now }: { data: DataPresent; now: Date }): ReactNode {
+	const { t } = useTranslation();
 	const challengeColumns: DataTableColumn<DataEventChallenge>[] = [
-		{ id: "name", header: "题目", cell: (row) => row.name, sortValue: (row) => row.name },
+		{
+			id: "name",
+			header: t("adminEvents.data.columns.challenge"),
+			cell: (row) => row.name,
+			sortValue: (row) => row.name,
+		},
 		{
 			id: "category",
-			header: "分类",
-			cell: (row) => <TonePill tone="neutral">{row.category}</TonePill>,
+			header: t("adminEvents.data.columns.category"),
+			cell: (row) => (
+				<TonePill tone="neutral" title={row.category}>
+					{row.category}
+				</TonePill>
+			),
 			sortValue: (row) => row.category,
 		},
 		{
 			id: "points",
-			header: "当前分值",
+			header: t("adminEvents.data.columns.points"),
 			align: "right",
 			cell: (row) => <MonoText>{formatScore(row.points)}</MonoText>,
 			sortValue: (row) => row.points,
 		},
 		{
 			id: "solved_count",
-			header: "解出数",
+			header: t("adminEvents.data.columns.solvedCount"),
 			align: "right",
 			cell: (row) => <MonoText>{row.solved_count}</MonoText>,
 			sortValue: (row) => row.solved_count,
 		},
 		{
 			id: "solved_percent",
-			header: "解出率",
+			header: t("adminEvents.data.columns.solvedPercent"),
 			align: "right",
 			cell: (row) => <MonoText>{formatPercent(row.solved_percent)}</MonoText>,
 			sortValue: (row) => row.solved_percent,
@@ -82,14 +95,14 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 	const scoreboardColumns: DataTableColumn<ScoreboardItem>[] = [
 		{
 			id: "no",
-			header: "#",
+			header: t("adminEvents.data.columns.rank"),
 			align: "right",
 			cell: (row) => <MonoText>{row.no}</MonoText>,
 			sortValue: (row) => row.no,
 		},
 		{
 			id: "name",
-			header: "选手 / 战队",
+			header: t("adminEvents.data.columns.name"),
 			cell: (row) => (
 				<div className="flex items-center gap-2">
 					<UserAvatar name={row.name} avatar={row.avatar} size="sm" />
@@ -100,14 +113,14 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 		},
 		{
 			id: "score",
-			header: "总分",
+			header: t("adminEvents.data.columns.score"),
 			align: "right",
 			cell: (row) => <MonoText>{formatScore(row.score)}</MonoText>,
 			sortValue: (row) => row.score,
 		},
 		{
 			id: "solved_count",
-			header: "解题数",
+			header: t("adminEvents.data.columns.solveCount"),
 			align: "right",
 			cell: (row) => <MonoText>{row.solved_count}</MonoText>,
 			sortValue: (row) => row.solved_count,
@@ -118,13 +131,13 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 	const solveColumns: DataTableColumn<DataEventChallengeSolve>[] = [
 		{
 			id: "user",
-			header: "选手",
-			cell: (row) => row.user_nickname || "—",
+			header: t("adminEvents.data.columns.user"),
+			cell: (row) => row.user_nickname || t("common.empty"),
 			sortValue: (row) => row.user_nickname,
 		},
 		{
 			id: "challenge",
-			header: "题目",
+			header: t("adminEvents.data.columns.challenge"),
 			cell: (row) => (
 				<span>
 					<span className="text-muted-foreground">{row.challenge_category} / </span>
@@ -135,9 +148,12 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 		},
 		{
 			id: "created_at",
-			header: "解出时间",
+			header: t("adminEvents.data.columns.solveTime"),
 			cell: (row) => (
-				<span className="tnum text-xs" title={formatDateTime(row.created_at, { seconds: true })}>
+				<span
+					className="tnum text-xs whitespace-nowrap"
+					title={formatDateTime(row.created_at, { seconds: true })}
+				>
 					{formatRelative(row.created_at, now)}
 				</span>
 			),
@@ -156,50 +172,54 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 		<div className="space-y-5">
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<StatCard
-					label="参赛人数"
+					label={t("adminEvents.data.stats.users.label")}
 					value={data.user_count}
-					hint="event_users 记录数"
-					icon={<Users className="size-5" />}
+					hint={t("adminEvents.data.stats.users.hint")}
+					icon={<Users className="size-4" />}
 				/>
 				<StatCard
-					label="战队数"
+					label={t("adminEvents.data.stats.teams.label")}
 					value={data.team_count}
-					hint="个人赛恒为 0"
-					icon={<Users className="size-5" />}
+					hint={t("adminEvents.data.stats.teams.hint")}
+					icon={<Users className="size-4" />}
 					tone="success"
 				/>
 				<StatCard
-					label="挂题数"
+					label={t("adminEvents.data.stats.challenges.label")}
 					value={data.event_challenges.length}
-					hint={`累计解出 ${solvedTotal} 次`}
-					icon={<Puzzle className="size-5" />}
+					hint={t("adminEvents.data.stats.challenges.hint", { count: solvedTotal })}
+					icon={<Puzzle className="size-4" />}
 				/>
 				<StatCard
-					label="最近解出"
+					label={t("adminEvents.data.stats.recent.label")}
 					value={data.solved_recent_15.length}
-					hint="最近 15 条流水"
-					icon={<Activity className="size-5" />}
+					hint={t("adminEvents.data.stats.recent.hint")}
+					icon={<Activity className="size-4" />}
 					tone="warning"
 				/>
 			</div>
 
 			<SectionCard
-				title="总分走势"
-				description="后端按解出流水的总分快照生成；悬停可查看各主体分数。"
+				title={t("adminEvents.data.trend.title")}
+				description={t("adminEvents.data.trend.description")}
 			>
 				<TrendChart
 					series={trendSeries}
 					formatY={(value) => value.toFixed(0)}
-					formatX={(value) =>
-						new Date(value).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })
-					}
+					formatX={(value) => formatTime(value)}
 				/>
 			</SectionCard>
 
 			<div className="grid gap-5 lg:grid-cols-2">
-				<SectionCard title="积分榜 Top10" description="与选手端积分榜同源（banned=false 过滤）。">
+				<SectionCard
+					title={t("adminEvents.data.scoreboard.title")}
+					description={t("adminEvents.data.scoreboard.description")}
+				>
 					{data.scoreboard_top10.length === 0 ? (
-						<EmptyBlock title="暂无排行数据" description="还没有队伍 / 选手得分。" />
+						<EmptyBlock
+							title={t("adminEvents.data.scoreboard.emptyTitle")}
+							description={t("adminEvents.data.scoreboard.emptyDescription")}
+						/>
 					) : (
 						<DataTable
 							data={data.scoreboard_top10}
@@ -208,9 +228,15 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 							mobileCard={(row) => (
 								<MobileFacts
 									items={[
-										{ k: "#", v: <MonoText>{row.no}</MonoText> },
-										{ k: "名称", v: row.name },
-										{ k: "总分", v: <MonoText>{formatScore(row.score)}</MonoText> },
+										{
+											k: t("adminEvents.data.mobile.rank"),
+											v: <MonoText>{row.no}</MonoText>,
+										},
+										{ k: t("adminEvents.data.mobile.name"), v: row.name },
+										{
+											k: t("adminEvents.data.mobile.score"),
+											v: <MonoText>{formatScore(row.score)}</MonoText>,
+										},
 									]}
 								/>
 							)}
@@ -218,9 +244,15 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 					)}
 				</SectionCard>
 
-				<SectionCard title="题目解出统计" description="按解出数倒序（后端排序）。">
+				<SectionCard
+					title={t("adminEvents.data.challenges.title")}
+					description={t("adminEvents.data.challenges.description")}
+				>
 					{data.event_challenges.length === 0 ? (
-						<EmptyBlock title="赛事还没有题目" description="挂题后这里会显示解出率与动态分值。" />
+						<EmptyBlock
+							title={t("adminEvents.data.challenges.emptyTitle")}
+							description={t("adminEvents.data.challenges.emptyDescription")}
+						/>
 					) : (
 						<DataTable
 							data={data.event_challenges}
@@ -229,10 +261,30 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 							mobileCard={(row) => (
 								<MobileFacts
 									items={[
-										{ k: "题目", v: row.name },
-										{ k: "分类", v: <TonePill tone="neutral">{row.category}</TonePill> },
-										{ k: "当前分值", v: <MonoText>{formatScore(row.points)}</MonoText> },
-										{ k: "解出", v: <MonoText>{`${row.solved_count} 次 / ${formatPercent(row.solved_percent)}`}</MonoText> },
+										{ k: t("adminEvents.data.mobile.challenge"), v: row.name },
+										{
+											k: t("adminEvents.data.mobile.category"),
+											v: (
+												<TonePill tone="neutral" title={row.category}>
+													{row.category}
+												</TonePill>
+											),
+										},
+										{
+											k: t("adminEvents.data.mobile.points"),
+											v: <MonoText>{formatScore(row.points)}</MonoText>,
+										},
+										{
+											k: t("adminEvents.data.mobile.solved"),
+											v: (
+												<MonoText>
+													{t("adminEvents.data.mobile.solvedValue", {
+														count: row.solved_count,
+														percent: formatPercent(row.solved_percent),
+													})}
+												</MonoText>
+											),
+										},
 									]}
 								/>
 							)}
@@ -242,14 +294,14 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 			</div>
 
 			<SectionCard
-				title="最近解出流水"
-				description="最近 15 条解题记录（含额外加分）。"
+				title={t("adminEvents.data.recent.title")}
+				description={t("adminEvents.data.recent.description")}
 			>
 				{data.solved_recent_15.length === 0 ? (
 					<EmptyBlock
-						title="暂无解题流水"
-						description="还没有选手解出赛事题目。"
-						icon={<BarChart3 className="size-5" />}
+						title={t("adminEvents.data.recent.emptyTitle")}
+						description={t("adminEvents.data.recent.emptyDescription")}
+						icon={<BarChart3 className="size-6" />}
 					/>
 				) : (
 					<DataTable
@@ -259,10 +311,19 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 						mobileCard={(row) => (
 							<MobileFacts
 								items={[
-									{ k: "选手", v: row.user_nickname || "—" },
-									{ k: "题目", v: row.challenge_name },
-									{ k: "加分", v: <MonoText>{formatScore(row.bonus_points)}</MonoText> },
-									{ k: "时间", v: formatDateTime(row.created_at) },
+									{
+										k: t("adminEvents.data.mobile.user"),
+										v: row.user_nickname || t("common.empty"),
+									},
+									{ k: t("adminEvents.data.mobile.challenge"), v: row.challenge_name },
+									{
+										k: t("adminEvents.data.mobile.bonus"),
+										v: <MonoText>{formatScore(row.bonus_points)}</MonoText>,
+									},
+									{
+										k: t("adminEvents.data.mobile.time"),
+										v: formatDateTime(row.created_at),
+									},
 								]}
 							/>
 						)}

@@ -6,9 +6,11 @@
  * Writeup / 数据大屏 / AWD 概览 / AWDP 概览）。
  *
  * 标签状态写进 `?tab=`，因此控制台里的任何视图都可以直接分享 / 刷新保持。
+ * 文案全部走 `adminEvents.console` 命名空间。
  */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, Swords, Terminal } from "lucide-react";
@@ -62,6 +64,7 @@ function normalizeTab(raw: string | null): TabKey {
 }
 
 export function EventConsolePage(): ReactNode {
+	const { t } = useTranslation();
 	const params = useParams();
 	const eventId = params.eventId ?? "";
 	const [searchParams, setSearchParams] = useSearchParams();
@@ -70,12 +73,16 @@ export function EventConsolePage(): ReactNode {
 
 	const query = useQuery({
 		queryKey: qk.admin.event(eventId),
-		queryFn: () => call<Events>(client.admin.events.get(eventId), "赛事详情"),
+		queryFn: () => call<Events>(client.admin.events.get(eventId), t("adminEvents.actions.loadEvent")),
 		enabled: eventId !== "",
 	});
 
 	const event = query.data ?? null;
-	useDocumentTitle(event ? `${event.title} · 赛事控制台 · FloatCTF` : "赛事控制台 · FloatCTF");
+	useDocumentTitle(
+		event
+			? t("adminEvents.console.documentTitle", { title: event.title })
+			: t("adminEvents.console.documentTitleFallback"),
+	);
 
 	// 家族专属标签：其它家族下如果 URL 带着这些 tab，回退到「配置」。
 	const rawTab = normalizeTab(searchParams.get("tab"));
@@ -114,11 +121,11 @@ export function EventConsolePage(): ReactNode {
 		return (
 			<PageBody>
 				<NotFoundBlock
-					title="缺少赛事 ID"
-					description="地址里没有 eventId，请从赛事管理列表进入。"
+					title={t("adminEvents.console.missingIdTitle")}
+					description={t("adminEvents.console.missingIdDescription")}
 					action={
 						<Button asChild>
-							<Link to="/admin/events">返回赛事管理</Link>
+							<Link to="/admin/events">{t("adminEvents.console.backToList")}</Link>
 						</Button>
 					}
 				/>
@@ -129,7 +136,7 @@ export function EventConsolePage(): ReactNode {
 	if (query.isPending) {
 		return (
 			<PageBody>
-				<LoadingBlock label="加载赛事详情…" />
+				<LoadingBlock label={t("adminEvents.console.loading")} />
 			</PageBody>
 		);
 	}
@@ -138,7 +145,7 @@ export function EventConsolePage(): ReactNode {
 		if (isForbidden(query.error)) {
 			return (
 				<PageBody>
-					<PermissionDeniedBlock description="当前管理员账号无权读取该赛事（后端返回 403）。" />
+					<PermissionDeniedBlock description={t("adminEvents.console.forbiddenDescription")} />
 				</PageBody>
 			);
 		}
@@ -146,11 +153,11 @@ export function EventConsolePage(): ReactNode {
 			return (
 				<PageBody>
 					<NotFoundBlock
-						title="赛事不存在"
-						description="该赛事可能已被删除，或 ID 不正确。"
+						title={t("adminEvents.console.notFoundTitle")}
+						description={t("adminEvents.console.notFoundDescription")}
 						action={
 							<Button asChild>
-								<Link to="/admin/events">返回赛事管理</Link>
+								<Link to="/admin/events">{t("adminEvents.console.backToList")}</Link>
 							</Button>
 						}
 					/>
@@ -161,7 +168,7 @@ export function EventConsolePage(): ReactNode {
 			<PageBody>
 				<ErrorBlock
 					error={query.error}
-					title="加载赛事失败"
+					title={t("adminEvents.console.loadError")}
 					onRetry={() => void query.refetch()}
 				/>
 			</PageBody>
@@ -172,11 +179,11 @@ export function EventConsolePage(): ReactNode {
 		return (
 			<PageBody>
 				<NotFoundBlock
-					title="赛事不存在"
-					description="后端未返回该赛事的数据。"
+					title={t("adminEvents.console.notFoundTitle")}
+					description={t("adminEvents.console.notFoundDescription")}
 					action={
 						<Button asChild>
-							<Link to="/admin/events">返回赛事管理</Link>
+							<Link to="/admin/events">{t("adminEvents.console.backToList")}</Link>
 						</Button>
 					}
 				/>
@@ -189,7 +196,7 @@ export function EventConsolePage(): ReactNode {
 			<PageHeader
 				breadcrumbs={
 					<Link to="/admin/events" className="underline-offset-4 hover:underline">
-						赛事管理
+						{t("adminEvents.console.breadcrumb")}
 					</Link>
 				}
 				title={event.title}
@@ -206,21 +213,22 @@ export function EventConsolePage(): ReactNode {
 				}
 				actions={
 					<Toolbar>
-						<CopyText value={event.id} label="赛事 ID" />
+						<CopyText value={event.id} label={t("adminEvents.console.eventIdLabel")} />
 						<Button variant="outline" onClick={refreshAll} disabled={query.isFetching}>
-							<RefreshCw className={query.isFetching ? "animate-spin" : undefined} /> 刷新
+							<RefreshCw className={query.isFetching ? "animate-spin" : undefined} />{" "}
+							{t("common.refresh")}
 						</Button>
 						{event.family === "awd" ? (
 							<Button variant="outline" asChild>
 								<Link to={`/admin/events/${event.id}/awd`}>
-									<Swords /> AWD 运维
+									<Swords /> {t("adminEvents.console.awdOps")}
 								</Link>
 							</Button>
 						) : null}
 						{event.family === "awdp" ? (
 							<Button variant="outline" asChild>
 								<Link to={`/admin/events/${event.id}/awdp`}>
-									<Terminal /> AWDP 工作台
+									<Terminal /> {t("adminEvents.console.awdpWorkbench")}
 								</Link>
 							</Button>
 						) : null}
@@ -230,18 +238,32 @@ export function EventConsolePage(): ReactNode {
 
 			<Tabs value={tab} onValueChange={changeTab}>
 				<div className="overflow-x-auto">
-					<TabsList variant="line" className="w-max min-w-full justify-start">
-						<TabsTrigger value="config">配置</TabsTrigger>
-						<TabsTrigger value="challenges">题目</TabsTrigger>
-						<TabsTrigger value="members">成员</TabsTrigger>
-						<TabsTrigger value="teams">战队</TabsTrigger>
-						<TabsTrigger value="announcements">公告</TabsTrigger>
-						<TabsTrigger value="instances">实例</TabsTrigger>
-						<TabsTrigger value="logs">日志</TabsTrigger>
-						<TabsTrigger value="writeups">Writeup</TabsTrigger>
-						<TabsTrigger value="data">数据大屏</TabsTrigger>
-						{event.family === "awd" ? <TabsTrigger value="awd">AWD 概览</TabsTrigger> : null}
-						{event.family === "awdp" ? <TabsTrigger value="awdp">AWDP 概览</TabsTrigger> : null}
+					<TabsList
+						variant="line"
+						className="w-max min-w-full justify-start"
+						aria-label={t("adminEvents.console.tabsLabel")}
+					>
+						<TabsTrigger value="config">{t("adminEvents.console.tabs.config")}</TabsTrigger>
+						<TabsTrigger value="challenges">
+							{t("adminEvents.console.tabs.challenges")}
+						</TabsTrigger>
+						<TabsTrigger value="members">{t("adminEvents.console.tabs.members")}</TabsTrigger>
+						<TabsTrigger value="teams">{t("adminEvents.console.tabs.teams")}</TabsTrigger>
+						<TabsTrigger value="announcements">
+							{t("adminEvents.console.tabs.announcements")}
+						</TabsTrigger>
+						<TabsTrigger value="instances">{t("adminEvents.console.tabs.instances")}</TabsTrigger>
+						<TabsTrigger value="logs">{t("adminEvents.console.tabs.logs")}</TabsTrigger>
+						<TabsTrigger value="writeups">
+							{t("adminEvents.console.tabs.writeups")}
+						</TabsTrigger>
+						<TabsTrigger value="data">{t("adminEvents.console.tabs.data")}</TabsTrigger>
+						{event.family === "awd" ? (
+							<TabsTrigger value="awd">{t("adminEvents.console.tabs.awd")}</TabsTrigger>
+						) : null}
+						{event.family === "awdp" ? (
+							<TabsTrigger value="awdp">{t("adminEvents.console.tabs.awdp")}</TabsTrigger>
+						) : null}
 					</TabsList>
 				</div>
 

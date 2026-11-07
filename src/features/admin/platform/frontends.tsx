@@ -17,9 +17,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ExternalLink, Info, RefreshCw, RotateCw, ShieldAlert } from "lucide-react";
 import { Link } from "react-router";
+import type { TFunction } from "i18next";
 
 import {
 	API_CONTRACT_VERSION,
@@ -79,6 +81,9 @@ import { textOf } from "./components";
 
 const FRONTEND_ACTIVE_KEY = "FRONTEND_ACTIVE";
 
+/** 切换生效前端是平台级高危操作：要求输入确认词。 */
+const SWITCH_PHRASE = "SWITCH";
+
 interface RegistryError {
 	message: string;
 	details: string[];
@@ -95,16 +100,22 @@ interface CompatInfo {
 }
 
 /** 契约兼容性判定（与 `resolveFrontend` 同一套 major 规则）。 */
-function checkCompatibility(version: FloatCTFRegistryVersion): CompatInfo {
+function checkCompatibility(version: FloatCTFRegistryVersion, t: TFunction): CompatInfo {
 	const reasons: string[] = [];
 	if (!isMajorCompatible(version.compatibility.frontendRuntime, FRONTEND_RUNTIME_VERSION)) {
 		reasons.push(
-			`需要前端运行时契约 ${version.compatibility.frontendRuntime}，平台为 ${FRONTEND_RUNTIME_VERSION}`,
+			t("adminPlatform.frontends.compat.runtimeMismatch", {
+				required: version.compatibility.frontendRuntime,
+				actual: FRONTEND_RUNTIME_VERSION,
+			}),
 		);
 	}
 	if (!isMajorCompatible(version.compatibility.apiContract, API_CONTRACT_VERSION)) {
 		reasons.push(
-			`需要 API 契约 ${version.compatibility.apiContract}，平台为 ${API_CONTRACT_VERSION}`,
+			t("adminPlatform.frontends.compat.apiMismatch", {
+				required: version.compatibility.apiContract,
+				actual: API_CONTRACT_VERSION,
+			}),
 		);
 	}
 	return { compatible: reasons.length === 0, reasons };
@@ -115,7 +126,8 @@ function currentVersionOf(entry: FloatCTFRegistryFrontend): FloatCTFRegistryVers
 }
 
 export function AdminFrontendsPage(): ReactNode {
-	useDocumentTitle("前端选择器 · FloatCTF 控制台");
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminPlatform.frontends.documentTitle"));
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -137,12 +149,17 @@ export function AdminFrontendsPage(): ReactNode {
 				setState({
 					status: "error",
 					error: {
-						message: `读取本地前端注册表失败：HTTP ${response.status} ${response.statusText}`,
+						message: t("adminPlatform.frontends.errors.http", {
+							status: response.status,
+							statusText: response.statusText,
+						}),
 						details: [
-							`地址：${DEFAULT_REGISTRY_URL}`,
+							t("adminPlatform.frontends.errors.address", {
+								url: DEFAULT_REGISTRY_URL,
+							}),
 							response.status === 404
-								? "文件不存在：宿主可能未安装任何前端制品，或静态前缀未挂载。"
-								: "同源静态文件不可读，请检查反向代理 / 挂载配置。",
+								? t("adminPlatform.frontends.errors.http404")
+								: t("adminPlatform.frontends.errors.httpOther"),
 						],
 					},
 				});
@@ -154,7 +171,7 @@ export function AdminFrontendsPage(): ReactNode {
 				setState({
 					status: "error",
 					error: {
-						message: "本地前端注册表校验失败：registry.json 不符合注册表 schema",
+						message: t("adminPlatform.frontends.errors.invalid"),
 						details: parsed.errors,
 					},
 				});
@@ -165,15 +182,19 @@ export function AdminFrontendsPage(): ReactNode {
 			setState({
 				status: "error",
 				error: {
-					message: `无法读取本地前端注册表：${error instanceof Error ? error.message : String(error)}`,
+					message: t("adminPlatform.frontends.errors.fetch", {
+						message: error instanceof Error ? error.message : String(error),
+					}),
 					details: [
-						`地址：${DEFAULT_REGISTRY_URL}`,
-						"请确认当前页面与平台同源，且静态文件可访问。",
+						t("adminPlatform.frontends.errors.address", {
+							url: DEFAULT_REGISTRY_URL,
+						}),
+						t("adminPlatform.frontends.errors.sameOrigin"),
 					],
 				},
 			});
 		}
-	}, []);
+	}, [t]);
 
 	useEffect(() => {
 		void loadRegistry();
@@ -197,15 +218,22 @@ export function AdminFrontendsPage(): ReactNode {
 
 	const patchMutation = useMutation({
 		mutationFn: (value: string) => {
-			if (!activeRow) throw new Error("平台设置里没有 FRONTEND_ACTIVE，无法切换");
-			return call(client.admin.settings.patch({ id: activeRow.id, value }), "切换前端");
+			if (!activeRow) throw new Error(t("adminPlatform.frontends.errors.noActive"));
+			return call(
+				client.admin.settings.patch({ id: activeRow.id, value }),
+				t("adminPlatform.frontends.switch.title"),
+			);
 		},
 		onSuccess: (_data, value) => {
-			toast.success(`已切换到前端「${value}」`, "刷新页面后由新前端接管界面。");
+			toast.success(
+				t("adminPlatform.frontends.switch.toastSwitched", { id: value }),
+				t("adminPlatform.frontends.switch.toastSwitchedDescription"),
+			);
 			setSwitched(value);
 			void queryClient.invalidateQueries({ queryKey: qk.admin.settings() });
 		},
-		onError: (error) => toast.apiError("切换前端失败", error),
+		onError: (error) =>
+			toast.apiError(t("adminPlatform.frontends.switch.toastSwitchFailed"), error),
 	});
 
 	const registry = state.status === "ok" ? state.registry : null;
@@ -219,11 +247,18 @@ export function AdminFrontendsPage(): ReactNode {
 		return rows.map((entry) => {
 			const version = currentVersionOf(entry);
 			const compat: CompatInfo = version
-				? checkCompatibility(version)
-				: { compatible: false, reasons: [`当前版本 ${entry.currentVersion} 不在 versions 中`] };
+				? checkCompatibility(version, t)
+				: {
+						compatible: false,
+						reasons: [
+							t("adminPlatform.frontends.compat.versionMissingInVersions", {
+								version: entry.currentVersion,
+							}),
+						],
+					};
 			return { entry, version, compat };
 		});
-	}, [rows]);
+	}, [rows, t]);
 
 	const selectedOption = options.find((option) => option.entry.id === selected) ?? null;
 	const dirty = selected !== null && selected !== currentValue;
@@ -232,18 +267,23 @@ export function AdminFrontendsPage(): ReactNode {
 	async function submitSwitch() {
 		if (!selected || !selectedOption) return;
 		if (!selectedOption.compat.compatible) {
-			toast.warning("该前端与当前平台契约不兼容", selectedOption.compat.reasons.join("；"));
+			toast.warning(
+				t("adminPlatform.frontends.switch.toastIncompatible"),
+				selectedOption.compat.reasons.join(t("adminPlatform.common.reasonSeparator")),
+			);
 			return;
 		}
 		const ok = await confirm({
-			title: `切换生效前端到「${selected}」？`,
-			description: "只修改平台设置 FRONTEND_ACTIVE；已打开的页面需要刷新才会换前端。",
+			title: t("adminPlatform.frontends.switch.confirmTitle", { id: selected }),
+			description: t("adminPlatform.frontends.switch.confirmDescription"),
 			consequences: [
-				`所有用户下次加载页面都会使用「${selected}」`,
-				"各前端的路由 / 布局 / 交互完全不同，用户会看到另一套界面",
-				"本前端的管理端页面只能通过 ?frontend=default 或改回该设置来恢复",
+				t("adminPlatform.frontends.switch.consequence1", { id: selected }),
+				t("adminPlatform.frontends.switch.consequence2"),
+				t("adminPlatform.frontends.switch.consequence3"),
 			],
-			confirmText: "保存并切换",
+			tone: "danger",
+			confirmText: t("adminPlatform.frontends.switch.confirmText"),
+			confirmPhrase: SWITCH_PHRASE,
 		});
 		if (!ok) return;
 		patchMutation.mutate(selected);
@@ -252,47 +292,60 @@ export function AdminFrontendsPage(): ReactNode {
 	const columns: DataTableColumn<FloatCTFRegistryFrontend>[] = [
 		{
 			id: "id",
-			header: "前端 ID",
+			header: t("adminPlatform.frontends.columns.id"),
 			sortValue: (row) => row.id,
 			cell: (row) => (
 				<span className="inline-flex items-center gap-1.5">
 					<MonoText className="font-medium">{row.id}</MonoText>
-					{row.protected ? <TonePill tone="info">平台内置</TonePill> : null}
-					{row.id === currentValue ? <TonePill tone="success">生效中</TonePill> : null}
+					{row.protected ? (
+						<TonePill tone="info">{t("adminPlatform.frontends.pills.builtin")}</TonePill>
+					) : null}
+					{row.id === currentValue ? (
+						<TonePill tone="success">{t("adminPlatform.frontends.pills.active")}</TonePill>
+					) : null}
 				</span>
 			),
 		},
 		{
 			id: "name",
-			header: "名称",
+			header: t("adminPlatform.frontends.columns.name"),
 			cell: (row) => <span>{currentVersionOf(row)?.name ?? "—"}</span>,
 		},
 		{
 			id: "version",
-			header: "当前版本",
+			header: t("adminPlatform.frontends.columns.version"),
 			cell: (row) => <MonoText>{row.currentVersion}</MonoText>,
 		},
 		{
 			id: "compat",
-			header: "契约兼容",
+			header: t("adminPlatform.frontends.columns.compat"),
 			cell: (row) => {
 				const version = currentVersionOf(row);
-				if (!version) return <TonePill tone="danger">版本缺失</TonePill>;
-				const compat = checkCompatibility(version);
+				if (!version) {
+					return (
+						<TonePill tone="danger">
+							{t("adminPlatform.frontends.compat.versionMissing")}
+						</TonePill>
+					);
+				}
+				const compat = checkCompatibility(version, t);
 				return compat.compatible ? (
-					<TonePill tone="success" icon={<CheckCircle2 />}>
-						兼容
+					<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
+						{t("adminPlatform.frontends.compat.compatible")}
 					</TonePill>
 				) : (
-					<TonePill tone="warning" title={compat.reasons.join("；")}>
-						不兼容
+					<TonePill
+						tone="warning"
+						title={compat.reasons.join(t("adminPlatform.common.reasonSeparator"))}
+					>
+						{t("adminPlatform.frontends.compat.incompatible")}
 					</TonePill>
 				);
 			},
 		},
 		{
 			id: "runtime",
-			header: "runtime / api",
+			header: t("adminPlatform.frontends.columns.runtime"),
 			hideBelow: "md",
 			cell: (row) => {
 				const version = currentVersionOf(row);
@@ -306,7 +359,7 @@ export function AdminFrontendsPage(): ReactNode {
 		},
 		{
 			id: "entry",
-			header: "入口",
+			header: t("adminPlatform.frontends.columns.entry"),
 			hideBelow: "lg",
 			cell: (row) => (
 				<MonoText className="text-muted-foreground">
@@ -316,7 +369,7 @@ export function AdminFrontendsPage(): ReactNode {
 		},
 		{
 			id: "installedAt",
-			header: "安装时间",
+			header: t("adminPlatform.frontends.columns.installedAt"),
 			align: "right",
 			hideBelow: "sm",
 			sortValue: (row) => Date.parse(currentVersionOf(row)?.installedAt ?? ""),
@@ -330,9 +383,9 @@ export function AdminFrontendsPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="前端"
-				description="选择平台当前生效的可插拔前端。前端是完整的浏览器应用（自己的路由 / 布局 / 交互），不是配色主题。"
-				badge={<TonePill tone="muted">specialized</TonePill>}
+				title={t("adminPlatform.frontends.title")}
+				description={t("adminPlatform.frontends.description")}
+				badge={<TonePill tone="muted">{t("adminPlatform.frontends.badge")}</TonePill>}
 				actions={
 					<Toolbar>
 						<Button
@@ -341,17 +394,13 @@ export function AdminFrontendsPage(): ReactNode {
 							onClick={() => void loadRegistry()}
 							disabled={state.status === "loading"}
 						>
-							<RefreshCw />
-							重读注册表
+							<RefreshCw aria-hidden="true" />
+							{t("adminPlatform.frontends.actions.reload")}
 						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							asChild
-						>
+						<Button variant="outline" size="sm" asChild>
 							<Link to="/admin/platform/settings">
-								<ExternalLink />
-								设置页面
+								<ExternalLink aria-hidden="true" />
+								{t("adminPlatform.frontends.actions.settingsPage")}
 							</Link>
 						</Button>
 					</Toolbar>
@@ -360,44 +409,69 @@ export function AdminFrontendsPage(): ReactNode {
 
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<StatCard
-					label="已安装前端"
+					label={t("adminPlatform.frontends.stats.installed")}
 					value={registry ? rows.length : "…"}
-					hint={registry ? `注册表更新于 ${registry.updatedAt}` : "等待注册表"}
-					icon={<Info className="size-5" />}
-				/>
-				<StatCard
-					label="平台运行时契约"
-					value={FRONTEND_RUNTIME_VERSION}
-					hint="FRONTEND_RUNTIME_VERSION（编译期常量）"
-				/>
-				<StatCard
-					label="API 契约"
-					value={API_CONTRACT_VERSION}
-					hint="API_CONTRACT_VERSION（编译期常量）"
-				/>
-				<StatCard
-					label="当前生效"
-					value={currentValue || "—"}
 					hint={
-						activeRow
-							? `FRONTEND_ACTIVE · 更新于 ${activeRow.updated_at}`
-							: "平台设置里没有 FRONTEND_ACTIVE"
+						registry ? (
+							<span>
+								{t("adminPlatform.frontends.stats.updatedAt")}{" "}
+								<AbsoluteTime value={registry.updatedAt} />
+							</span>
+						) : (
+							t("adminPlatform.frontends.stats.waitingRegistry")
+						)
+					}
+					icon={<Info className="size-4" aria-hidden="true" />}
+				/>
+				<StatCard
+					label={t("adminPlatform.frontends.stats.runtimeContract")}
+					value={FRONTEND_RUNTIME_VERSION}
+					hint={
+						<span className="inline-flex flex-wrap items-center gap-1">
+							<MonoText>FRONTEND_RUNTIME_VERSION</MonoText>·{" "}
+							{t("adminPlatform.frontends.stats.compileTimeConstant")}
+						</span>
+					}
+				/>
+				<StatCard
+					label={t("adminPlatform.frontends.stats.apiContract")}
+					value={API_CONTRACT_VERSION}
+					hint={
+						<span className="inline-flex flex-wrap items-center gap-1">
+							<MonoText>API_CONTRACT_VERSION</MonoText>·{" "}
+							{t("adminPlatform.frontends.stats.compileTimeConstant")}
+						</span>
+					}
+				/>
+				<StatCard
+					label={t("adminPlatform.frontends.stats.active")}
+					value={<span className="font-mono">{currentValue || "—"}</span>}
+					hint={
+						activeRow ? (
+							<span className="inline-flex flex-wrap items-center gap-1">
+								<MonoText>FRONTEND_ACTIVE</MonoText>·{" "}
+								{t("adminPlatform.frontends.stats.activeUpdatedAt")}{" "}
+								<AbsoluteTime value={activeRow.updated_at} />
+							</span>
+						) : (
+							t("adminPlatform.frontends.stats.activeMissing")
+						)
 					}
 					tone={activeRow ? "success" : "warning"}
 				/>
 			</div>
 
 			<SectionCard
-				title="注册表（本地静态文件）"
-				description="只列出宿主已安装的前端；安装 / 升级 / 回滚由运维在宿主执行 frontend.sh。"
+				title={t("adminPlatform.frontends.registry.title")}
+				description={t("adminPlatform.frontends.registry.description")}
 				actions={<RefreshingBadge active={state.status === "loading"} />}
 			>
 				{state.status === "loading" ? (
-					<LoadingBlock label="读取注册表…" />
+					<LoadingBlock label={t("adminPlatform.frontends.registry.loading")} />
 				) : state.status === "error" ? (
 					<ErrorBlock
 						error={new Error(state.error.message)}
-						title="读取本地前端注册表失败"
+						title={t("adminPlatform.frontends.registry.errorTitle")}
 						onRetry={() => void loadRegistry()}
 					/>
 				) : (
@@ -406,24 +480,33 @@ export function AdminFrontendsPage(): ReactNode {
 							columns={3}
 							items={[
 								{
-									key: "注册表地址",
-									value: <CopyText value={DEFAULT_REGISTRY_URL} label="注册表地址" />,
+									key: t("adminPlatform.frontends.registry.address"),
+									value: (
+										<CopyText
+											value={DEFAULT_REGISTRY_URL}
+											label={t("adminPlatform.frontends.registry.address")}
+										/>
+									),
 								},
 								{
-									key: "schemaVersion",
-									value: <MonoText>{String(state.registry.schemaVersion)}</MonoText>,
+									key: t("adminPlatform.frontends.registry.schemaVersion"),
+									value: (
+										<MonoText>{String(state.registry.schemaVersion)}</MonoText>
+									),
 									hint: "FRONTEND_REGISTRY_SCHEMA_VERSION",
 								},
 								{
-									key: "updatedAt",
-									value: <AbsoluteTime value={state.registry.updatedAt} seconds />,
+									key: t("adminPlatform.frontends.registry.updatedAt"),
+									value: (
+										<AbsoluteTime value={state.registry.updatedAt} seconds />
+									),
 								},
 							]}
 						/>
 						{rows.length === 0 ? (
 							<EmptyBlock
-								title="注册表里没有前端"
-								description="宿主尚未安装任何前端制品；安装 default 后即可在此选择。"
+								title={t("adminPlatform.frontends.registry.emptyTitle")}
+								description={t("adminPlatform.frontends.registry.emptyDescription")}
 							/>
 						) : (
 							<DataTable
@@ -431,20 +514,34 @@ export function AdminFrontendsPage(): ReactNode {
 								getRowId={(row) => row.id}
 								columns={columns}
 								rowActions={(row) => (
-									<Button variant="ghost" size="sm" onClick={() => setDetailId(row.id)}>
-										版本明细
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() => setDetailId(row.id)}
+									>
+										{t("adminPlatform.frontends.detail.title")}
 									</Button>
 								)}
 								mobileCard={(row) => {
 									const version = currentVersionOf(row);
-									const compat = version ? checkCompatibility(version) : null;
+									const compat = version ? checkCompatibility(version, t) : null;
 									return (
 										<div className="space-y-2">
 											<div className="flex items-center justify-between gap-2">
 												<MonoText className="font-medium">{row.id}</MonoText>
 												{compat ? (
-													<TonePill tone={compat.compatible ? "success" : "warning"}>
-														{compat.compatible ? "契约兼容" : "契约不兼容"}
+													<TonePill
+														tone={
+															compat.compatible ? "success" : "warning"
+														}
+													>
+														{compat.compatible
+															? t(
+																	"adminPlatform.frontends.compat.contractCompatible",
+																)
+															: t(
+																	"adminPlatform.frontends.compat.contractIncompatible",
+																)}
 													</TonePill>
 												) : null}
 											</div>
@@ -452,10 +549,18 @@ export function AdminFrontendsPage(): ReactNode {
 												{version?.name ?? "—"} · v{row.currentVersion}
 											</p>
 											{compat && !compat.compatible ? (
-												<p className="text-xs text-destructive">{compat.reasons.join("；")}</p>
+												<p className="text-xs text-destructive">
+													{compat.reasons.join(
+														t("adminPlatform.common.reasonSeparator"),
+													)}
+												</p>
 											) : null}
-											<Button variant="outline" size="sm" onClick={() => setDetailId(row.id)}>
-												版本明细
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => setDetailId(row.id)}
+											>
+												{t("adminPlatform.frontends.detail.title")}
 											</Button>
 										</div>
 									);
@@ -468,8 +573,8 @@ export function AdminFrontendsPage(): ReactNode {
 
 			{state.status === "error" ? (
 				<SectionCard
-					title="注册表错误明细"
-					description="fail-closed：读取 / 校验失败时不会退化成「空注册表」，错误逐条列出以便定位。"
+					title={t("adminPlatform.frontends.registry.errorDetailsTitle")}
+					description={t("adminPlatform.frontends.registry.errorDetailsDescription")}
 				>
 					<ul className="list-disc space-y-1 pl-5 text-sm">
 						{state.error.details.map((detail) => (
@@ -482,93 +587,161 @@ export function AdminFrontendsPage(): ReactNode {
 			) : null}
 
 			<SectionCard
-				title="切换生效前端"
-				description="写入平台设置 FRONTEND_ACTIVE（受保护键，可改不可删）；刷新页面后生效。"
+				title={t("adminPlatform.frontends.switch.title")}
+				description={t("adminPlatform.frontends.switch.description")}
 			>
 				<div className="space-y-4">
 					{activeQuery.isPending ? (
-						<LoadingBlock label="读取 FRONTEND_ACTIVE…" />
+						<LoadingBlock
+							label={t("adminPlatform.frontends.switch.loadingSettings")}
+						/>
 					) : activeQuery.isError ? (
 						<ErrorBlock
 							error={activeQuery.error}
-							title="读取平台设置失败"
+							title={t("adminPlatform.frontends.switch.settingsLoadFailed")}
 							onRetry={() => void activeQuery.refetch()}
 						/>
 					) : !activeRow ? (
-						<div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm">
-							<ShieldAlert className="mt-0.5 size-4 shrink-0" />
-							<span>
-								平台设置里没有 <span className="font-mono">{FRONTEND_ACTIVE_KEY}</span>
-								（正常情况下后端启动时会补种默认值 default）。请先在
+						<div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+							<ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+							<div className="space-y-1">
+								<p className="flex flex-wrap items-center gap-1.5">
+									<MonoText>{FRONTEND_ACTIVE_KEY}</MonoText>
+									<span>{t("adminPlatform.frontends.switch.noActiveDescription")}</span>
+								</p>
 								<Link
 									to="/admin/platform/settings"
-									className="mx-1 underline underline-offset-4"
+									className="underline underline-offset-4"
 								>
-									动态设置
+									{t("adminPlatform.frontends.switch.goSettings")}
 								</Link>
-								中创建该键，否则无法在此切换。
-							</span>
+							</div>
 						</div>
 					) : (
 						<>
 							<div className="grid gap-4 lg:grid-cols-2">
 								<div className="space-y-1.5">
-									<p className="text-xs text-muted-foreground">
-										当前生效的前端（{FRONTEND_ACTIVE_KEY}）
+									<p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+										{t("adminPlatform.frontends.switch.currentLabel")}
+										<MonoText>{FRONTEND_ACTIVE_KEY}</MonoText>
 									</p>
 									<Select
 										value={selected ?? ""}
 										onValueChange={setSelected}
 										disabled={registry === null || patchMutation.isPending}
 									>
-										<SelectTrigger className="w-full" aria-label="选择生效前端">
-											<SelectValue placeholder="选择已安装的前端" />
+										<SelectTrigger
+											className="w-full"
+											aria-label={t("adminPlatform.frontends.switch.selectAria")}
+										>
+											<SelectValue
+												placeholder={t(
+													"adminPlatform.frontends.switch.placeholder",
+												)}
+											/>
 										</SelectTrigger>
 										<SelectContent>
-											{options.map((option) => (
-												<SelectItem
-													key={option.entry.id}
-													value={option.entry.id}
-													disabled={!option.compat.compatible}
-												>
-													{option.entry.id} · {option.version?.name ?? "?"} · v
-													{option.entry.currentVersion}
-													{option.entry.protected ? "（平台内置）" : ""}
-													{option.compat.compatible ? "" : "（契约不兼容，已禁用）"}
-												</SelectItem>
-											))}
+											{options.map((option) => {
+												const suffix = `${
+													option.entry.protected
+														? t(
+																"adminPlatform.frontends.switch.optionBuiltinSuffix",
+															)
+														: ""
+												}${
+													option.compat.compatible
+														? ""
+														: t(
+																"adminPlatform.frontends.switch.optionDisabledSuffix",
+															)
+												}`;
+												return (
+													<SelectItem
+														key={option.entry.id}
+														value={option.entry.id}
+														disabled={!option.compat.compatible}
+													>
+														{t(
+															"adminPlatform.frontends.switch.option",
+															{
+																id: option.entry.id,
+																name:
+																	option.version?.name ??
+																	t(
+																		"adminPlatform.frontends.switch.optionNameFallback",
+																	),
+																version: option.entry.currentVersion,
+															},
+														)}
+														{suffix}
+													</SelectItem>
+												);
+											})}
 										</SelectContent>
 									</Select>
 								</div>
 								<div className="space-y-1.5">
-									<p className="text-xs text-muted-foreground">选中项详情</p>
+									<p className="text-xs text-muted-foreground">
+										{t("adminPlatform.frontends.switch.selectedTitle")}
+									</p>
 									{selectedOption ? (
 										<div className="space-y-1 text-sm">
 											<div className="flex flex-wrap items-center gap-2">
 												<BooleanPill
 													value={selectedOption.compat.compatible}
-													trueText="契约兼容"
-													falseText="契约不兼容"
+													trueText={t(
+														"adminPlatform.frontends.compat.contractCompatible",
+													)}
+													falseText={t(
+														"adminPlatform.frontends.compat.contractIncompatible",
+													)}
 													trueTone="success"
 													falseTone="warning"
 												/>
 												<BooleanPill
 													value={selectedOption.entry.protected}
-													trueText="平台内置"
-													falseText="第三方安装"
+													trueText={t(
+														"adminPlatform.frontends.pills.builtin",
+													)}
+													falseText={t(
+														"adminPlatform.frontends.pills.thirdParty",
+													)}
 												/>
 											</div>
-											<p className="text-xs text-muted-foreground">
-												版本 {selectedOption.entry.currentVersion} · 入口{" "}
-												<MonoText>{selectedOption.version?.entry ?? "—"}</MonoText>
+											<p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+												<span>
+													{t(
+														"adminPlatform.frontends.switch.versionLabel",
+														{
+															version:
+																selectedOption.entry
+																	.currentVersion,
+														},
+													)}
+												</span>
+												·{" "}
+												<span>
+													{t(
+														"adminPlatform.frontends.switch.entryLabel",
+													)}
+												</span>
+												<MonoText>
+													{selectedOption.version?.entry ?? "—"}
+												</MonoText>
 											</p>
 											{selectedOption.compat.reasons.length > 0 ? (
-												<InlineError error={selectedOption.compat.reasons.join("；")} />
+												<InlineError
+													error={selectedOption.compat.reasons.join(
+														t(
+															"adminPlatform.common.reasonSeparator",
+														),
+													)}
+												/>
 											) : null}
 										</div>
 									) : (
 										<p className="text-sm text-muted-foreground">
-											选择一个前端查看契约兼容性与入口。
+											{t("adminPlatform.frontends.switch.selectHint")}
 										</p>
 									)}
 								</div>
@@ -579,30 +752,36 @@ export function AdminFrontendsPage(): ReactNode {
 									onClick={() => void submitSwitch()}
 									disabled={!dirty || patchMutation.isPending || !activeRow}
 								>
-									{patchMutation.isPending ? "保存中…" : "保存并切换"}
+									{patchMutation.isPending
+										? t("adminPlatform.frontends.switch.saving")
+										: t("adminPlatform.frontends.switch.save")}
 								</Button>
 								<Button
 									variant="outline"
 									onClick={() => window.location.reload()}
 									disabled={switched === null}
 								>
-									<RotateCw />
-									刷新页面
+									<RotateCw aria-hidden="true" />
+									{t("adminPlatform.frontends.switch.reload")}
 								</Button>
 								{switched && !dirty ? (
 									<p className="text-xs text-muted-foreground">
-										已保存为「{switched}」；刷新页面后由该前端接管界面。
+										{t("adminPlatform.frontends.switch.savedHint", {
+											id: switched,
+										})}
 									</p>
 								) : null}
 								{activeQuery.isFetching ? (
-									<RefreshingBadge active={activeQuery.isFetching && !activeQuery.isPending} />
+									<RefreshingBadge
+										active={activeQuery.isFetching && !activeQuery.isPending}
+									/>
 								) : null}
 							</div>
 
-							<p className="text-xs text-muted-foreground">
-								破窗恢复：任意页面加上 <span className="font-mono">?frontend=default</span>{" "}
-								即可用内置前端打开（只影响本次加载，不改动本设置）。
-							</p>
+							<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+								<span>{t("adminPlatform.frontends.switch.breakGlass")}</span>
+								<MonoText>?frontend=default</MonoText>
+							</div>
 						</>
 					)}
 				</div>
@@ -612,10 +791,14 @@ export function AdminFrontendsPage(): ReactNode {
 				<SheetContent className="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-2xl">
 					<SheetHeader>
 						<SheetTitle>
-							{detailEntry ? `${detailEntry.id} 的已安装版本` : "版本明细"}
+							{detailEntry
+								? t("adminPlatform.frontends.detail.namedTitle", {
+										id: detailEntry.id,
+									})
+								: t("adminPlatform.frontends.detail.title")}
 						</SheetTitle>
 						<SheetDescription>
-							每个版本都必须显式声明与平台契约的兼容性；当前版本由注册表 currentVersion 指针决定。
+							{t("adminPlatform.frontends.detail.description")}
 						</SheetDescription>
 					</SheetHeader>
 					{detailEntry ? (
@@ -623,68 +806,157 @@ export function AdminFrontendsPage(): ReactNode {
 							<KeyValueList
 								columns={2}
 								items={[
-									{ key: "前端 ID", value: <MonoText>{detailEntry.id}</MonoText> },
 									{
-										key: "currentVersion",
-										value: <MonoText>{detailEntry.currentVersion}</MonoText>,
+										key: t("adminPlatform.frontends.detail.id"),
+										value: <MonoText>{detailEntry.id}</MonoText>,
 									},
 									{
-										key: "protected",
+										key: t("adminPlatform.frontends.detail.currentVersion"),
+										value: (
+											<MonoText>{detailEntry.currentVersion}</MonoText>
+										),
+									},
+									{
+										key: t("adminPlatform.frontends.detail.protected"),
 										value: (
 											<BooleanPill
 												value={detailEntry.protected}
-												trueText="平台内置（不可移除）"
-												falseText="第三方安装"
+												trueText={t(
+													"adminPlatform.frontends.pills.builtinNoRemove",
+												)}
+												falseText={t(
+													"adminPlatform.frontends.pills.thirdParty",
+												)}
 											/>
 										),
 									},
 									{
-										key: "已安装版本数",
-										value: <MonoText>{Object.keys(detailEntry.versions).length}</MonoText>,
+										key: t("adminPlatform.frontends.detail.versionCount"),
+										value: (
+											<MonoText>
+												{Object.keys(detailEntry.versions).length}
+											</MonoText>
+										),
 									},
 								]}
 							/>
 							<div className="space-y-2">
-								{Object.entries(detailEntry.versions).map(([versionKey, version]) => {
-									const compat = checkCompatibility(version);
-									return (
-										<div key={versionKey} className="space-y-1 rounded-md border px-3 py-2">
-											<div className="flex flex-wrap items-center gap-2">
-												<MonoText className="font-medium">v{versionKey}</MonoText>
-												<span className="text-sm">{version.name}</span>
-												{versionKey === detailEntry.currentVersion ? (
-													<TonePill tone="success">当前版本</TonePill>
-												) : null}
-												<TonePill tone={compat.compatible ? "success" : "warning"}>
-													{compat.compatible ? "契约兼容" : "契约不兼容"}
-												</TonePill>
-											</div>
-											<p className="text-xs text-muted-foreground">
-												runtime {version.compatibility.frontendRuntime} · api{" "}
-												{version.compatibility.apiContract}
-												{version.compatibility.sdk
-													? ` · sdk ${version.compatibility.sdk}`
-													: ""}
-											</p>
-											<p className="text-xs text-muted-foreground">
-												入口 <MonoText>{version.entry}</MonoText> · 样式{" "}
-												<MonoText>{version.styles.join(", ") || "（无）"}</MonoText>
-											</p>
-											<p className="text-xs text-muted-foreground">
-												安装于 <AbsoluteTime value={version.installedAt} seconds />
-												{version.author ? ` · 作者 ${textOf(version.author)}` : ""}
-											</p>
-											{version.description ? (
+								{Object.entries(detailEntry.versions).map(
+									([versionKey, version]) => {
+										const compat = checkCompatibility(version, t);
+										return (
+											<div
+												key={versionKey}
+												className="space-y-1 rounded-lg border px-3 py-2"
+											>
+												<div className="flex flex-wrap items-center gap-2">
+													<MonoText className="font-medium">
+														v{versionKey}
+													</MonoText>
+													<span className="text-sm">
+														{version.name}
+													</span>
+													{versionKey ===
+													detailEntry.currentVersion ? (
+														<TonePill tone="success">
+															{t(
+																"adminPlatform.frontends.pills.currentVersion",
+															)}
+														</TonePill>
+													) : null}
+													<TonePill
+														tone={
+															compat.compatible
+																? "success"
+																: "warning"
+														}
+													>
+														{compat.compatible
+															? t(
+																	"adminPlatform.frontends.compat.contractCompatible",
+																)
+															: t(
+																	"adminPlatform.frontends.compat.contractIncompatible",
+																)}
+													</TonePill>
+												</div>
 												<p className="text-xs text-muted-foreground">
-													{version.description}
+													{t(
+														"adminPlatform.frontends.detail.runtimeApi",
+														{
+															runtime:
+																version.compatibility
+																	.frontendRuntime,
+															api: version.compatibility
+																.apiContract,
+														},
+													)}
+													{version.compatibility.sdk
+														? ` · sdk ${version.compatibility.sdk}`
+														: ""}
 												</p>
-											) : null}
-											{compat.reasons.length > 0 ? (
-												<InlineError error={compat.reasons.join("；")} />
-											) : null}
-										</div>
-									);
-								})}
+												<p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+													<span>
+														{t(
+															"adminPlatform.frontends.detail.entry",
+														)}
+													</span>
+													<MonoText>{version.entry}</MonoText>
+													·{" "}
+													<span>
+														{t(
+															"adminPlatform.frontends.detail.styles",
+														)}
+													</span>
+													<MonoText>
+														{version.styles.join(", ") ||
+															t(
+																"adminPlatform.frontends.detail.emptyStyles",
+															)}
+													</MonoText>
+												</p>
+												<p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+													<span>
+														{t(
+															"adminPlatform.frontends.detail.installedAt",
+														)}
+													</span>
+													<AbsoluteTime
+														value={version.installedAt}
+														seconds
+													/>
+													{version.author ? (
+														<span>
+															·{" "}
+															{t(
+																"adminPlatform.frontends.detail.author",
+																{
+																	author: textOf(
+																		version.author,
+																	),
+																},
+															)}
+														</span>
+													) : null}
+												</p>
+												{version.description ? (
+													<p className="text-xs text-muted-foreground">
+														{version.description}
+													</p>
+												) : null}
+												{compat.reasons.length > 0 ? (
+													<InlineError
+														error={compat.reasons.join(
+															t(
+																"adminPlatform.common.reasonSeparator",
+															),
+														)}
+													/>
+												) : null}
+											</div>
+										);
+									},
+								)}
 							</div>
 						</div>
 					) : null}

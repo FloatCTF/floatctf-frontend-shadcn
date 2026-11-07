@@ -10,14 +10,19 @@
  * - **读**：`healthchecks_json` / `judge_args_json` 是 `unknown | null`；
  * - **写**：`PATCH` 要求 JSON **字符串**（后端会 `serde_json::from_str`），显式 `null` = 清空；
  *   没改动的字段**不发**，避免把 `unknown` 重新序列化后写回。
+ *
+ * 所有用户可见文案走 `adminCore.gameboxes.*` / `adminCore.form.*` / `adminCore.ops.*`。
  */
 
 import { useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import type { TFunction } from "i18next";
 import {
 	EyeOff,
 	FileUp,
 	Hammer,
+	Lock,
 	Pencil,
 	RefreshCw,
 	ScanSearch,
@@ -120,49 +125,63 @@ function resolveJsonPatch(
 	original: string,
 	field: keyof GameboxFormErrors,
 	errors: GameboxFormErrors,
+	t: TFunction,
 ): string | null | undefined {
 	const trimmed = text.trim();
 	if (trimmed === "") return null;
 	if (trimmed === original.trim()) return undefined;
 	const parsed = parseJsonInput(trimmed);
 	if (!parsed.ok) {
-		errors[field] = `不是合法 JSON：${parsed.error}`;
+		errors[field] = t("adminCore.form.jsonInvalid", { error: parsed.error });
 		return undefined;
 	}
 	return JSON.stringify(parsed.value);
 }
 
-function validate(form: GameboxFormState, original: GameboxOriginal): GameboxFormErrors {
+function validate(
+	form: GameboxFormState,
+	original: GameboxOriginal,
+	t: TFunction,
+): GameboxFormErrors {
 	const errors: GameboxFormErrors = {};
-	if (!form.name.trim()) errors.name = "名称不能为空";
-	if (!form.category.trim()) errors.category = "分类不能为空";
-
-	for (const [key, label] of [
-		["cpuMillis", "推荐 CPU"],
-		["memoryBytes", "推荐内存"],
-		["pidsLimit", "推荐 PID 上限"],
-	] as const) {
-		const parsed = parseIntInput(form[key]);
-		if (parsed.kind === "invalid") errors[key] = `${label}应为整数；留空表示不修改。`;
-		else if (parsed.kind === "ok" && parsed.value <= 0) errors[key] = `${label}必须大于 0。`;
+	if (!form.name.trim()) errors.name = t("adminCore.gameboxes.validation.nameRequired");
+	if (!form.category.trim()) {
+		errors.category = t("adminCore.gameboxes.validation.categoryRequired");
 	}
 
 	for (const [key, label] of [
-		["judgeTimeoutSecs", "评测超时"],
-		["judgeRetryIntervalSecs", "评测重试间隔"],
+		["cpuMillis", t("adminCore.form.labels.recommendedCpu")],
+		["memoryBytes", t("adminCore.form.labels.recommendedMemory")],
+		["pidsLimit", t("adminCore.form.labels.recommendedPids")],
 	] as const) {
 		const parsed = parseIntInput(form[key]);
-		if (parsed.kind === "invalid") errors[key] = `${label}应为整数（秒）；留空表示清空并使用赛事默认值。`;
-		else if (parsed.kind === "ok" && parsed.value < 0) errors[key] = `${label}不能为负数。`;
+		if (parsed.kind === "invalid") {
+			errors[key] = t("adminCore.form.integerField", { label });
+		} else if (parsed.kind === "ok" && parsed.value <= 0) {
+			errors[key] = t("adminCore.form.positiveField", { label });
+		}
 	}
 
-	resolveJsonPatch(form.healthchecksJson, original.healthchecksJson, "healthchecksJson", errors);
-	resolveJsonPatch(form.judgeArgsJson, original.judgeArgsJson, "judgeArgsJson", errors);
+	for (const [key, label] of [
+		["judgeTimeoutSecs", t("adminCore.form.labels.judgeTimeout")],
+		["judgeRetryIntervalSecs", t("adminCore.form.labels.judgeRetryInterval")],
+	] as const) {
+		const parsed = parseIntInput(form[key]);
+		if (parsed.kind === "invalid") {
+			errors[key] = t("adminCore.form.integerSecondsField", { label });
+		} else if (parsed.kind === "ok" && parsed.value < 0) {
+			errors[key] = t("adminCore.form.nonNegativeField", { label });
+		}
+	}
+
+	resolveJsonPatch(form.healthchecksJson, original.healthchecksJson, "healthchecksJson", errors, t);
+	resolveJsonPatch(form.judgeArgsJson, original.judgeArgsJson, "judgeArgsJson", errors, t);
 	return errors;
 }
 
 export function AdminGameboxesPage(): ReactNode {
-	useDocumentTitle("GameBox 库 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminCore.gameboxes.documentTitle"));
 	const client = useClient();
 	const queryClient = useAppQueryClient();
 	const confirm = useConfirm();
@@ -226,6 +245,7 @@ export function AdminGameboxesPage(): ReactNode {
 						input.original.healthchecksJson,
 						"healthchecksJson",
 						{},
+						t,
 					),
 					judge_script_name: body.judgeScriptName,
 					judge_script_content: body.judgeScriptContent,
@@ -234,40 +254,49 @@ export function AdminGameboxesPage(): ReactNode {
 						input.original.judgeArgsJson,
 						"judgeArgsJson",
 						{},
+						t,
 					),
 					// 空 = 清空（继承赛事默认值）。
 					judge_timeout_secs: timeout.kind === "ok" ? timeout.value : null,
 					judge_retry_interval_secs: retry.kind === "ok" ? retry.value : null,
 				}),
-				"更新 GameBox",
+				t("adminCore.actions.updateGamebox"),
 			);
 		},
 		onSuccess: () => {
-			toast.success("GameBox 已更新");
+			toast.success(t("adminCore.gameboxes.toasts.updated"));
 			invalidate();
 			setEditing(null);
 			setErrors({});
 		},
-		onError: (error) => toast.apiError("更新 GameBox 失败", error),
+		onError: (error) => toast.apiError(t("adminCore.gameboxes.toasts.updateFailed"), error),
 	});
 
 	const hide = useMutation({
-		mutationFn: (id: string) => call<null>(client.awd.admin.hideGamebox(id), "隐藏 GameBox"),
+		mutationFn: (id: string) =>
+			call<null>(client.awd.admin.hideGamebox(id), t("adminCore.actions.hideGamebox")),
 		onSuccess: () => {
-			toast.success("GameBox 已隐藏", "选手端与赛事选择器不再列出它。");
+			toast.success(
+				t("adminCore.gameboxes.toasts.hidden"),
+				t("adminCore.gameboxes.toasts.hiddenDescription"),
+			);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("隐藏 GameBox 失败", error),
+		onError: (error) => toast.apiError(t("adminCore.gameboxes.toasts.hideFailed"), error),
 	});
 
 	const remove = useMutation({
-		mutationFn: (ids: string[]) => call<number>(client.awd.admin.removeGamebox(ids), "删除 GameBox"),
+		mutationFn: (ids: string[]) =>
+			call<number>(client.awd.admin.removeGamebox(ids), t("adminCore.actions.deleteGameboxes")),
 		onSuccess: (count) => {
-			toast.success(`已删除 ${count} 个 GameBox`, "磁盘上的 package 目录已由后端一并清理。");
+			toast.success(
+				t("adminCore.gameboxes.toasts.deleted", { count }),
+				t("adminCore.gameboxes.toasts.deletedDescription"),
+			);
 			invalidate();
 			setSelectedIds([]);
 		},
-		onError: (error) => toast.apiError("删除 GameBox 失败", error),
+		onError: (error) => toast.apiError(t("adminCore.gameboxes.toasts.deleteFailed"), error),
 	});
 
 	const importMutation = useMutation({
@@ -284,60 +313,97 @@ export function AdminGameboxesPage(): ReactNode {
 			setImported(data.gamebox);
 			setFile(null);
 			setProgress(0);
-			toast.success("GameBox 包导入完成", `靶机：${data.gamebox.name}`);
+			toast.success(
+				t("adminCore.gameboxes.toasts.imported"),
+				t("adminCore.gameboxes.toasts.importedDescription", { name: data.gamebox.name }),
+			);
 			invalidate();
 		},
 		onError: (error) => {
 			setProgress(0);
-			toast.apiError("导入 GameBox 包失败", error);
+			toast.apiError(t("adminCore.gameboxes.toasts.importFailed"), error);
 		},
 	});
 
 	const scan = useMutation({
 		mutationFn: () =>
-			call<GameBoxScanItem[]>(client.awd.admin.scanGameboxes(), "扫描 GameBox 目录"),
+			call<GameBoxScanItem[]>(
+				client.awd.admin.scanGameboxes(),
+				t("adminCore.actions.scanGameboxes"),
+			),
 		onSuccess: (items) => {
 			setScanItems(items);
 			const failed = items.filter((item) => item.status === "error").length;
-			if (failed > 0) toast.warning(`扫描完成：${items.length} 条，其中 ${failed} 条失败`);
-			else toast.success(`扫描完成：${items.length} 条结果`);
+			if (failed > 0) {
+				toast.warning(
+					t("adminCore.gameboxes.toasts.scanWarning", {
+						count: items.length,
+						failed,
+					}),
+				);
+			} else {
+				toast.success(
+					t("adminCore.gameboxes.toasts.scanSuccess", { count: items.length }),
+				);
+			}
 			invalidate();
 		},
-		onError: (error) => toast.apiError("扫描 GameBox 目录失败", error),
+		onError: (error) => toast.apiError(t("adminCore.gameboxes.toasts.scanFailed"), error),
 	});
 
 	const check = useMutation({
 		mutationFn: (ids?: string[]) =>
-			call<GameBoxCheckResult[]>(client.awd.admin.checkGameboxes(ids), "校验 GameBox"),
+			call<GameBoxCheckResult[]>(
+				client.awd.admin.checkGameboxes(ids),
+				t("adminCore.actions.checkGameboxes"),
+			),
 		onSuccess: (items) => {
 			setCheckItems(items);
 			const failed = items.filter((item) => !item.is_ok).length;
-			if (failed > 0) toast.warning(`校验完成：${items.length} 个，${failed} 个不可用`);
-			else toast.success(`校验完成：${items.length} 个全部可用`);
+			if (failed > 0) {
+				toast.warning(
+					t("adminCore.gameboxes.toasts.checkWarning", {
+						count: items.length,
+						failed,
+					}),
+				);
+			} else {
+				toast.success(
+					t("adminCore.gameboxes.toasts.checkSuccess", { count: items.length }),
+				);
+			}
 			invalidate();
 		},
-		onError: (error) => toast.apiError("校验 GameBox 失败", error),
+		onError: (error) => toast.apiError(t("adminCore.gameboxes.toasts.checkFailed"), error),
 	});
 
 	const build = useMutation({
 		mutationFn: (ids?: string[]) =>
-			call<GameBoxBuildResult[]>(client.awd.admin.buildGameboxes(ids), "构建 GameBox"),
+			call<GameBoxBuildResult[]>(
+				client.awd.admin.buildGameboxes(ids),
+				t("adminCore.actions.buildGameboxes"),
+			),
 		onSuccess: (items) => {
 			setBuildItems(items);
 			const failed = items.filter((item) => !item.is_ok);
 			if (items.length === 0) {
 				toast.warning(
-					"没有可构建的对象",
-					"构建只对 build_status=ready 的 GameBox 生效，请先确认当前版本镜像已 pin。",
+					t("adminCore.gameboxes.toasts.buildEmptyTitle"),
+					t("adminCore.gameboxes.toasts.buildEmptyDescription"),
 				);
 			} else if (failed.length > 0) {
-				toast.error(`${failed.length} 个 GameBox 构建失败`, failed[0]?.message);
+				toast.error(
+					t("adminCore.gameboxes.toasts.buildFailedTitle", { count: failed.length }),
+					failed[0]?.message,
+				);
 			} else {
-				toast.success(`${items.length} 个 GameBox 镜像已就绪`);
+				toast.success(
+					t("adminCore.gameboxes.toasts.buildSuccess", { count: items.length }),
+				);
 			}
 			invalidate();
 		},
-		onError: (error) => toast.apiError("构建 GameBox 失败", error),
+		onError: (error) => toast.apiError(t("adminCore.gameboxes.toasts.buildFailed"), error),
 	});
 
 	function openEdit(row: GameBoxLibraryDto): void {
@@ -374,10 +440,10 @@ export function AdminGameboxesPage(): ReactNode {
 
 	function submit(): void {
 		if (!editing) return;
-		const nextErrors = validate(form, original);
+		const nextErrors = validate(form, original, t);
 		setErrors(nextErrors);
 		if (Object.keys(nextErrors).length > 0) {
-			toast.warning("请先修正表单中的错误");
+			toast.warning(t("adminCore.form.fixErrors"));
 			return;
 		}
 		save.mutate({ id: editing.id, body: form, original });
@@ -385,15 +451,15 @@ export function AdminGameboxesPage(): ReactNode {
 
 	async function confirmHide(row: GameBoxLibraryDto): Promise<void> {
 		const ok = await confirm({
-			title: `隐藏 GameBox「${row.name}」？`,
-			description: "隐藏是「归档」语义（hidden = true），不会删除镜像与磁盘目录。",
+			title: t("adminCore.gameboxes.confirm.hideTitle", { name: row.name }),
+			description: t("adminCore.gameboxes.confirm.hideDescription"),
 			consequences: [
-				"选手端与赛事的 GameBox 选择器不再列出它",
-				"已被赛事引用的现有实例不受影响；被引用时删除请求会被拒绝",
-				"要恢复可见请用「编辑」把 hidden 关掉",
+				t("adminCore.gameboxes.confirm.hideConsequence1"),
+				t("adminCore.gameboxes.confirm.hideConsequence2"),
+				t("adminCore.gameboxes.confirm.hideConsequence3"),
 			],
 			tone: "danger",
-			confirmText: "隐藏",
+			confirmText: t("adminCore.gameboxes.confirm.hide"),
 			confirmPhrase: row.name,
 		});
 		if (ok) hide.mutate(row.id);
@@ -401,14 +467,14 @@ export function AdminGameboxesPage(): ReactNode {
 
 	async function confirmRemoveOne(row: GameBoxLibraryDto): Promise<void> {
 		const ok = await confirm({
-			title: `删除 GameBox「${row.name}」？`,
-			description: "该操作不可恢复。",
+			title: t("adminCore.gameboxes.confirm.deleteOneTitle", { name: row.name }),
+			description: t("adminCore.gameboxes.confirm.deleteDescription"),
 			consequences: [
-				"数据库记录与磁盘 package 目录（GAMEBOXES_DIR/{safe_name}）一并删除",
-				"已被任何赛事或 AWDP Run 引用时后端会拒绝删除，请先解除挂载",
+				t("adminCore.gameboxes.confirm.deleteConsequence1"),
+				t("adminCore.gameboxes.confirm.deleteConsequence2"),
 			],
 			tone: "danger",
-			confirmText: "删除",
+			confirmText: t("adminCore.gameboxes.confirm.delete"),
 			confirmPhrase: row.name,
 		});
 		if (ok) remove.mutate([row.id]);
@@ -416,18 +482,22 @@ export function AdminGameboxesPage(): ReactNode {
 
 	async function confirmRemoveSelected(): Promise<void> {
 		if (selectedIds.length === 0) {
-			toast.warning("请先选择要删除的 GameBox");
+			toast.warning(t("adminCore.gameboxes.toasts.selectForDelete"));
 			return;
 		}
 		const ok = await confirm({
-			title: `删除选中的 ${selectedIds.length} 个 GameBox？`,
-			description: "该操作不可恢复。",
+			title: t("adminCore.gameboxes.confirm.deleteSelectedTitle", {
+				count: selectedIds.length,
+			}),
+			description: t("adminCore.gameboxes.confirm.deleteDescription"),
 			consequences: [
-				`${selectedIds.length} 个 GameBox 的记录与磁盘 package 目录会被删除`,
-				"被赛事 / AWDP Run 引用的条目后端会拒绝，需先解除挂载",
+				t("adminCore.gameboxes.confirm.deleteSelectedConsequence1", {
+					count: selectedIds.length,
+				}),
+				t("adminCore.gameboxes.confirm.deleteSelectedConsequence2"),
 			],
 			tone: "danger",
-			confirmText: "删除",
+			confirmText: t("adminCore.gameboxes.confirm.delete"),
 			confirmPhrase: "delete",
 		});
 		if (ok) remove.mutate(selectedIds);
@@ -435,29 +505,32 @@ export function AdminGameboxesPage(): ReactNode {
 
 	async function confirmBuild(ids: string[]): Promise<void> {
 		const ok = await confirm({
-			title: ids.length === 1 ? "构建该 GameBox 的镜像？" : `构建选中的 ${ids.length} 个 GameBox？`,
-			description: "构建 = 确保当前版本 pin 的镜像在本地 Docker 中存在（必要时按 digest 拉取）。",
+			title:
+				ids.length === 1
+					? t("adminCore.gameboxes.confirm.buildOneTitle")
+					: t("adminCore.gameboxes.confirm.buildSelectedTitle", { count: ids.length }),
+			description: t("adminCore.gameboxes.confirm.buildDescription"),
 			consequences: [
-				"会占用宿主 Docker / 网络资源，镜像较大时可能耗时数分钟",
-				"只对 build_status=ready 的对象生效，其它会被跳过",
-				"每个对象的成功 / 失败消息逐条展示",
+				t("adminCore.gameboxes.confirm.buildConsequence1"),
+				t("adminCore.gameboxes.confirm.buildConsequence2"),
+				t("adminCore.gameboxes.confirm.buildConsequence3"),
 			],
 			tone: "default",
-			confirmText: "开始构建",
+			confirmText: t("adminCore.gameboxes.confirm.buildConfirm"),
 		});
 		if (ok) build.mutate(ids.length > 0 ? ids : undefined);
 	}
 
 	async function confirmScan(): Promise<void> {
 		const ok = await confirm({
-			title: "扫描 GameBox 目录并登记未入库的 package？",
-			description: "扫描后端配置的 GAMEBOXES_DIR，把磁盘上存在但数据库里没有的靶机包登记进来。",
+			title: t("adminCore.gameboxes.confirm.scanTitle"),
+			description: t("adminCore.gameboxes.confirm.scanDescription"),
 			consequences: [
-				"会向 GameBox 库写入新条目（已存在的包只会 skipped，不覆盖版本）",
-				"结果逐条列出 added / skipped / error 及原因",
+				t("adminCore.gameboxes.confirm.scanConsequence1"),
+				t("adminCore.gameboxes.confirm.scanConsequence2"),
 			],
 			tone: "default",
-			confirmText: "开始扫描",
+			confirmText: t("adminCore.gameboxes.confirm.scanConfirm"),
 		});
 		if (ok) scan.mutate();
 	}
@@ -465,15 +538,15 @@ export function AdminGameboxesPage(): ReactNode {
 	async function confirmImport(): Promise<void> {
 		if (!file) return;
 		const ok = await confirm({
-			title: `导入 GameBox 包「${file.name}」？`,
-			description: "导入 = 解压 package + 同步构建镜像并 pin digest（单版本模型，版本号严格递增）。",
+			title: t("adminCore.gameboxes.confirm.importTitle", { file: file.name }),
+			description: t("adminCore.gameboxes.confirm.importDescription"),
 			consequences: [
-				"会占用宿主 Docker / 网络资源，构建可能耗时数分钟",
-				"同名靶机会按递增版本 upsert 身份行，版本冲突时导入失败",
-				"失败会写入 build_status=failed 与错误原因，可用「校验」查看",
+				t("adminCore.gameboxes.confirm.importConsequence1"),
+				t("adminCore.gameboxes.confirm.importConsequence2"),
+				t("adminCore.gameboxes.confirm.importConsequence3"),
 			],
 			tone: "default",
-			confirmText: "开始导入",
+			confirmText: t("adminCore.gameboxes.confirm.importConfirm"),
 		});
 		if (ok) importMutation.mutate(file);
 	}
@@ -481,7 +554,7 @@ export function AdminGameboxesPage(): ReactNode {
 	const columns: DataTableColumn<GameBoxLibraryDto>[] = [
 		{
 			id: "name",
-			header: "GameBox",
+			header: t("adminCore.gameboxes.columns.gamebox"),
 			cell: (row) => (
 				<div className="min-w-0">
 					<p className="truncate text-sm font-medium">{row.name}</p>
@@ -495,7 +568,7 @@ export function AdminGameboxesPage(): ReactNode {
 		},
 		{
 			id: "version",
-			header: "版本 / 构建",
+			header: t("adminCore.gameboxes.columns.versionBuild"),
 			cell: (row) => (
 				<div className="flex flex-wrap items-center gap-1">
 					<MonoText>{row.version ?? "—"}</MonoText>
@@ -506,46 +579,67 @@ export function AdminGameboxesPage(): ReactNode {
 		},
 		{
 			id: "image",
-			header: "镜像",
+			header: t("adminCore.gameboxes.columns.image"),
 			cell: (row) =>
 				row.image_ref ? (
 					<div className="min-w-0">
 						<MonoText title={row.image_ref}>{row.image_ref}</MonoText>
 						{row.image_repo_digest ? (
-							<span className="ml-1 text-xs text-muted-foreground" title="已 pin 到 repo digest">
-								🔒
+							<span
+								className="ml-1 inline-flex text-muted-foreground"
+								role="img"
+								aria-label={t("adminCore.common.repositoryPinned")}
+								title={t("adminCore.common.repositoryPinned")}
+							>
+								<Lock className="size-4" aria-hidden="true" />
 							</span>
 						) : null}
 					</div>
 				) : (
-					<span className="text-xs text-muted-foreground">无镜像</span>
+					<span className="text-xs text-muted-foreground">
+						{t("adminCore.gameboxes.noImage")}
+					</span>
 				),
 			hideBelow: "lg",
 		},
 		{
 			id: "runtime",
-			header: "资源",
+			header: t("adminCore.gameboxes.columns.resources"),
 			cell: (row) => (
 				<div className="tnum font-mono text-xs text-muted-foreground">
-					{row.cpu_millis !== null ? `${row.cpu_millis}m` : "—"} /{" "}
-					{row.memory_bytes !== null ? formatBytes(row.memory_bytes) : "—"} /{" "}
-					{row.pids_limit ?? "—"} pids
+					{t("adminCore.common.runtimeValue", {
+						cpu: row.cpu_millis !== null ? `${row.cpu_millis}m` : "—",
+						memory: row.memory_bytes !== null ? formatBytes(row.memory_bytes) : "—",
+						pids: row.pids_limit ?? "—",
+					})}
 				</div>
 			),
 			hideBelow: "xl",
 		},
 		{
 			id: "judge",
-			header: "评测脚本",
+			header: t("adminCore.gameboxes.columns.judge"),
 			cell: (row) => (
 				<div className="space-y-0.5 text-xs">
 					{row.judge_script_name ? (
 						<MonoText>{row.judge_script_name}</MonoText>
 					) : (
-						<span className="text-muted-foreground">未配置脚本</span>
+						<span className="text-muted-foreground">
+							{t("adminCore.gameboxes.noScript")}
+						</span>
 					)}
 					<div className="tnum font-mono text-muted-foreground">
-						超时 {row.judge_timeout_secs ?? "默认"}s · 重试 {row.judge_retry_interval_secs ?? "默认"}s
+						{t("adminCore.gameboxes.judgeTiming", {
+							timeout:
+								row.judge_timeout_secs === null || row.judge_timeout_secs === undefined
+									? t("adminCore.gameboxes.defaultValue")
+									: `${row.judge_timeout_secs}s`,
+							retry:
+								row.judge_retry_interval_secs === null ||
+								row.judge_retry_interval_secs === undefined
+									? t("adminCore.gameboxes.defaultValue")
+									: `${row.judge_retry_interval_secs}s`,
+						})}
 					</div>
 				</div>
 			),
@@ -553,23 +647,25 @@ export function AdminGameboxesPage(): ReactNode {
 		},
 		{
 			id: "healthchecks",
-			header: "健康检查",
+			header: t("adminCore.gameboxes.columns.healthchecks"),
 			cell: (row) =>
 				row.healthchecks_json === null || row.healthchecks_json === undefined ? (
-					<TonePill tone="muted">未配置</TonePill>
+					<TonePill tone="muted">{t("adminCore.common.notConfigured")}</TonePill>
 				) : (
 					<TonePill tone="success" title={formatJsonText(row.healthchecks_json)}>
-						已配置
+						{t("adminCore.common.configured")}
 					</TonePill>
 				),
 			hideBelow: "sm",
 		},
 		{
 			id: "hidden",
-			header: "可见性",
+			header: t("adminCore.gameboxes.columns.visibility"),
 			cell: (row) => (
 				<TonePill tone={row.hidden ? "muted" : "success"}>
-					{row.hidden ? "已隐藏" : "公开"}
+					{row.hidden
+						? t("adminCore.common.visibility.hidden")
+						: t("adminCore.common.visibility.public")}
 				</TonePill>
 			),
 			sortValue: (row) => (row.hidden ? 1 : 0),
@@ -581,30 +677,33 @@ export function AdminGameboxesPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="GameBox 库"
-				description="AWD / AWDP 靶机模板库：身份 + 当前版本 package。新条目只能通过导入或扫描进入。"
+				title={t("adminCore.gameboxes.title")}
+				description={t("adminCore.gameboxes.description")}
 				actions={
 					<Toolbar>
 						<Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
-							<RefreshCw className={query.isFetching ? "animate-spin" : undefined} />
-							刷新
+							<RefreshCw
+								className={query.isFetching ? "animate-spin" : undefined}
+								aria-hidden="true"
+							/>
+							{t("common.refresh")}
 						</Button>
 						<Button onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending}>
-							<FileUp /> 导入 GameBox 包
+							<FileUp aria-hidden="true" /> {t("adminCore.gameboxes.import")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
 			<SectionCard
-				title="GameBox 列表"
-				description="搜索在名称 / safe_name / 分类上做服务端 OR 匹配。"
+				title={t("adminCore.gameboxes.listTitle")}
+				description={t("adminCore.gameboxes.listDescription")}
 				actions={
 					<Toolbar>
 						<SearchInput
 							value={list.search}
 							onChange={list.setSearch}
-							placeholder="搜索名称 / safe_name / 分类"
+							placeholder={t("adminCore.gameboxes.searchPlaceholder")}
 						/>
 						<Button
 							variant="outline"
@@ -612,7 +711,10 @@ export function AdminGameboxesPage(): ReactNode {
 							onClick={() => void confirmScan()}
 							disabled={scan.isPending}
 						>
-							<ScanSearch /> {scan.isPending ? "扫描中…" : "扫描目录"}
+							<ScanSearch aria-hidden="true" />{" "}
+							{scan.isPending
+								? t("adminCore.gameboxes.scanning")
+								: t("adminCore.gameboxes.scan")}
 						</Button>
 						<Button
 							variant="outline"
@@ -620,8 +722,12 @@ export function AdminGameboxesPage(): ReactNode {
 							onClick={() => check.mutate(selectedIds.length > 0 ? selectedIds : undefined)}
 							disabled={check.isPending}
 						>
-							<ShieldCheck />{" "}
-							{check.isPending ? "校验中…" : selectedIds.length > 0 ? "校验选中" : "校验全部"}
+							<ShieldCheck aria-hidden="true" />{" "}
+							{check.isPending
+								? t("adminCore.gameboxes.checking")
+								: selectedIds.length > 0
+									? t("adminCore.gameboxes.checkSelected")
+									: t("adminCore.gameboxes.checkAll")}
 						</Button>
 						{selectedIds.length > 0 ? (
 							<>
@@ -631,7 +737,8 @@ export function AdminGameboxesPage(): ReactNode {
 									onClick={() => void confirmBuild(selectedIds)}
 									disabled={build.isPending}
 								>
-									<Hammer /> 构建选中（{selectedIds.length}）
+									<Hammer aria-hidden="true" />{" "}
+									{t("adminCore.gameboxes.buildSelected", { count: selectedIds.length })}
 								</Button>
 								<Button
 									variant="destructive"
@@ -639,7 +746,8 @@ export function AdminGameboxesPage(): ReactNode {
 									onClick={() => void confirmRemoveSelected()}
 									disabled={remove.isPending}
 								>
-									<Trash2 /> 删除选中（{selectedIds.length}）
+									<Trash2 aria-hidden="true" />{" "}
+									{t("adminCore.gameboxes.deleteSelected", { count: selectedIds.length })}
 								</Button>
 							</>
 						) : null}
@@ -669,7 +777,10 @@ export function AdminGameboxesPage(): ReactNode {
 						event.target.value = "";
 						if (!selected) return;
 						if (!selected.name.toLowerCase().endsWith(".zip")) {
-							toast.error("只支持 ZIP 靶机包", "package zip 应包含 meta.toml 与运行所需文件。");
+							toast.error(
+								t("adminCore.gameboxes.toasts.zipOnly"),
+								t("adminCore.gameboxes.toasts.zipOnlyDescription"),
+							);
 							return;
 						}
 						setFile(selected);
@@ -683,33 +794,47 @@ export function AdminGameboxesPage(): ReactNode {
 							<div className="min-w-0">
 								<p className="truncate text-sm font-medium">{file.name}</p>
 								<p className="tnum text-xs text-muted-foreground">
-									{formatBytes(file.size)} · 导入为同步构建，可能耗时数分钟
+									{t("adminCore.common.syncBuildHint", { size: formatBytes(file.size) })}
 								</p>
 							</div>
 							<div className="flex items-center gap-2">
 								<Button variant="ghost" size="sm" onClick={() => setFile(null)}>
-									取消
+									{t("common.cancel")}
 								</Button>
-								<Button size="sm" onClick={() => void confirmImport()} disabled={importMutation.isPending}>
-									<FileUp /> {importMutation.isPending ? "导入中…" : "开始导入"}
+								<Button
+									size="sm"
+									onClick={() => void confirmImport()}
+									disabled={importMutation.isPending}
+								>
+									<FileUp aria-hidden="true" />{" "}
+									{importMutation.isPending
+										? t("adminCore.common.importing")
+										: t("adminCore.common.startImport")}
 								</Button>
 							</div>
 						</div>
 						{importMutation.isPending || progress > 0 ? (
 							<div className="space-y-1">
-								<Progress value={progress} aria-label="上传进度" />
-								<p className="tnum text-xs text-muted-foreground">上传进度 {progress}%</p>
+								<Progress
+									value={progress}
+									aria-label={t("adminCore.common.uploadProgressLabel")}
+								/>
+								<p className="tnum text-xs text-muted-foreground">
+									{t("adminCore.common.uploadProgress", { percent: progress })}
+								</p>
 							</div>
 						) : null}
 					</div>
 				) : null}
 
 				{imported ? (
-					<div className="flex flex-wrap items-center gap-3 border-b bg-emerald-500/10 px-4 py-2 text-sm">
-						<span className="font-medium">导入成功：</span>
+					<div className="flex flex-wrap items-center gap-3 border-b border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+						<span className="font-medium">{t("adminCore.common.importSuccess")}</span>
 						<span>{imported.name}</span>
 						<MonoText>{imported.safe_name}</MonoText>
-						<MonoText>v{imported.version ?? "—"}</MonoText>
+						<MonoText>
+							{t("adminCore.common.versionShort", { version: imported.version ?? "—" })}
+						</MonoText>
 						<BuildStatusPill status={imported.build_status} />
 					</div>
 				) : null}
@@ -717,22 +842,24 @@ export function AdminGameboxesPage(): ReactNode {
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={5} />}
-					errorTitle="加载 GameBox 库失败"
+					errorTitle={t("adminCore.gameboxes.error")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
 						list.filter ? (
 							<EmptyBlock
 								variant="filtered"
-								title="没有匹配的 GameBox"
-								description={`没有名称 / safe_name / 分类匹配「${list.search}」的靶机。`}
+								title={t("adminCore.gameboxes.filtered.title")}
+								description={t("adminCore.gameboxes.filtered.description", {
+									query: list.search,
+								})}
 							/>
 						) : (
 							<EmptyBlock
-								title="GameBox 库是空的"
-								description="导入靶机包，或扫描后端 GAMEBOXES_DIR 里已有的 package。"
+								title={t("adminCore.gameboxes.empty.title")}
+								description={t("adminCore.gameboxes.empty.description")}
 								action={
 									<Button size="sm" onClick={() => fileInputRef.current?.click()}>
-										<FileUp /> 导入 GameBox 包
+										<FileUp aria-hidden="true" /> {t("adminCore.gameboxes.import")}
 									</Button>
 								}
 							/>
@@ -754,17 +881,23 @@ export function AdminGameboxesPage(): ReactNode {
 										<BuildStatusPill status={row.build_status} />
 									</div>
 									<MonoText className="text-muted-foreground">
-										{row.safe_name} · {row.category} · v{row.version ?? "—"}
+										{row.safe_name} · {row.category} ·{" "}
+										{t("adminCore.common.versionShort", {
+											version: row.version ?? "—",
+										})}
 									</MonoText>
 									{row.image_ref ? <MonoText>{row.image_ref}</MonoText> : null}
 									<p className="tnum font-mono text-xs text-muted-foreground">
-										{row.cpu_millis !== null ? `${row.cpu_millis}m` : "—"} /{" "}
-										{row.memory_bytes !== null ? formatBytes(row.memory_bytes) : "—"} /{" "}
-										{row.pids_limit ?? "—"} pids
+										{t("adminCore.common.runtimeValue", {
+											cpu: row.cpu_millis !== null ? `${row.cpu_millis}m` : "—",
+											memory:
+												row.memory_bytes !== null ? formatBytes(row.memory_bytes) : "—",
+											pids: row.pids_limit ?? "—",
+										})}
 									</p>
 									<div className="flex flex-wrap gap-2 pt-1">
 										<Button variant="outline" size="sm" onClick={() => openEdit(row)}>
-											<Pencil /> 编辑
+											<Pencil aria-hidden="true" /> {t("common.edit")}
 										</Button>
 										<Button
 											variant="outline"
@@ -772,7 +905,8 @@ export function AdminGameboxesPage(): ReactNode {
 											onClick={() => check.mutate([row.id])}
 											disabled={check.isPending}
 										>
-											<ShieldCheck /> 校验
+											<ShieldCheck aria-hidden="true" />{" "}
+											{t("adminCore.gameboxes.check")}
 										</Button>
 										{canBuild(row) ? (
 											<Button
@@ -781,12 +915,18 @@ export function AdminGameboxesPage(): ReactNode {
 												onClick={() => void confirmBuild([row.id])}
 												disabled={build.isPending}
 											>
-												<Hammer /> 构建
+												<Hammer aria-hidden="true" />{" "}
+												{t("adminCore.gameboxes.build")}
 											</Button>
 										) : null}
 										{!row.hidden ? (
-											<Button variant="outline" size="sm" onClick={() => void confirmHide(row)}>
-												<EyeOff /> 隐藏
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => void confirmHide(row)}
+											>
+												<EyeOff aria-hidden="true" />{" "}
+												{t("adminCore.gameboxes.hide")}
 											</Button>
 										) : null}
 										<Button
@@ -794,32 +934,37 @@ export function AdminGameboxesPage(): ReactNode {
 											size="sm"
 											onClick={() => void confirmRemoveOne(row)}
 										>
-											<Trash2 /> 删除
+											<Trash2 aria-hidden="true" /> {t("common.delete")}
 										</Button>
 									</div>
 								</div>
 							)}
 							rowActions={(row) => (
-								<RowMenu label={`GameBox ${row.name} 的操作`}>
+								<RowMenu label={t("adminCore.gameboxes.rowMenu", { name: row.name })}>
 									<DropdownMenuItem onSelect={() => openEdit(row)}>
-										<Pencil /> 编辑
+										<Pencil aria-hidden="true" /> {t("common.edit")}
 									</DropdownMenuItem>
 									<DropdownMenuItem onSelect={() => check.mutate([row.id])}>
-										<ShieldCheck /> 校验
+										<ShieldCheck aria-hidden="true" />{" "}
+										{t("adminCore.gameboxes.check")}
 									</DropdownMenuItem>
 									{canBuild(row) ? (
 										<DropdownMenuItem onSelect={() => void confirmBuild([row.id])}>
-											<Hammer /> 构建镜像
+											<Hammer aria-hidden="true" />{" "}
+											{t("adminCore.gameboxes.buildImage")}
 										</DropdownMenuItem>
 									) : null}
 									{!row.hidden ? (
 										<DropdownMenuItem onSelect={() => void confirmHide(row)}>
-											<EyeOff /> 隐藏
+											<EyeOff aria-hidden="true" /> {t("adminCore.gameboxes.hide")}
 										</DropdownMenuItem>
 									) : null}
 									<DropdownMenuSeparator />
-									<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemoveOne(row)}>
-										<Trash2 /> 删除
+									<DropdownMenuItem
+										variant="destructive"
+										onSelect={() => void confirmRemoveOne(row)}
+									>
+										<Trash2 aria-hidden="true" /> {t("common.delete")}
 									</DropdownMenuItem>
 								</RowMenu>
 							)}
@@ -830,8 +975,10 @@ export function AdminGameboxesPage(): ReactNode {
 
 			{scanItems ? (
 				<ResultsCard
-					title="GameBox 目录扫描结果"
-					description={`后端返回 ${scanItems.length} 条（added / skipped / error 原样展示）。`}
+					title={t("adminCore.gameboxes.results.scanTitle")}
+					description={t("adminCore.gameboxes.results.scanDescription", {
+						count: scanItems.length,
+					})}
 					onDismiss={() => setScanItems(null)}
 				>
 					<ScanResultTable items={scanItems} />
@@ -840,8 +987,11 @@ export function AdminGameboxesPage(): ReactNode {
 
 			{checkItems ? (
 				<ResultsCard
-					title="校验结果"
-					description={`${checkItems.length} 个，${checkItems.filter((item) => !item.is_ok).length} 个不可用。`}
+					title={t("adminCore.gameboxes.results.checkTitle")}
+					description={t("adminCore.gameboxes.results.checkDescription", {
+						count: checkItems.length,
+						failed: checkItems.filter((item) => !item.is_ok).length,
+					})}
 					onDismiss={() => setCheckItems(null)}
 				>
 					<GameboxCheckResultTable
@@ -854,11 +1004,15 @@ export function AdminGameboxesPage(): ReactNode {
 
 			{buildItems ? (
 				<ResultsCard
-					title="构建结果"
-					description="逐个结果与后端消息（失败原因原样展示）。"
+					title={t("adminCore.gameboxes.results.buildTitle")}
+					description={t("adminCore.gameboxes.results.buildDescription")}
 					onDismiss={() => setBuildItems(null)}
 				>
-					<BuildResultTable items={buildItems} nameOf={(row) => row.gamebox_name} label="GameBox" />
+					<BuildResultTable
+						items={buildItems}
+						nameOf={(row) => row.gamebox_name}
+						label={t("adminCore.gameboxes.columns.gamebox")}
+					/>
 				</ResultsCard>
 			) : null}
 
@@ -867,18 +1021,25 @@ export function AdminGameboxesPage(): ReactNode {
 				onOpenChange={(open) => {
 					if (!open) setEditing(null);
 				}}
-				title={`编辑 GameBox${editing ? `：${editing.name}` : ""}`}
-				description="身份与运行参数可改；版本、镜像 digest 与 build_status 由导入决定。"
+				title={
+					editing
+						? t("adminCore.gameboxes.sheet.editTitleWithName", { name: editing.name })
+						: t("adminCore.gameboxes.sheet.editTitle")
+				}
+				description={t("adminCore.gameboxes.sheet.formDescription")}
 				width="xl"
 				footer={
 					<FormFooter
 						onCancel={() => setEditing(null)}
-						submitLabel="保存修改"
+						submitLabel={t("common.saveChanges")}
 						isPending={save.isPending}
 						formId="admin-gamebox-form"
 						hint={
 							editing
-								? `safe_name=${editing.safe_name} · v${editing.version ?? "—"}`
+								? t("adminCore.common.safeNameWithVersion", {
+										safeName: editing.safe_name,
+										version: editing.version ?? "—",
+									})
 								: undefined
 						}
 					/>
@@ -893,14 +1054,24 @@ export function AdminGameboxesPage(): ReactNode {
 					}}
 				>
 					<FormGrid columns={2}>
-						<Field label="名称" htmlFor="gamebox-name" required error={errors.name}>
+						<Field
+							label={t("adminCore.gameboxes.sheet.name")}
+							htmlFor="gamebox-name"
+							required
+							error={errors.name}
+						>
 							<Input
 								id="gamebox-name"
 								value={form.name}
 								onChange={(event) => setForm({ ...form, name: event.target.value })}
 							/>
 						</Field>
-						<Field label="分类" htmlFor="gamebox-category" required error={errors.category}>
+						<Field
+							label={t("adminCore.gameboxes.sheet.category")}
+							htmlFor="gamebox-category"
+							required
+							error={errors.category}
+						>
 							<Input
 								id="gamebox-category"
 								value={form.category}
@@ -908,7 +1079,10 @@ export function AdminGameboxesPage(): ReactNode {
 							/>
 						</Field>
 					</FormGrid>
-					<Field label="描述" htmlFor="gamebox-description">
+					<Field
+						label={t("adminCore.gameboxes.sheet.description")}
+						htmlFor="gamebox-description"
+					>
 						<Textarea
 							id="gamebox-description"
 							rows={3}
@@ -918,23 +1092,23 @@ export function AdminGameboxesPage(): ReactNode {
 					</Field>
 					<div className="flex items-center justify-between rounded-lg border px-3 py-2">
 						<div>
-							<p className="text-sm font-medium">隐藏（归档）</p>
+							<p className="text-sm font-medium">{t("adminCore.gameboxes.sheet.hidden")}</p>
 							<p className="text-xs text-muted-foreground">
-								隐藏后选手端与赛事选择器不再列出它；已在使用的实例不受影响。
+								{t("adminCore.gameboxes.sheet.hiddenHint")}
 							</p>
 						</div>
 						<Switch
 							checked={form.hidden}
 							onCheckedChange={(checked) => setForm({ ...form, hidden: checked })}
-							aria-label="隐藏 GameBox"
+							aria-label={t("adminCore.gameboxes.sheet.hiddenAria")}
 						/>
 					</div>
 
 					<FormGrid columns={2}>
 						<Field
-							label="容器内用户名"
+							label={t("adminCore.gameboxes.sheet.username")}
 							htmlFor="gamebox-username"
-							hint="healthcheck / judge 在容器内执行时使用的用户；留空表示清空。"
+							hint={t("adminCore.gameboxes.sheet.usernameHint")}
 						>
 							<Input
 								id="gamebox-username"
@@ -943,10 +1117,10 @@ export function AdminGameboxesPage(): ReactNode {
 							/>
 						</Field>
 						<Field
-							label="推荐 CPU（毫核）"
+							label={t("adminCore.gameboxes.sheet.cpu")}
 							htmlFor="gamebox-cpu"
 							error={errors.cpuMillis}
-							hint="留空表示不修改；必须大于 0。"
+							hint={t("adminCore.gameboxes.sheet.resourceHint")}
 						>
 							<Input
 								id="gamebox-cpu"
@@ -956,10 +1130,10 @@ export function AdminGameboxesPage(): ReactNode {
 							/>
 						</Field>
 						<Field
-							label="推荐内存（字节）"
+							label={t("adminCore.gameboxes.sheet.memory")}
 							htmlFor="gamebox-memory"
 							error={errors.memoryBytes}
-							hint="留空表示不修改；必须大于 0。"
+							hint={t("adminCore.gameboxes.sheet.resourceHint")}
 						>
 							<Input
 								id="gamebox-memory"
@@ -969,10 +1143,10 @@ export function AdminGameboxesPage(): ReactNode {
 							/>
 						</Field>
 						<Field
-							label="推荐 PID 上限"
+							label={t("adminCore.gameboxes.sheet.pids")}
 							htmlFor="gamebox-pids"
 							error={errors.pidsLimit}
-							hint="留空表示不修改；必须大于 0。"
+							hint={t("adminCore.gameboxes.sheet.resourceHint")}
 						>
 							<Input
 								id="gamebox-pids"
@@ -982,55 +1156,63 @@ export function AdminGameboxesPage(): ReactNode {
 							/>
 						</Field>
 						<Field
-							label="评测超时（秒）"
+							label={t("adminCore.gameboxes.sheet.timeout")}
 							htmlFor="gamebox-timeout"
 							error={errors.judgeTimeoutSecs}
-							hint="留空 = 清空，使用赛事默认值；最小 0。"
+							hint={t("adminCore.gameboxes.sheet.timingHint")}
 						>
 							<Input
 								id="gamebox-timeout"
 								inputMode="numeric"
 								value={form.judgeTimeoutSecs}
-								onChange={(event) => setForm({ ...form, judgeTimeoutSecs: event.target.value })}
+								onChange={(event) =>
+									setForm({ ...form, judgeTimeoutSecs: event.target.value })
+								}
 							/>
 						</Field>
 						<Field
-							label="评测重试间隔（秒）"
+							label={t("adminCore.gameboxes.sheet.retry")}
 							htmlFor="gamebox-retry"
 							error={errors.judgeRetryIntervalSecs}
-							hint="留空 = 清空，使用赛事默认值；最小 0。"
+							hint={t("adminCore.gameboxes.sheet.timingHint")}
 						>
 							<Input
 								id="gamebox-retry"
 								inputMode="numeric"
 								value={form.judgeRetryIntervalSecs}
-								onChange={(event) => setForm({ ...form, judgeRetryIntervalSecs: event.target.value })}
+								onChange={(event) =>
+									setForm({ ...form, judgeRetryIntervalSecs: event.target.value })
+								}
 							/>
 						</Field>
 						<Field
-							label="评测脚本名"
+							label={t("adminCore.gameboxes.sheet.judgeName")}
 							htmlFor="gamebox-judge-name"
-							hint="留空表示清空（回退到包内默认脚本）。"
+							hint={t("adminCore.gameboxes.sheet.judgeNameHint")}
 						>
 							<Input
 								id="gamebox-judge-name"
 								value={form.judgeScriptName}
-								onChange={(event) => setForm({ ...form, judgeScriptName: event.target.value })}
+								onChange={(event) =>
+									setForm({ ...form, judgeScriptName: event.target.value })
+								}
 							/>
 						</Field>
 					</FormGrid>
 
 					<Field
-						label="评测脚本内容"
+						label={t("adminCore.gameboxes.sheet.judgeContent")}
 						htmlFor="gamebox-judge-content"
-						hint="留空表示清空，回退到包内默认脚本。"
+						hint={t("adminCore.gameboxes.sheet.judgeContentHint")}
 					>
 						<Textarea
 							id="gamebox-judge-content"
 							rows={6}
 							className="font-mono text-xs"
 							value={form.judgeScriptContent}
-							onChange={(event) => setForm({ ...form, judgeScriptContent: event.target.value })}
+							onChange={(event) =>
+								setForm({ ...form, judgeScriptContent: event.target.value })
+							}
 						/>
 					</Field>
 
@@ -1038,15 +1220,17 @@ export function AdminGameboxesPage(): ReactNode {
 						label="healthchecks_json"
 						htmlFor="gamebox-healthchecks"
 						error={errors.healthchecksJson}
-						hint="JSON 文本；留空 = 清空该配置，内容未修改则不会提交。后端会按 JSON 解析，非法 JSON 会 400。"
+						hint={t("adminCore.gameboxes.sheet.healthchecksHint")}
 					>
 						<Textarea
 							id="gamebox-healthchecks"
 							rows={6}
 							className="font-mono text-xs"
-							placeholder='例如 [{"name":"port-80","type":"tcp","port":80}]'
+							placeholder='[{"name":"port-80","type":"tcp","port":80}]'
 							value={form.healthchecksJson}
-							onChange={(event) => setForm({ ...form, healthchecksJson: event.target.value })}
+							onChange={(event) =>
+								setForm({ ...form, healthchecksJson: event.target.value })
+							}
 						/>
 					</Field>
 
@@ -1054,7 +1238,7 @@ export function AdminGameboxesPage(): ReactNode {
 						label="judge_args_json"
 						htmlFor="gamebox-judge-args"
 						error={errors.judgeArgsJson}
-						hint="JSON 文本；留空 = 清空该配置，内容未修改则不会提交。"
+						hint={t("adminCore.gameboxes.sheet.judgeArgsHint")}
 					>
 						<Textarea
 							id="gamebox-judge-args"
@@ -1080,32 +1264,35 @@ function GameboxCheckResultTable({
 	onBuild: (id: string) => void;
 	building: boolean;
 }): ReactNode {
+	const { t } = useTranslation();
 	const columns: DataTableColumn<GameBoxCheckResult>[] = [
 		{
 			id: "gamebox_name",
-			header: "GameBox",
+			header: t("adminCore.gameboxes.columns.gamebox"),
 			cell: (row) => <span className="text-sm font-medium">{row.gamebox_name}</span>,
 			sortValue: (row) => row.gamebox_name,
 		},
 		{
 			id: "docker_image",
-			header: "镜像",
+			header: t("adminCore.gameboxes.checkTable.image"),
 			cell: (row) =>
 				row.docker_image ? (
-					<TonePill tone="success">就绪</TonePill>
+					<TonePill tone="success">{t("adminCore.gameboxes.checkTable.ready")}</TonePill>
 				) : (
 					<Button variant="outline" size="xs" onClick={() => onBuild(row.id)} disabled={building}>
-						<Hammer /> 构建
+						<Hammer aria-hidden="true" /> {t("adminCore.gameboxes.build")}
 					</Button>
 				),
 			sortValue: (row) => (row.docker_image ? 1 : 0),
 		},
 		{
 			id: "package_dir",
-			header: "package 目录",
+			header: t("adminCore.gameboxes.checkTable.packageDir"),
 			cell: (row) => (
 				<TonePill tone={row.package_dir ? "success" : "danger"}>
-					{row.package_dir ? "已镜像" : "缺失"}
+					{row.package_dir
+						? t("adminCore.gameboxes.checkTable.mirrored")
+						: t("adminCore.gameboxes.checkTable.missing")}
 				</TonePill>
 			),
 			sortValue: (row) => (row.package_dir ? 1 : 0),
@@ -1113,9 +1300,13 @@ function GameboxCheckResultTable({
 		},
 		{
 			id: "is_ok",
-			header: "结论",
+			header: t("adminCore.gameboxes.checkTable.conclusion"),
 			cell: (row) => (
-				<TonePill tone={row.is_ok ? "success" : "danger"}>{row.is_ok ? "可用" : "不可用"}</TonePill>
+				<TonePill tone={row.is_ok ? "success" : "danger"}>
+					{row.is_ok
+						? t("adminCore.gameboxes.checkTable.ok")
+						: t("adminCore.gameboxes.checkTable.notOk")}
+				</TonePill>
 			),
 			sortValue: (row) => (row.is_ok ? 1 : 0),
 		},
@@ -1131,16 +1322,24 @@ function GameboxCheckResultTable({
 					<div className="flex items-center justify-between gap-2">
 						<span className="text-sm font-medium">{row.gamebox_name}</span>
 						<TonePill tone={row.is_ok ? "success" : "danger"}>
-							{row.is_ok ? "可用" : "不可用"}
+							{row.is_ok
+								? t("adminCore.gameboxes.checkTable.ok")
+								: t("adminCore.gameboxes.checkTable.notOk")}
 						</TonePill>
 					</div>
 					<p className="text-xs text-muted-foreground">
-						镜像 {row.docker_image ? "就绪" : "缺失"} · package 目录{" "}
-						{row.package_dir ? "已镜像" : "缺失"}
+						{t("adminCore.gameboxes.checkTable.mobile", {
+							image: row.docker_image
+								? t("adminCore.gameboxes.checkTable.ready")
+								: t("adminCore.gameboxes.checkTable.missing"),
+							packageDir: row.package_dir
+								? t("adminCore.gameboxes.checkTable.mirrored")
+								: t("adminCore.gameboxes.checkTable.missing"),
+						})}
 					</p>
 				</div>
 			)}
-			empty={<span>后端未返回任何校验结果</span>}
+			empty={<span>{t("adminCore.gameboxes.checkTable.empty")}</span>}
 		/>
 	);
 }

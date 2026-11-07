@@ -3,6 +3,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Search } from "lucide-react";
 
 import { Input } from "~/components/ui/input";
@@ -12,22 +13,28 @@ import { cn } from "~/lib/utils";
 export function SearchInput({
 	value,
 	onChange,
-	placeholder = "搜索",
+	placeholder,
 	className,
 }: {
 	value: string;
 	onChange: (value: string) => void;
+	/** 页面必须传入已本地化的提示；缺省使用通用「搜索」。 */
 	placeholder?: string;
 	className?: string;
 }): ReactNode {
+	const { t } = useTranslation();
+	const label = placeholder ?? t("common.search");
 	return (
 		<div className={cn("relative w-full sm:max-w-72", className)}>
-			<Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+			<Search
+				className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+				aria-hidden="true"
+			/>
 			<Input
 				value={value}
 				onChange={(event) => onChange(event.target.value)}
-				placeholder={placeholder}
-				aria-label={placeholder}
+				placeholder={label}
+				aria-label={label}
 				className="pl-8"
 			/>
 		</div>

@@ -7,6 +7,7 @@
  */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { AppWindow, Info, RefreshCw, Server } from "lucide-react";
 
@@ -28,17 +29,19 @@ import {
 	StatCard,
 	Toolbar,
 } from "~/components/app/page";
-import { ErrorBlock, LoadingBlock } from "~/components/app/states";
+import { LoadingBlock, QueryState } from "~/components/app/states";
 import { Button } from "~/components/ui/button";
 import { useDocumentTitle } from "~/lib/hooks";
 
 export function AdminVersionPage(): ReactNode {
-	useDocumentTitle("平台版本 · FloatCTF 控制台");
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminInfra.version.documentTitle"));
 	const client = useClient();
+	const empty = t("common.empty");
 
 	const query = useQuery({
 		queryKey: qk.admin.version(),
-		queryFn: () => call<string>(client.admin.system.version(), "平台版本"),
+		queryFn: () => call<string>(client.admin.system.version(), t("adminInfra.version.title")),
 		// 版本号几乎不变：低频缓存足够。
 		staleTime: 5 * 60_000,
 	});
@@ -46,8 +49,8 @@ export function AdminVersionPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="平台版本"
-				description="后端 API 版本与前端运行时契约版本。契约版本用于判断可插拔前端是否兼容。"
+				title={t("adminInfra.version.title")}
+				description={t("adminInfra.version.description")}
 				actions={
 					<Toolbar>
 						<Button
@@ -56,68 +59,79 @@ export function AdminVersionPage(): ReactNode {
 							onClick={() => void query.refetch()}
 							disabled={query.isFetching}
 						>
-							<RefreshCw />
-							刷新
+							<RefreshCw
+								className={query.isFetching ? "size-4 animate-spin" : "size-4"}
+								aria-hidden="true"
+							/>
+							{t("common.refresh")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
-			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 				<StatCard
-					label="平台 API"
-					value={query.isPending ? "…" : query.isError ? "—" : (query.data ?? "—")}
-					hint="GET /api/admin/system/version"
-					icon={<Server className="size-5" />}
+					label={t("adminInfra.version.stats.api")}
+					value={query.isPending ? "…" : query.isError ? empty : (query.data ?? empty)}
+					hint={t("adminInfra.version.stats.apiHint")}
+					icon={<Server className="size-4" aria-hidden="true" />}
 					tone={query.isError ? "danger" : "default"}
 				/>
 				<StatCard
-					label="前端运行时契约"
+					label={t("adminInfra.version.stats.runtimeContract")}
 					value={FRONTEND_RUNTIME_VERSION}
-					hint="FRONTEND_RUNTIME_VERSION（编译期常量）"
-					icon={<AppWindow className="size-5" />}
+					hint={t("adminInfra.version.stats.runtimeContractHint", {
+						name: "FRONTEND_RUNTIME_VERSION",
+					})}
+					icon={<AppWindow className="size-4" aria-hidden="true" />}
 				/>
 				<StatCard
-					label="API 契约"
+					label={t("adminInfra.version.stats.apiContract")}
 					value={API_CONTRACT_VERSION}
-					hint="API_CONTRACT_VERSION（编译期常量）"
-					icon={<Info className="size-5" />}
+					hint={t("adminInfra.version.stats.apiContractHint", {
+						name: "API_CONTRACT_VERSION",
+					})}
+					icon={<Info className="size-4" aria-hidden="true" />}
 				/>
 				<StatCard
-					label="运行时完整版本"
+					label={t("adminInfra.version.stats.fullVersion")}
 					value={FRONTEND_RUNTIME_FULL_VERSION}
-					hint="FRONTEND_RUNTIME_FULL_VERSION（仅诊断展示）"
+					hint={t("adminInfra.version.stats.fullVersionHint", {
+						name: "FRONTEND_RUNTIME_FULL_VERSION",
+					})}
 				/>
 			</div>
 
 			<SectionCard
-				title="后端 API 版本"
-				description="来自真实接口；失败时显示后端文案并可重试。"
+				title={t("adminInfra.version.apiSection.title")}
+				description={t("adminInfra.version.apiSection.description")}
 			>
-				{query.isPending ? (
-					<LoadingBlock label="查询版本…" />
-				) : query.isError ? (
-					<ErrorBlock
-						error={query.error}
-						title="查询平台版本失败"
-						onRetry={() => void query.refetch()}
-					/>
-				) : (
-					<KeyValueList
-						columns={1}
-						items={[
-							{
-								key: "floatctf-api",
-								value: <MonoText className="text-sm">{query.data ?? "（后端未返回版本号）"}</MonoText>,
-							},
-						]}
-					/>
-				)}
+				<QueryState
+					query={query}
+					skeleton={<LoadingBlock label={t("adminInfra.version.loading")} />}
+					errorTitle={t("adminInfra.version.errorTitle")}
+				>
+					{(version) => (
+						<KeyValueList
+							columns={1}
+							items={[
+								{
+									key: "floatctf-api",
+									value: (
+										<MonoText className="text-sm">
+											{version || t("adminInfra.version.apiSection.missing")}
+										</MonoText>
+									),
+								},
+							]}
+						/>
+					)}
+				</QueryState>
 			</SectionCard>
 
 			<SectionCard
-				title="契约版本说明"
-				description="三个版本概念互相独立，前端与注册表的 compatibility 必须与运行时 / API 契约 major 一致。"
+				title={t("adminInfra.version.contracts.title")}
+				description={t("adminInfra.version.contracts.description")}
 			>
 				<KeyValueList
 					columns={1}
@@ -125,17 +139,17 @@ export function AdminVersionPage(): ReactNode {
 						{
 							key: "FRONTEND_RUNTIME_VERSION",
 							value: <MonoText className="text-sm">{FRONTEND_RUNTIME_VERSION}</MonoText>,
-							hint: "破坏 frontend.json 或 mount(context) 契约时变更",
+							hint: t("adminInfra.version.contracts.hints.runtime"),
 						},
 						{
 							key: "API_CONTRACT_VERSION",
 							value: <MonoText className="text-sm">{API_CONTRACT_VERSION}</MonoText>,
-							hint: "破坏前端可见的 HTTP API（删字段 / 改语义）时变更",
+							hint: t("adminInfra.version.contracts.hints.api"),
 						},
 						{
 							key: "FRONTEND_RUNTIME_FULL_VERSION",
 							value: <MonoText className="text-sm">{FRONTEND_RUNTIME_FULL_VERSION}</MonoText>,
-							hint: "含 minor/patch，仅用于诊断展示",
+							hint: t("adminInfra.version.contracts.hints.full"),
 						},
 					]}
 				/>
