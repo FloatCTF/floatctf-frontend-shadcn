@@ -12,7 +12,7 @@ export function NotFoundPage() {
 	const { t } = useTranslation();
 	useDocumentTitle(t("shell.notFound.title"));
 	return (
-		<PageBody className="max-w-2xl">
+		<PageBody className="flex min-h-[60vh] max-w-2xl items-center justify-center">
 			<NotFoundBlock
 				title={t("shell.notFound.title")}
 				description={t("shell.notFound.description")}

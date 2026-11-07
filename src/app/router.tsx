@@ -43,7 +43,7 @@ export function createAppRouter() {
 							<PlayerShell />
 						</RequireUser>
 					),
-					children: collectRoutes("player"),
+					children: [...collectRoutes("player"), { path: "*", element: <NotFoundPage /> }],
 				},
 				{
 					element: (
@@ -51,7 +51,7 @@ export function createAppRouter() {
 							<AdminShell />
 						</RequireAdmin>
 					),
-					children: collectRoutes("admin"),
+					children: [...collectRoutes("admin"), { path: "*", element: <NotFoundPage /> }],
 				},
 				{ path: "*", element: <NotFoundPage /> },
 			],

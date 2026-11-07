@@ -34,6 +34,7 @@
 | `player-awdp-lab.png` | AWDP 工作台（阶段 / Break·Fix / 评测 / 矩阵） |
 | `player-training.png` | 训练场目录（推荐资源 / 训练状态 / 每页 12 条） |
 | `player-training-run.png` | 训练 run 工作台（阶段、生命周期、实例、评测、积分/Writeup） |
+| `check-404-player.png` | 404 兜底页（在壳内、可恢复） |
 | `check-admin-awd.png` | 管理端 AWD 运维（生命周期门禁 / 阶段矩阵） |
 | `check-admin-awdp.png` | 管理端 AWDP 运维（阶段推进 / 配置锁定） |
 | `check-admin-awdp-data.png` | 管理端 AWDP 数据大屏 |
