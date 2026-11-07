@@ -304,7 +304,9 @@ export function PaginationBar({
 	useEffect(() => {
 		if (page > totalPages) onPageChange(totalPages);
 	}, [page, totalPages, onPageChange]);
-	const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+	// 0 条时不再渲染「共 0 条 / 第 1 页」——空态已经说明了没有数据。
+	if (total === 0) return null;
+	const from = (page - 1) * pageSize + 1;
 	const to = Math.min(total, page * pageSize);
 	return (
 		<div className="flex flex-wrap items-center justify-between gap-3">

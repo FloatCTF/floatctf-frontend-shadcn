@@ -60,6 +60,13 @@ export function ChallengesCatalogPage() {
 	const [pageSize, setPageSize] = useState(20);
 	const debouncedSearch = useDebouncedValue(search, 300);
 
+	const clearFilters = () => {
+		setSearch("");
+		setCategory("all");
+		setOnlyUnsolved(false);
+		setPage(1);
+	};
+
 	const query = useQuery({
 		queryKey: qk.challenges.list({ limit: 200 }),
 		queryFn: () => callList(client.service.challenges.fetch({ limit: 200 })),
@@ -199,16 +206,18 @@ export function ChallengesCatalogPage() {
 				}
 				contentClassName="px-0"
 				footer={
-					<PaginationBar
-						page={page}
-						pageSize={pageSize}
-						total={filtered.length}
-						onPageChange={setPage}
-						onPageSizeChange={(size) => {
-							setPageSize(size);
-							setPage(1);
-						}}
-					/>
+					filtered.length > 0 ? (
+						<PaginationBar
+							page={page}
+							pageSize={pageSize}
+							total={filtered.length}
+							onPageChange={setPage}
+							onPageSizeChange={(size) => {
+								setPageSize(size);
+								setPage(1);
+							}}
+						/>
+					) : null
 				}
 			>
 				<Toolbar className="px-4 pb-4">
@@ -278,7 +287,16 @@ export function ChallengesCatalogPage() {
 				>
 					{() =>
 						filtered.length === 0 ? (
-							<EmptyBlock variant="filtered" />
+							<EmptyBlock
+								variant="filtered"
+								title={t("jeopardy.list.filteredTitle")}
+								description={t("jeopardy.list.filteredDescription")}
+								action={
+									<Button variant="outline" size="sm" onClick={clearFilters}>
+										{t("jeopardy.list.filteredAction")}
+									</Button>
+								}
+							/>
 						) : (
 							<DataTable
 								data={paged}

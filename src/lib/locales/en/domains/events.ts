@@ -2,6 +2,9 @@
 
 export default {
 	list: {
+		filteredTitle: "No matching events",
+		filteredDescription: "Try a different keyword or loosen the filters.",
+		filteredAction: "Clear filters",
 		documentTitle: "Events · FloatCTF",
 		title: "Events",
 		description: "All visible events. Join a competition to open its workspace; practice runs start from Challenges / Training.",

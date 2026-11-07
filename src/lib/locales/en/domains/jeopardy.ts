@@ -14,6 +14,9 @@ export default {
 		error: "Error",
 	},
 	list: {
+		filteredTitle: "No matching challenges",
+		filteredDescription: "Try a different keyword or loosen the filters.",
+		filteredAction: "Clear filters",
 		documentTitle: "Challenges · FloatCTF",
 		title: "Challenges",
 		subtitle:
@@ -118,7 +121,7 @@ export default {
 			startFailed: "Failed to launch instance",
 			destroyed: "Instance destroyed",
 			destroyFailed: "Failed to destroy instance",
-			emptyTitle: "No running instance",
+		emptyTitle: "No running instance",
 			emptyDynamic:
 				"This is a dynamic challenge: the platform generates a unique flag for your instance after launch.",
 			emptyStatic:

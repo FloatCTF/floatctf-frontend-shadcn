@@ -25,7 +25,7 @@ export default {
 		contextual: "Current page actions",
 		hints: "Hints",
 		openPalette: "Open command palette",
-		trigger: "Search / command",
+		trigger: "Search",
 	},
 	notFound: {
 		title: "Page not found",

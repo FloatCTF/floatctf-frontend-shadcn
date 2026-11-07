@@ -2,6 +2,9 @@
 
 export default {
 	list: {
+		filteredTitle: "没有匹配的赛事",
+		filteredDescription: "换个关键词或放宽筛选条件试试。",
+		filteredAction: "清除筛选",
 		documentTitle: "赛事 · FloatCTF",
 		title: "赛事",
 		description: "全部可见赛事。正式赛加入后进入赛事工作区；练习赛直接从题库 / 训练场进入。",

@@ -17,6 +17,7 @@ export default {
 		writeupDetail: "题解详情",
 	},
 	rank: {
+		loadError: "排行榜加载失败",
 		documentTitle: "排行榜 · FloatCTF",
 		title: "排行榜",
 		subtitle: "按解题数排名的练习赛选手（30 秒自动刷新），最多展示前 15 名。",

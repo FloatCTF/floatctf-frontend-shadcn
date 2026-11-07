@@ -17,6 +17,7 @@ export default {
 		writeupDetail: "Writeup details",
 	},
 	rank: {
+		loadError: "Failed to load the leaderboard",
 		documentTitle: "Leaderboard · FloatCTF",
 		title: "Leaderboard",
 		subtitle:

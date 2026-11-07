@@ -190,7 +190,7 @@ export function AppShell({ navGroups, mobileNav, scope }: AppShellProps) {
 						<p className="truncate text-sm font-medium">{title}</p>
 					</div>
 
-					<CommandTrigger className="hidden h-8 items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted md:inline-flex md:w-56" />
+					<CommandTrigger className="hidden h-8 items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted md:inline-flex md:w-56 md:min-w-56 max-md:w-auto" />
 					{/* 移动端没有 ⌘K：给一个图标入口，别让命令面板在手机上不可达。 */}
 					<Button
 						variant="ghost"

@@ -14,6 +14,9 @@ export default {
 		error: "运行异常",
 	},
 	list: {
+		filteredTitle: "没有匹配的题目",
+		filteredDescription: "换个关键词或放宽筛选条件试试。",
+		filteredAction: "清除筛选",
 		documentTitle: "题库 · FloatCTF",
 		title: "题库",
 		subtitle: "练习用题目集合。动态题启动后平台会为你的实例生成独立 flag。",
@@ -116,7 +119,7 @@ export default {
 			startFailed: "启动实例失败",
 			destroyed: "实例已销毁",
 			destroyFailed: "销毁实例失败",
-			emptyTitle: "还没有运行中的实例",
+		emptyTitle: "还没有运行中的实例",
 			emptyDynamic: "这是一道动态题：启动后平台会为你的实例生成独立 flag。",
 			emptyStatic: "启动后即可获得答题入口（静态题无需容器，启动会创建答题实例）。",
 			start: "启动实例",

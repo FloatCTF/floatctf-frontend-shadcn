@@ -34,6 +34,7 @@ import {
 } from "~/components/app/page";
 import {
 	EmptyBlock,
+	ErrorBlock,
 	InlineError,
 	QueryState,
 	RefreshingBadge,
@@ -126,22 +127,39 @@ export function RankPage(): ReactNode {
 		},
 	];
 
+	const header = (
+		<PageHeader
+			title={t("community.rank.title")}
+			description={t("community.rank.subtitle")}
+			badge={<TonePill tone="info">{t("community.rank.badge")}</TonePill>}
+			actions={
+				<Toolbar>
+					<Button variant="outline" asChild>
+						<Link to="/solves">
+							<Activity aria-hidden="true" /> {t("community.rank.actions.solves")}
+						</Link>
+					</Button>
+				</Toolbar>
+			}
+		/>
+	);
+
+	if (query.isError) {
+		return (
+			<PageBody>
+				{header}
+				<ErrorBlock
+					error={query.error}
+					title={t("community.rank.loadError")}
+					onRetry={() => void query.refetch()}
+				/>
+			</PageBody>
+		);
+	}
+
 	return (
 		<PageBody>
-			<PageHeader
-				title={t("community.rank.title")}
-				description={t("community.rank.subtitle")}
-				badge={<TonePill tone="info">{t("community.rank.badge")}</TonePill>}
-				actions={
-					<Toolbar>
-						<Button variant="outline" asChild>
-							<Link to="/solves">
-								<Activity aria-hidden="true" /> {t("community.rank.actions.solves")}
-							</Link>
-						</Button>
-					</Toolbar>
-				}
-			/>
+			{header}
 
 			<div className="grid gap-4 sm:grid-cols-3">
 				<StatCard

@@ -288,11 +288,11 @@ export function CommandTrigger({ className }: { className?: string }) {
 			aria-label={t("shell.command.openPalette")}
 			title={t("shell.command.openPalette")}
 		>
-			<span className="inline-flex items-center gap-2">
+			<span className="inline-flex items-center gap-2 whitespace-nowrap">
 				<Search className="size-4" aria-hidden="true" />
 				<span className="hidden sm:inline">{t("shell.command.trigger")}</span>
 			</span>
-			<kbd className="hidden items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] text-muted-foreground sm:inline-flex">
+			<kbd className="hidden items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] whitespace-nowrap text-muted-foreground sm:inline-flex">
 				{shortcutHint}
 			</kbd>
 		</button>

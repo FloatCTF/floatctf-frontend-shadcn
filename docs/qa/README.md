@@ -30,10 +30,11 @@
 | `player-practice-gate.png` | 练习赛门禁（不显示报名，引导去题库/训练场） |
 | `check-login-validation.png` | 登录页字段级校验（必填 + 焦点） |
 | `check-task-confirm.png` | 高危操作确认（后果清单 + 输入确认词） |
-| `player-awd-arena.png` | AWD 驾驶舱（4 指标 + flag/靶机/积分/凭据） |
+| `player-awd-arena.png` | AWD 驾驶舱（4 指标 + flag/靶机/积分/凭据；实时通道「已连接」） |
 | `player-awdp-lab.png` | AWDP 工作台（阶段 / Break·Fix / 评测 / 矩阵） |
 | `player-training.png` | 训练场目录（推荐资源 / 训练状态 / 每页 12 条） |
 | `player-training-run.png` | 训练 run 工作台（阶段、生命周期、实例、评测、积分/Writeup） |
+| `check-empty-filtered-en.png` | 筛选无结果态（英文，含「清除筛选」） |
 | `check-404-player.png` | 404 兜底页（在壳内、可恢复） |
 | `check-admin-awd.png` | 管理端 AWD 运维（生命周期门禁 / 阶段矩阵） |
 | `check-admin-awdp.png` | 管理端 AWDP 运维（阶段推进 / 配置锁定） |
@@ -41,7 +42,6 @@
 | `player-rank.png` | 排行榜 |
 | `player-solves.png` | 解题流水 |
 | `player-discussions.png` | 讨论区 |
-| `player-awd-arena.png` | AWD 驾驶舱（SSE 未接，显示「已降级轮询」是真实降级行为） |
 | `admin-dashboard.png` | 管理端总览 |
 | `admin-events.png` | 赛事管理 |
 | `admin-challenges.png` | 题目管理 |
@@ -56,3 +56,6 @@ node scripts/mock-api.mjs        # :7780，Vite 的 /api 代理目标
 pnpm dev                         # :13400
 # 登录：任意账号 + 任意密码（mock 不校验）
 ```
+
+mock 同时提供 SSE（`/events/{id}/awd/stream` 等），因此截图里的实时徽标是「已连接」；
+想复现断线降级可 `curl -X POST http://127.0.0.1:7780/api/__sse/close`。

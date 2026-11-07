@@ -86,6 +86,14 @@ export function EventsListPage() {
 	const [pageSize, setPageSize] = useState(20);
 	const debouncedSearch = useDebouncedValue(search, 300);
 
+	const clearFilters = () => {
+		setSearch("");
+		setFamily("all");
+		setStatusFilter("all");
+		setOnlyJoined(false);
+		setPage(1);
+	};
+
 	const query = useQuery({
 		queryKey: qk.events.list({ limit: 200 }),
 		queryFn: () => callList<EventInfo>(client.service.events.fetch({ limit: 200 })),
@@ -311,7 +319,16 @@ export function EventsListPage() {
 				>
 					{() =>
 						filtered.length === 0 ? (
-							<EmptyBlock variant="filtered" />
+							<EmptyBlock
+								variant="filtered"
+								title={t("events.list.filteredTitle")}
+								description={t("events.list.filteredDescription")}
+								action={
+									<Button variant="outline" size="sm" onClick={clearFilters}>
+										{t("events.list.filteredAction")}
+									</Button>
+								}
+							/>
 						) : (
 							<DataTable
 								data={paged}
