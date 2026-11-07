@@ -185,7 +185,8 @@ export const feature: FeatureModule = {
 5. **凭据安全**：token 只存在本前端的 store（localStorage，异常兜底），**绝不进 URL / query string**；
    SSH 密码、WireGuard 私钥、flag 等敏感值用 `SecretValue` 默认模糊；不渲染 `password` 字段。
 6. **可访问性**：全部交互可键盘完成；图标按钮带 `aria-label`；对话框/抽屉用 Radix（自带焦点陷阱与
-   `aria-*`）；状态不只靠颜色区分。
+   `aria-*`）；状态不只靠颜色区分。Tab 第一站是「跳到主内容」；命令面板 / 抽屉 / 确认框关闭后焦点
+   回到触发控件（触发元素被列表刷新替换时退回主内容），实现在 `src/lib/focus.ts`。
 7. **资产路径**：一律用 `context.assetBaseUrl` 解析自带资产，绝不硬编码站点根。
 
 ## 7. 已知契约观察（供平台维护者）

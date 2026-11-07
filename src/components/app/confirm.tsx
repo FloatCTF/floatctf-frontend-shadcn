@@ -15,7 +15,10 @@
  * ```
  */
 
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+
+import { restoreFocusAfterLayer } from "~/lib/focus";
 
 import {
 	createContext,
@@ -90,6 +93,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 	);
 
 	const value = useMemo(() => confirm, [confirm]);
+	useEffect(() => {
+		if (!pending) return;
+		return () => restoreFocusAfterLayer();
+	}, [pending]);
+
 	const phraseOk = !pending?.confirmPhrase || phrase.trim() === pending.confirmPhrase;
 
 	return (

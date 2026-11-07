@@ -9,10 +9,10 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
-import { ChevronsUpDown, Languages, LogOut, Moon, Sun, UserCircle } from "lucide-react";
+import { ChevronsUpDown, Languages, LogOut, Moon, Search, Sun, UserCircle } from "lucide-react";
 
 import { useAuthStore, useMe } from "~/auth/store";
-import { CommandTrigger } from "~/app/command-palette";
+import { CommandTrigger, useCommandPalette } from "~/app/command-palette";
 import { BrandMark } from "~/components/app/brand";
 import { UserAvatar } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
@@ -90,6 +90,7 @@ function currentItem(groups: NavGroup[], pathname: string): NavItem | undefined 
 export function AppShell({ navGroups, mobileNav, scope }: AppShellProps) {
 	const { t } = useTranslation();
 	const location = useLocation();
+	const setPaletteOpen = useCommandPalette().setOpen;
 	const navigate = useNavigate();
 	const theme = useTheme();
 	const me = useMe();
@@ -127,6 +128,13 @@ export function AppShell({ navGroups, mobileNav, scope }: AppShellProps) {
 
 	return (
 		<SidebarProvider defaultOpen={sidebarDefaultOpen}>
+			{/* 键盘用户先到主内容：Tab 第一站，Enter 跳过侧栏与顶栏。 */}
+			<a
+				href="#main-content"
+				className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:border focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-sm"
+			>
+				{t("shell.skipToContent")}
+			</a>
 			<Sidebar collapsible="icon">
 				<SidebarHeader>
 					<div className="flex items-center gap-2 px-1 py-1.5">
@@ -183,6 +191,17 @@ export function AppShell({ navGroups, mobileNav, scope }: AppShellProps) {
 					</div>
 
 					<CommandTrigger className="hidden h-8 items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted md:inline-flex md:w-56" />
+					{/* 移动端没有 ⌘K：给一个图标入口，别让命令面板在手机上不可达。 */}
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className="md:hidden"
+						aria-label={t("shell.command.openPalette")}
+						title={t("shell.command.openPalette")}
+						onClick={() => setPaletteOpen(true)}
+					>
+						<Search className="size-4" aria-hidden="true" />
+					</Button>
 
 					{/* 单键切换亮/暗（theme.md §2.4 ThemeToggle）：一次点击即生效，不藏在菜单里。 */}
 					<Button
@@ -263,7 +282,7 @@ export function AppShell({ navGroups, mobileNav, scope }: AppShellProps) {
 					</DropdownMenu>
 				</header>
 
-				<main className="min-w-0 flex-1 pb-16 md:pb-0">
+				<main id="main-content" tabIndex={-1} className="min-w-0 flex-1 pb-16 md:pb-0 outline-none">
 					<Outlet />
 				</main>
 			</SidebarInset>

@@ -5,9 +5,22 @@ import { cn } from "~/lib/utils"
 import i18n from "~/lib/i18n"
 import { XIcon } from "lucide-react"
 import { Dialog as SheetPrimitive } from "radix-ui"
+import { restoreFocusAfterLayer } from "~/lib/focus"
 
-function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+function Sheet({ open, ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
+  // 受控 Sheet 关闭后还原焦点（Radix 在触发元素被重渲染时会落到 body）。
+  const wasOpen = React.useRef(false)
+  React.useEffect(() => {
+    if (open) {
+      wasOpen.current = true
+      return
+    }
+    if (wasOpen.current) {
+      wasOpen.current = false
+      restoreFocusAfterLayer()
+    }
+  }, [open])
+  return <SheetPrimitive.Root data-slot="sheet" open={open} {...props} />
 }
 
 function SheetTrigger({
@@ -54,6 +67,7 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  // Radix 的焦点还原在「触发按钮被重渲染 / 条件挂载」时会落到 body：卸载时统一还原。
   return (
     <SheetPortal>
       <SheetOverlay />

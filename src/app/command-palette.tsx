@@ -7,7 +7,7 @@
  *    卸载时自动撤销，不会在别的页面里残留；调用方负责把文案本地化后再注册。
  */
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router";
 import { Search } from "lucide-react";
@@ -27,6 +27,14 @@ import { useIsAdminAuthenticated } from "~/auth/store";
 import { adminNav, flatNav, playerNav } from "./nav";
 
 const RECENT_KEY = "shadcn.recent-pages";
+
+/** 顶栏触发器与面板提示必须一致：Mac 用 ⌘K，其余用 Ctrl K。 */
+function platformShortcutHint(): string {
+	if (typeof navigator !== "undefined" && !/Mac|iPhone|iPad/.test(navigator.platform)) {
+		return "Ctrl K";
+	}
+	return "⌘K";
+}
 
 export interface AppCommand {
 	id: string;
@@ -124,6 +132,27 @@ export function CommandPalette(): ReactNode {
 
 	// 最近访问：只在命中导航项时记录（子页面归并到所属一级页面）。
 	const allNavItems = useMemo(() => [...flatNav(playerNav), ...flatNav(adminNav)], []);
+	const openedOnce = useRef(false);
+	const previouslyFocused = useRef<HTMLElement | null>(null);
+	useEffect(() => {
+		if (open) {
+			openedOnce.current = true;
+			previouslyFocused.current =
+				document.activeElement instanceof HTMLElement ? document.activeElement : null;
+			return;
+		}
+		if (!openedOnce.current) return;
+		// Radix 关闭时会自己处理一次焦点；延后一拍再覆盖，避免被还原成 body。
+		window.setTimeout(() => {
+			const previous = previouslyFocused.current;
+			if (previous && document.contains(previous)) {
+				previous.focus();
+				return;
+			}
+			document.getElementById("global-search-trigger")?.focus();
+		}, 0);
+	}, [open]);
+
 	const [recent, setRecent] = useState<string[]>(() => {
 		try {
 			const raw = window.localStorage.getItem(RECENT_KEY);
@@ -160,12 +189,7 @@ export function CommandPalette(): ReactNode {
 		[recent, allNavItems, location.pathname],
 	);
 
-	const [shortcutHint, setShortcutHint] = useState("⌘K");
-	useEffect(() => {
-		if (typeof navigator !== "undefined" && !/Mac|iPhone|iPad/.test(navigator.platform)) {
-			setShortcutHint("Ctrl K");
-		}
-	}, []);
+	const shortcutHint = platformShortcutHint();
 
 	return (
 		<CommandDialog
@@ -254,9 +278,11 @@ export function CommandPalette(): ReactNode {
 export function CommandTrigger({ className }: { className?: string }) {
 	const { t } = useTranslation();
 	const { setOpen } = usePaletteStore();
+	const shortcutHint = platformShortcutHint();
 	return (
 		<button
 			type="button"
+			id="global-search-trigger"
 			onClick={() => setOpen(true)}
 			className={className}
 			aria-label={t("shell.command.openPalette")}
@@ -267,7 +293,7 @@ export function CommandTrigger({ className }: { className?: string }) {
 				<span className="hidden sm:inline">{t("shell.command.trigger")}</span>
 			</span>
 			<kbd className="hidden items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] text-muted-foreground sm:inline-flex">
-				⌘K
+				{shortcutHint}
 			</kbd>
 		</button>
 	);

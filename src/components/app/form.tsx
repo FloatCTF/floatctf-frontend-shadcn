@@ -4,9 +4,18 @@
  * 让简单 CRUD 与复杂表单共享同一套版式。使用 react-hook-form 时可直接把 `FormItem` 放进 `Field`。
  */
 
-import { cloneElement, isValidElement, useId, type ReactElement, type ReactNode } from "react";
+import {
+	cloneElement,
+	isValidElement,
+	useEffect,
+	useId,
+	type ReactElement,
+	type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
+
+import { restoreFocusAfterLayer } from "~/lib/focus";
 
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
@@ -112,6 +121,14 @@ export function FormGrid({
 	);
 }
 
+/** 受控 Sheet 关闭/卸载后把焦点还给触发控件（见 ~/lib/focus）。 */
+function useRestoreFocus(open: boolean): void {
+	useEffect(() => {
+		if (!open) return;
+		return () => restoreFocusAfterLayer();
+	}, [open]);
+}
+
 export function FormSheet({
 	open,
 	onOpenChange,
@@ -130,6 +147,7 @@ export function FormSheet({
 	/** md = 更窄（默认 28rem+）；lg / xl 用于字段较多的表单。 */
 	width?: "md" | "lg" | "xl";
 }) {
+	useRestoreFocus(open);
 	const widthClass =
 		width === "xl"
 			? "sm:max-w-3xl"
