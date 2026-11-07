@@ -60,6 +60,7 @@ import {
 	AWD_RESET_CONSEQUENCE_KEYS,
 	awdCredentialsUnavailable,
 	awdFlagGate,
+	awdHealthLabel,
 	awdPhaseKey,
 	awdPhaseTone,
 	awdResetGate,
@@ -357,7 +358,7 @@ export function AwdGameboxPanel({
 									sortValue: (row) => row.health_status,
 									cell: (row) => (
 										<span className="text-sm text-muted-foreground">
-											{row.health_status || "—"}
+											{awdHealthLabel(row.health_status, t)}
 										</span>
 									),
 								},
@@ -394,7 +395,7 @@ export function AwdGameboxPanel({
 									<div className="flex flex-wrap items-center justify-between gap-2">
 										<span className="text-xs text-muted-foreground">
 											{t("awd.gamebox.healthValue", {
-												health: row.health_status || "—",
+												health: awdHealthLabel(row.health_status, t),
 											})}
 										</span>
 										<Button

@@ -75,6 +75,8 @@ export default {
 			round: "Current round",
 			roundHintUnknown: "Total rounds not configured",
 			roundHint: "{{rounds}} rounds total",
+			statusHint: "Streamed from the backend",
+			phaseHint: "Advanced by the backend tick",
 		},
 		fields: {
 			status: "Event status",
@@ -179,6 +181,13 @@ export default {
 	},
 
 	gamebox: {
+		healthValues: {
+			healthy: "healthy",
+			unhealthy: "unhealthy",
+			degraded: "degraded",
+			unknown: "unknown",
+			starting: "starting",
+		},
 		title: "My GameBoxes",
 		description: "Only your team's instances in this event are shown; access their IPs through WireGuard / the intranet.",
 		loadError: "Failed to load GameBoxes",

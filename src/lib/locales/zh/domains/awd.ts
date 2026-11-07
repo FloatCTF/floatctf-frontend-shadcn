@@ -72,6 +72,8 @@ export default {
 			round: "当前轮次",
 			roundHintUnknown: "总轮次未配置",
 			roundHint: "共 {{rounds}} 轮",
+			statusHint: "由后端实时下发",
+			phaseHint: "由后端按时间推进",
 		},
 		fields: {
 			status: "赛事状态",
@@ -173,6 +175,13 @@ export default {
 	},
 
 	gamebox: {
+		healthValues: {
+			healthy: "健康",
+			unhealthy: "异常",
+			degraded: "降级",
+			unknown: "未知",
+			starting: "启动中",
+		},
 		title: "我的 GameBox",
 		description: "只显示你所在队伍在本赛事中的实例；IP 通过 WireGuard / 内网访问。",
 		loadError: "加载 GameBox 失败",

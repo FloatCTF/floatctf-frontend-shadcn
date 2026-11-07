@@ -25,7 +25,6 @@ import { qk } from "~/api/keys";
 import { BooleanPill, RealtimePill, TonePill } from "~/components/app/badges";
 import {
 	KeyValueList,
-	MonoText,
 	PageBody,
 	PageHeader,
 	SectionCard,
@@ -236,7 +235,7 @@ export function ArenaPage(): ReactNode {
 					) : null}
 
 					{/* 总览指标放顶部一行：窄侧栏里塞表格会横向溢出，也浪费左列高度。 */}
-					<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+					<div className="grid grid-cols-1 gap-4 min-[380px]:grid-cols-2 xl:grid-cols-4">
 						<StatCard
 							label={t("awd.arena.stats.score")}
 							value={formatPoints(status.score)}
@@ -262,13 +261,13 @@ export function ArenaPage(): ReactNode {
 						<StatCard
 							label={t("awd.arena.fields.status")}
 							value={t(awdStatusKey(status.status))}
-							hint={<MonoText className="text-muted-foreground">{status.status}</MonoText>}
+							hint={t("awd.arena.stats.statusHint")}
 							icon={<Activity className="size-4" aria-hidden="true" />}
 						/>
 						<StatCard
 							label={t("awd.arena.fields.phase")}
 							value={t(awdPhaseKey(status.phase))}
-							hint={<MonoText className="text-muted-foreground">{status.phase}</MonoText>}
+							hint={t("awd.arena.stats.phaseHint")}
 							icon={<Swords className="size-4" aria-hidden="true" />}
 						/>
 					</div>
@@ -291,25 +290,11 @@ export function ArenaPage(): ReactNode {
 										items={[
 											{
 												key: t("awd.arena.fields.status"),
-												value: (
-													<span className="flex flex-wrap items-center gap-2">
-														<span>{t(awdStatusKey(status.status))}</span>
-														<MonoText className="text-muted-foreground">
-															{status.status}
-														</MonoText>
-													</span>
-												),
+												value: t(awdStatusKey(status.status)),
 											},
 											{
 												key: t("awd.arena.fields.phase"),
-												value: (
-													<span className="flex flex-wrap items-center gap-2">
-														<span>{t(awdPhaseKey(status.phase))}</span>
-														<MonoText className="text-muted-foreground">
-															{status.phase}
-														</MonoText>
-													</span>
-												),
+												value: t(awdPhaseKey(status.phase)),
 											},
 											{
 												key: t("awd.arena.fields.teamStatus"),

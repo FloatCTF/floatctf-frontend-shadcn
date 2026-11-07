@@ -130,6 +130,26 @@ export function awdPhaseKey(phase: string | null | undefined): string {
 	return PHASE_KEYS[phase as AwdPhase] ?? "awd.state.unknown";
 }
 
+/** GameBox 健康状态的展示文案：后端只约定字符串，未知值原样显示而不是硬编码英文枚举。 */
+const HEALTH_KEYS: Record<string, string> = {
+	healthy: "awd.gamebox.healthValues.healthy",
+	unhealthy: "awd.gamebox.healthValues.unhealthy",
+	degraded: "awd.gamebox.healthValues.degraded",
+	unknown: "awd.gamebox.healthValues.unknown",
+	starting: "awd.gamebox.healthValues.starting",
+};
+
+export function awdHealthLabel(
+	value: string | null | undefined,
+	t: (key: string) => string,
+): string {
+	if (!value) return "—";
+	const key = HEALTH_KEYS[value];
+	if (!key) return value;
+	const translated = t(key);
+	return translated === key ? value : translated;
+}
+
 export function awdPhaseTone(phase: string | null | undefined): PillTone {
 	if (!phase) return "muted";
 	return PHASE_TONES[phase as AwdPhase] ?? "neutral";
