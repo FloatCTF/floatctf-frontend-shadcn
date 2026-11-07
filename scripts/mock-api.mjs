@@ -1046,6 +1046,68 @@ const routes = [
 	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/source$/, (_m, res) =>
 		ok(res, "// mock：源码包只对已参赛选手开放，这里仅返回占位说明。\n")],
 
+	// AWDP 训练场（目录 / Practice Run / 阶段动作 / 实例 / 评测 / 积分 / Writeup）
+	["GET", /^\/api\/service\/gameboxes$/, (_m, res, req) => ok(res, trainingCatalog, req)],
+	["POST", /^\/api\/service\/gameboxes\/([^/]+)\/awdp\/runs$/, (_m, res) => ok(res, trainingRun("pending"))],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)$/, (m, res) => ok(res, trainingRun(mockRunPhase, m[1]))],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/start$/, (m, res) => {
+		mockRunPhase = "break";
+		return ok(res, trainingRun(mockRunPhase, m[1]));
+	}],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/stop$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/reset$/, (m, res) => {
+		mockRunPhase = "break";
+		return ok(res, trainingRun(mockRunPhase, m[1]));
+	}],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/end$/, (m, res) => {
+		mockRunPhase = "ended";
+		return ok(res, trainingRun(mockRunPhase, m[1]));
+	}],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/restart-training$/, (_m, res) => ok(res, trainingRun("pending", "run-2"))],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/phase$/, (m, res) => {
+		// 前端只会切到「另一个阶段」；mock 用反转模拟（不解析 body）。
+		mockRunPhase = mockRunPhase === "fix" ? "break" : "fix";
+		return ok(res, trainingRun(mockRunPhase, m[1]));
+	}],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/rounds$/, (_m, res) => ok(res, runRounds)],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/evaluations$/, (_m, res) => ok(res, runEvaluations)],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/scores$/, (_m, res) => ok(res, runScores)],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res) =>
+		ok(res, { run_id: m[1], content: "", updated_at: null })],
+	["PUT", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res) =>
+		ok(res, { run_id: m[1], content: "## 训练复盘\n\n（mock）", updated_at: iso(now) })],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, runInstance)],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/start$/, (_m, res) => ok(res, runInstance)],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => ok(res, runInstance)],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/break$/, (_m, res) =>
+		ok(res, { accepted: true, scored: true, already_broken: false })],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/patch$/, (_m, res) =>
+		ok(res, { status: "applied", error_message: null })],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/test-check$/, (_m, res) =>
+		ok(res, {
+			evaluation_id: "ev-run-manual",
+			status: "completed",
+			healthcheck_ok: true,
+			healthcheck_detail: ["mock: 服务可用"],
+			judge_ok: true,
+			judge_detail: "mock: judge 通过",
+			exploit_ok: true,
+			exploit_detail: "mock: exploit 被阻断",
+		})],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/all-check$/, (_m, res) =>
+		ok(res, {
+			status: "patched",
+			swept: false,
+			swept_rounds: 0,
+			healthcheck_ok: true,
+			judge_ok: true,
+			exploit_ok: true,
+			detail: "mock: ALL Check 通过",
+		})],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/source$/, (_m, res) =>
+		ok(res, "https://files.example.edu/mock/web-shop-src.tar.gz")],
+
 	// 认证 / 账号
 	["POST", /^\/api\/session$/, (_m, res) => ok(res, "mock-token-0001")],
 	["POST", /^\/api\/users$/, (_m, res) => ok(res, "mock-token-0001")],
@@ -1150,6 +1212,19 @@ const routes = [
 		})))],
 	["POST", /^\/api\/events\/([^/]+)\/awd\/submissions$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)\/reset$/, (_m, res) => ok(res, null)],
+	["GET", /^\/api\/events\/([^/]+)\/awd\/wireguard\/config$/, (_m, res) => ok(res, { config: wireguardConfig })],
+	["GET", /^\/api\/events\/([^/]+)\/awd\/ssh-config$/, (_m, res) =>
+		ok(res, {
+			port: 2222,
+			password: "mock-ssh-password",
+			instances: awdGameboxes.map((box) => ({
+				id: box.id,
+				gamebox_ip: box.gamebox_ip,
+				username: "root",
+				container_name: box.container_name,
+				health_status: box.health_status,
+			})),
+		})],
 
 	// 平台网络（AWD 地址池 + 宿主观测 + 分配账本）
 	["GET", /^\/api\/admin\/awd\/network$/, (_m, res) =>
