@@ -53,7 +53,7 @@ import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { formatBytes, formatDateTime, formatDuration, formatInt, formatScore } from "~/lib/format";
+import { formatBytes, formatDateTime, formatDuration, formatInt, formatPoints } from "~/lib/format";
 import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
 
 import {
@@ -76,8 +76,10 @@ import {
 	runSetPhaseBreakConsequences,
 	runSetPhaseFixConsequences,
 	runStopConsequences,
+	resetRunGate,
 	setPhaseGate,
 	startRunGate,
+	stopRunGate,
 } from "./domain";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -205,6 +207,8 @@ export function TrainingCatalogPage(): ReactNode {
 								setPageSize(size);
 								setPage(1);
 							}}
+							// 默认每页 12 条（卡片目录三列布局），选项必须包含当前值，否则下拉显示空白。
+							pageSizeOptions={[12, 24, 48]}
 						/>
 					) : null
 				}
@@ -299,16 +303,29 @@ export function TrainingCatalogPage(): ReactNode {
 												</TonePill>
 											) : null}
 											{row.active_training ? (
-												<TonePill tone="info" className="tnum">
-													{t("training.catalog.state.active", {
-														phase: runPhaseLabel(
-															row.active_training.phase,
-															t,
-														),
-														score: formatScore(
-															row.active_training.score,
-														),
-													})}
+												<TonePill
+													tone={
+														row.active_training.phase === "ended"
+															? "muted"
+															: "info"
+													}
+													className="tnum"
+												>
+													{row.active_training.phase === "ended"
+														? t("training.catalog.state.ended", {
+																score: formatPoints(
+																	row.active_training.score,
+																),
+															})
+														: t("training.catalog.state.active", {
+																phase: runPhaseLabel(
+																	row.active_training.phase,
+																	t,
+																),
+																score: formatPoints(
+																	row.active_training.score,
+																),
+															})}
 												</TonePill>
 											) : null}
 											{!row.solved && !row.active_training ? (
@@ -634,9 +651,12 @@ export function TrainingRunPage(): ReactNode {
 				)
 			) : run ? (
 				(() => {
-					const startGate = startRunGate(run.phase, t);
+					const instanceRunning = instance?.runtime_state === "running";
+					const startGate = startRunGate(run.phase, t, instanceRunning);
 					const endGate = endRunGate(run.phase, t);
 					const restartGate = restartTrainingGate(run.phase, t);
+					const stopGate = stopRunGate(run.phase, instanceRunning, t);
+					const resetGate = resetRunGate(run.phase, t);
 					const toFixGate = setPhaseGate(run.phase, "fix", t);
 					const toBreakGate = setPhaseGate(run.phase, "break", t);
 					const lifecycleBusy =
@@ -675,7 +695,7 @@ export function TrainingRunPage(): ReactNode {
 								<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 									<StatCard
 										label={t("training.run.stats.myScore")}
-										value={formatScore(run.my_score)}
+										value={formatPoints(run.my_score)}
 										hint={t("training.run.stats.myScoreHint")}
 										icon={<Trophy className="size-4" aria-hidden="true" />}
 										tone="success"
@@ -687,7 +707,7 @@ export function TrainingRunPage(): ReactNode {
 									/>
 									<StatCard
 										label={t("training.run.stats.penalty")}
-										value={formatScore(run.fix_round_penalty)}
+										value={formatPoints(run.fix_round_penalty)}
 										hint={t("training.run.stats.penaltyHint")}
 									/>
 									<StatCard
@@ -707,7 +727,7 @@ export function TrainingRunPage(): ReactNode {
 											key: t("training.run.fields.breakScore"),
 											value: (
 												<span className="tnum">
-													{formatScore(run.break_score)}
+													{formatPoints(run.break_score)}
 												</span>
 											),
 										},
@@ -715,7 +735,7 @@ export function TrainingRunPage(): ReactNode {
 											key: t("training.run.fields.fixRoundScore"),
 											value: (
 												<span className="tnum">
-													{formatScore(run.fix_round_score)}
+													{formatPoints(run.fix_round_score)}
 												</span>
 											),
 										},
@@ -775,6 +795,7 @@ export function TrainingRunPage(): ReactNode {
 								/>
 
 								<div className="mt-4 flex flex-wrap items-center gap-2">
+									{run.phase !== "pending" ? null : (
 									<Button
 										size="sm"
 										disabled={!startGate.allowed || lifecycleBusy}
@@ -792,11 +813,12 @@ export function TrainingRunPage(): ReactNode {
 										)}
 										{t("training.run.lifecycle.start")}
 									</Button>
+									)}
 									<Button
 										variant="outline"
 										size="sm"
-										disabled={lifecycleBusy}
-										title={t("training.run.lifecycle.stopTitle")}
+										disabled={!stopGate.allowed || lifecycleBusy}
+										title={stopGate.allowed ? t("training.run.lifecycle.stopTitle") : stopGate.reason}
 										onClick={async () => {
 											const ok = await confirm({
 												title: t("training.confirm.stopRun.title"),
@@ -822,8 +844,8 @@ export function TrainingRunPage(): ReactNode {
 									<Button
 										variant="outline"
 										size="sm"
-										disabled={lifecycleBusy}
-										title={t("training.run.lifecycle.resetTitle")}
+										disabled={!resetGate.allowed || lifecycleBusy}
+										title={resetGate.allowed ? t("training.run.lifecycle.resetTitle") : resetGate.reason}
 										onClick={async () => {
 											const ok = await confirm({
 												title: t("training.confirm.resetRun.title"),
@@ -1021,7 +1043,8 @@ export function TrainingRunPage(): ReactNode {
 								</div>
 							</SectionCard>
 
-							<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.2fr)]">
+							{/* 1280 下三列会把评测表压到 320px：宽屏才三列。 */}
+							<div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.2fr)]">
 								<TrainingInstancePanel
 									gameboxName={run.gamebox_name}
 									broken={runInstance?.broken ?? false}
@@ -1078,7 +1101,9 @@ export function TrainingRunPage(): ReactNode {
 									onChanged={refreshAll}
 								/>
 
-								<RunRoundsEvaluationsPanel runId={runId} />
+								<div className="lg:col-span-2 2xl:col-span-1">
+									<RunRoundsEvaluationsPanel runId={runId} />
+								</div>
 							</div>
 
 							<SectionCard

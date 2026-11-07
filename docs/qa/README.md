@@ -32,6 +32,8 @@
 | `check-task-confirm.png` | 高危操作确认（后果清单 + 输入确认词） |
 | `player-awd-arena.png` | AWD 驾驶舱（4 指标 + flag/靶机/积分/凭据） |
 | `player-awdp-lab.png` | AWDP 工作台（阶段 / Break·Fix / 评测 / 矩阵） |
+| `player-training.png` | 训练场目录（推荐资源 / 训练状态 / 每页 12 条） |
+| `player-training-run.png` | 训练 run 工作台（阶段、生命周期、实例、评测、积分/Writeup） |
 | `player-rank.png` | 排行榜 |
 | `player-solves.png` | 解题流水 |
 | `player-discussions.png` | 讨论区 |

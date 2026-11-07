@@ -38,6 +38,7 @@ export default {
 		noDescription: "No description",
 		state: {
 			trained: "Trained",
+			ended: "Ended · {{score}}",
 			active: "In progress · {{phase}} · {{score}}",
 			activeShort: "In progress · {{phase}}",
 			notStarted: "Not started",
@@ -103,7 +104,8 @@ export default {
 		},
 		lifecycle: {
 			start: "Start training",
-			stop: "Stop instances",
+			startInstance: "Start instance",
+			stop: "Stop training",
 			reset: "Reset run",
 			end: "End training",
 			restart: "Train again",
@@ -176,6 +178,7 @@ export default {
 		serviceDown: "Service unavailable (+0)",
 		functionalBroken: "Functionality broken (+0)",
 		vulnerable: "Still exploitable (+0)",
+		patchedManual: "Patched (self-check, not scored)",
 		patched: "Patched (scored)",
 		platformError: "Platform error",
 		kind: {
@@ -189,6 +192,10 @@ export default {
 		notStarted: "Not started",
 	},
 	gates: {
+		stopEnded: "The run has ended: there is nothing to stop.",
+		stopIdle: "No instance is running; use Start instance to continue.",
+		resetEnded: "The run has ended: use Train again to start over.",
+		startRunning: "The instance is already running; use Reset instance to start over.",
 		startEnded: "The run has ended: use “Train again” to create a new run.",
 		end: "Only runs in the Break or Fix phase can be ended (current: {{phase}}).",
 		restart:

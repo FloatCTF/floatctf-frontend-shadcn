@@ -38,6 +38,7 @@ export default {
 		state: {
 			trained: "已训练",
 			active: "进行中 · {{phase}} · {{score}}",
+			ended: "已结束 · {{score}}",
 			activeShort: "进行中 · {{phase}}",
 			notStarted: "未开始",
 		},
@@ -100,7 +101,8 @@ export default {
 		},
 		lifecycle: {
 			start: "开始训练",
-			stop: "停止实例",
+			startInstance: "启动实例",
+			stop: "停止训练",
 			reset: "重置 run",
 			end: "结束训练",
 			restart: "再次训练",
@@ -173,6 +175,7 @@ export default {
 		functionalBroken: "功能被破坏（+0）",
 		vulnerable: "漏洞仍可利用（+0）",
 		patched: "已修复（计分）",
+		patchedManual: "已修复（自检不计分）",
 		platformError: "平台错误",
 		kind: {
 			official: "官方",
@@ -185,6 +188,10 @@ export default {
 		notStarted: "未启动",
 	},
 	gates: {
+		stopEnded: "run 已结束：没有可停止的实例。",
+		stopIdle: "当前没有运行中的实例；如需继续请用「启动实例」。",
+		resetEnded: "run 已结束：如需重来请用「再次训练」。",
+		startRunning: "实例已在运行；需要重来请用「重置实例」。",
 		startEnded: "run 已结束：请使用「再次训练」新建 run。",
 		end: "只有 Break / Fix 阶段的 run 可以结束（当前：{{phase}}）。",
 		restart: "只有已结束的 run 可以再次训练（当前：{{phase}}）；如需重来请先结束训练。",

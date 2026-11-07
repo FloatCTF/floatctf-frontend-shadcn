@@ -91,8 +91,13 @@ const EVAL_STATUS_TONE: Record<string, PillTone> = {
 export function runEvaluationLabel(
 	status: string | null | undefined,
 	t: TFunction,
+	kind?: "manual" | "official",
 ): string {
 	if (!status) return "—";
+	// 自检（manual）不计分：同一个 patched 不能对两种情况都说「（计分）」。
+	if (status === "patched" && kind === "manual") {
+		return t("training.evaluation.patchedManual");
+	}
 	const key = EVAL_STATUS_LABEL_KEY[status];
 	return key ? t(key) : status;
 }
@@ -133,9 +138,18 @@ export function isRunInstanceRunning(instance: AwdpInstance | null | undefined):
 }
 
 /** 「开始训练（Launch）」：pending / break / fix 可启动或继续；ended 终态拒绝。 */
-export function startRunGate(phase: AwdpPhase, t: TFunction): TrainingGate {
+export function startRunGate(
+	phase: AwdpPhase,
+	t: TFunction,
+	instanceRunning = false,
+): TrainingGate {
 	if (phase === "ended") {
 		return { allowed: false, reason: t("training.gates.startEnded") };
+	}
+	// Break/Fix 阶段「开始」等价于「启动实例」：实例已在跑就没有可做的事，
+	// 否则会出现「实例运行中却还能点开始训练」的错觉。
+	if (phase !== "pending" && instanceRunning) {
+		return { allowed: false, reason: t("training.gates.startRunning") };
 	}
 	return ALLOWED;
 }
@@ -147,6 +161,29 @@ export function endRunGate(phase: AwdpPhase, t: TFunction): TrainingGate {
 		allowed: false,
 		reason: t("training.gates.end", { phase: runPhaseLabel(phase, t) }),
 	};
+}
+
+/** 「停止训练」：只在还有实例在跑时有意义；已结束的 run 不再提供。 */
+export function stopRunGate(
+	phase: AwdpPhase,
+	instanceRunning: boolean,
+	t: TFunction,
+): TrainingGate {
+	if (phase === "ended") {
+		return { allowed: false, reason: t("training.gates.stopEnded") };
+	}
+	if (!instanceRunning) {
+		return { allowed: false, reason: t("training.gates.stopIdle") };
+	}
+	return ALLOWED;
+}
+
+/** 「重置 run」：会销毁实例并回卷，已结束的 run 不允许。 */
+export function resetRunGate(phase: AwdpPhase, t: TFunction): TrainingGate {
+	if (phase === "ended") {
+		return { allowed: false, reason: t("training.gates.resetEnded") };
+	}
+	return ALLOWED;
 }
 
 /** 「再次训练」：仅 ended run（后端新建一个从 0 计分的 run）。 */

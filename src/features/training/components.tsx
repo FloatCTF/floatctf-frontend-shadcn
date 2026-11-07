@@ -54,7 +54,7 @@ import { EmptyBlock, ErrorBlock, TableSkeleton } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { formatDateTime, formatDuration, formatInt, formatScore } from "~/lib/format";
+import { formatDateTime, formatDuration, formatInt, formatPoints } from "~/lib/format";
 import { useNow } from "~/lib/hooks";
 
 import {
@@ -1007,7 +1007,7 @@ export function RunRoundsEvaluationsPanel({ runId }: { runId: string }): ReactNo
 								sortValue: (row) => row.status,
 								cell: (row) => (
 									<TonePill tone={runEvaluationTone(row.status)}>
-										{runEvaluationLabel(row.status, t)}
+										{runEvaluationLabel(row.status, t, row.kind)}
 									</TonePill>
 								),
 							},
@@ -1064,7 +1064,7 @@ export function RunScoresPanel({ runId }: { runId: string }): ReactNode {
 		<div className="space-y-3">
 			<div className="flex items-center gap-2">
 				<span className="text-xs text-muted-foreground">{t("training.scores.total")}</span>
-				<MonoText className="text-base font-semibold">{formatScore(data.total)}</MonoText>
+				<MonoText className="text-base font-semibold">{formatPoints(data.total)}</MonoText>
 			</div>
 			<DataTable
 				data={data.history}
@@ -1087,7 +1087,7 @@ export function RunScoresPanel({ runId }: { runId: string }): ReactNode {
 						sortValue: (row) => row.delta,
 						cell: (row) => (
 							<MonoText className={row.delta < 0 ? "text-destructive" : undefined}>
-								{row.delta > 0 ? `+${formatScore(row.delta)}` : formatScore(row.delta)}
+								{row.delta > 0 ? `+${formatPoints(row.delta)}` : formatPoints(row.delta)}
 							</MonoText>
 						),
 					},

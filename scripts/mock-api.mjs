@@ -491,6 +491,107 @@ const ok = (res, data, req) => {
 	json(res, 200, { code: 0, message: "OK", data, meta: Array.isArray(data) ? meta : null });
 };
 
+// ── AWDP 训练场（目录 + Practice Run）──────────────────────────────────
+const trainingCatalog = [
+	{
+		id: "gb-lib-1",
+		name: "web-shop",
+		description: "练习用 Web 靶机：修复 SESSION 伪造漏洞。",
+		category: "Web",
+		version: "1.2.0",
+		author: "组委会",
+		updated_at: iso(now - 10 * D),
+		awdp_capable: true,
+		recommended_cpu_millis: 500,
+		recommended_memory_bytes: 268435456,
+		recommended_pids_limit: 128,
+		active_training: null,
+		solved: false,
+	},
+	{
+		id: "gb-lib-2",
+		name: "pwn-note",
+		description: "练习用 Pwn 靶机：堆溢出到任意写。",
+		category: "Pwn",
+		version: "0.9.3",
+		author: "组委会",
+		updated_at: iso(now - 20 * D),
+		awdp_capable: true,
+		recommended_cpu_millis: 500,
+		recommended_memory_bytes: 536870912,
+		recommended_pids_limit: 64,
+		active_training: { run_id: "run-done", phase: "ended", score: 140 },
+		solved: true,
+	},
+];
+const runInstance = {
+	instance_id: "run-inst-1",
+	gamebox_id: "gb-lib-1",
+	runtime_state: process.env.MOCK_RUN_STATE ?? "running",
+	runtime_generation: 1,
+	reset_count: 0,
+	endpoints: [
+		{ protocol: "http", container_port: 8080, public_host: "10.42.30.11", public_port: 18080 },
+	],
+};
+let mockRunPhase = "break";
+const trainingRun = (phase = mockRunPhase, runId = "run-1") => ({
+	run_id: runId,
+	gamebox_id: "gb-lib-1",
+	gamebox_name: "web-shop",
+	gamebox_category: "Web",
+	gamebox_description: "练习用 Web 靶机：修复 SESSION 伪造漏洞。",
+	event_id: null,
+	phase,
+	break_duration_secs: 1800,
+	fix_duration_secs: 1200,
+	fix_round_interval_secs: 300,
+	break_score: 100,
+	fix_round_score: 50,
+	total_rounds: 2,
+	started_at: iso(now - 5 * 60000),
+	break_ends_at: iso(now + 25 * 60000),
+	fix_started_at: phase === "fix" ? iso(now - 60000) : null,
+	fix_ends_at: phase === "fix" ? iso(now + 19 * 60000) : null,
+	finished_at: null,
+	current_round: phase === "fix" ? 1 : 0,
+	next_action_at: iso(now + 25 * 60000),
+	my_score: 100,
+	fix_round_penalty: 10,
+	source_code_dir: "src/web-shop",
+	instances: [runInstance],
+	judge_endpoint: {
+		base_url: "http://10.42.30.2:8080",
+		flag_url: "http://10.42.30.2:8080/flag",
+		scope: "gamebox_internal",
+	},
+});
+const runRounds = [
+	{ id: "rrun-1", sequence: 1, starts_at: iso(now - 3 * 60000), cutoff_at: iso(now + 2 * 60000), status: "pending" },
+	{ id: "rrun-2", sequence: 2, starts_at: iso(now + 5 * 60000), cutoff_at: iso(now + 10 * 60000), status: "pending" },
+];
+const runEvaluations = [
+	{
+		id: "ev-run-1",
+		instance_id: "run-inst-1",
+		gamebox_id: "gb-lib-1",
+		fix_round_id: null,
+		round_sequence: null,
+		kind: "manual",
+		status: "patched",
+		healthcheck_result: "ok",
+		judge_result: "ok",
+		exploit_result: "blocked",
+		finished_at: iso(now - 2 * 60000),
+	},
+];
+const runScores = {
+	total: 100,
+	history: [
+		{ id: "se-1", score_type: "break", gamebox_id: "gb-lib-1", fix_round_id: null, delta: 100, created_at: iso(now - 4 * 60000) },
+	],
+};
+
 // ── AWD 选手端 ──────────────────────────────────────────────────────────
 const awdStatus = (eventId) => ({
 	event_id: eventId,
@@ -610,6 +711,69 @@ const awdpScores = [
 ];
 
 const routes = [
+
+
+	// AWDP 训练场（目录 / Practice Run / 阶段动作 / 实例 / 评测 / 积分 / Writeup）
+	["GET", /^\/api\/service\/gameboxes$/, (_m, res, req) => ok(res, trainingCatalog, req)],
+	["POST", /^\/api\/service\/gameboxes\/([^/]+)\/awdp\/runs$/, (_m, res) => ok(res, trainingRun("pending"))],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)$/, (m, res) => ok(res, trainingRun(mockRunPhase, m[1]))],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/start$/, (m, res) => {
+		mockRunPhase = "break";
+		return ok(res, trainingRun(mockRunPhase, m[1]));
+	}],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/stop$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/reset$/, (m, res) => {
+		mockRunPhase = "break";
+		return ok(res, trainingRun(mockRunPhase, m[1]));
+	}],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/end$/, (m, res) => {
+		mockRunPhase = "ended";
+		return ok(res, trainingRun(mockRunPhase, m[1]));
+	}],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/restart-training$/, (_m, res) => ok(res, trainingRun("pending", "run-2"))],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/phase$/, (m, res) => {
+		// 前端只会切到「另一个阶段」；mock 用反转模拟（不解析 body）。
+		mockRunPhase = mockRunPhase === "fix" ? "break" : "fix";
+		return ok(res, trainingRun(mockRunPhase, m[1]));
+	}],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/rounds$/, (_m, res) => ok(res, runRounds)],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/evaluations$/, (_m, res) => ok(res, runEvaluations)],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/scores$/, (_m, res) => ok(res, runScores)],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res) =>
+		ok(res, { run_id: m[1], content: "", updated_at: null })],
+	["PUT", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res) =>
+		ok(res, { run_id: m[1], content: "## 训练复盘\n\n（mock）", updated_at: iso(now) })],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, runInstance)],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/start$/, (_m, res) => ok(res, runInstance)],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => ok(res, runInstance)],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/break$/, (_m, res) =>
+		ok(res, { accepted: true, scored: true, already_broken: false })],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/patch$/, (_m, res) =>
+		ok(res, { status: "applied", error_message: null })],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/test-check$/, (_m, res) =>
+		ok(res, {
+			evaluation_id: "ev-run-manual",
+			status: "completed",
+			healthcheck_ok: true,
+			healthcheck_detail: ["mock: 服务可用"],
+			judge_ok: true,
+			judge_detail: "mock: judge 通过",
+			exploit_ok: true,
+			exploit_detail: "mock: exploit 被阻断",
+		})],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/all-check$/, (_m, res) =>
+		ok(res, {
+			status: "patched",
+			swept: false,
+			swept_rounds: 0,
+			healthcheck_ok: true,
+			judge_ok: true,
+			exploit_ok: true,
+			detail: "mock: ALL Check 通过",
+		})],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/source$/, (_m, res) =>
+		ok(res, "https://files.example.edu/mock/web-shop-src.tar.gz")],
 
 	// AWD 选手端（mock：赛事状态 / 靶机 / 积分 / 下发凭据）
 	["GET", /^\/api\/events\/([^/]+)\/awd\/status$/, (m, res) => ok(res, awdStatus(m[1]))],
