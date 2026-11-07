@@ -19,6 +19,7 @@ export default {
 		adminLogin: "Admin sign-in",
 	},
 	fields: {
+		required: "Required",
 		username: "Account",
 		nickname: "Nickname",
 		email: "Email",

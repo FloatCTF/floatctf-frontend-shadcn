@@ -154,8 +154,8 @@ export default {
 		tabs: {
 			overview: "总览",
 			challenges: "题目",
-			arena: "AWD",
-			lab: "AWDP",
+			arena: "AWD 概览",
+			lab: "AWDP 概览",
 			scoreboard: "积分榜",
 			trend: "趋势",
 			instances: "实例",

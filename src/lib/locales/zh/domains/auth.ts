@@ -19,6 +19,7 @@ export default {
 		adminLogin: "管理端登录",
 	},
 	fields: {
+		required: "必填",
 		username: "账号",
 		nickname: "昵称",
 		email: "邮箱",

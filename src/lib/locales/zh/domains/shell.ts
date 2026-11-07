@@ -32,6 +32,8 @@ export default {
 		hint: "如果反复出现，请刷新页面；已登录状态不会丢失。",
 	},
 	toggleNav: "切换导航",
+	navigation: "导航",
+	mobileNavDescription: "全部页面入口；选中后自动收起。",
 	commandPlaceholder: "搜索页面、题目、账号…",
 	commandEmpty: "没有匹配的命令",
 	commandHint: "命令面板",

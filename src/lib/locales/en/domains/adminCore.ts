@@ -183,6 +183,8 @@ export default {
 			copyLabel: "version",
 		},
 		system: {
+			unavailable: "System monitor unavailable",
+			unavailableHint: "The host helper returns no data while it is not ready; refresh once it recovers.",
 			title: "System monitor",
 			description: "Host CPU / memory / disks / NICs / Docker, refreshed every 60 seconds.",
 			loading: "Reading system information…",

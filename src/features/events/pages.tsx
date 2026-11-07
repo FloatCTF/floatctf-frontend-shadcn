@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronRight, FlaskConical, Search, Swords } from "lucide-react";
+import { CalendarDays, ChevronRight, Search } from "lucide-react";
 
 import { call, callList } from "~/api/call";
 import { useClient } from "~/api/client";
@@ -396,27 +396,11 @@ export function EventWorkspacePage() {
 									</div>
 								}
 								actions={
-									<div className="flex flex-wrap items-center gap-2">
-										{caps.arena && data.joined ? (
-											<Button asChild>
-												<Link to={`/arena/${resolvedEventId}`}>
-													<Swords aria-hidden="true" />
-													{t("events.workspace.linkArena")}
-												</Link>
-											</Button>
-										) : null}
-										{caps.lab && data.joined ? (
-											<Button asChild>
-												<Link to={`/lab/${resolvedEventId}`}>
-													<FlaskConical aria-hidden="true" />
-													{t("events.workspace.linkLab")}
-												</Link>
-											</Button>
-										) : null}
-										<Button variant="outline" asChild>
-											<Link to="/events">{t("events.workspace.backToList")}</Link>
-										</Button>
-									</div>
+									// 进入驾驶舱 / 工作台的入口在对应标签页里（AWD 概览 / AWDP 概览），
+									// 这里不再重复放一个同义按钮。
+									<Button variant="outline" asChild>
+										<Link to="/events">{t("events.workspace.backToList")}</Link>
+									</Button>
 								}
 							/>
 

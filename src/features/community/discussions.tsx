@@ -811,9 +811,10 @@ export function DiscussionDetailPage(): ReactNode {
 						<SectionCard
 							title={t("community.discussions.detail.contentTitle")}
 							description={t("community.discussions.detail.contentStats", {
-								views: data.view_count,
-								likes: data.like_count,
-								comments: data.comment_count,
+								// 缺字段时不要渲染成空白数字（旧版后端 / 部分契约）。
+								views: data.view_count ?? 0,
+								likes: data.like_count ?? 0,
+								comments: data.comment_count ?? 0,
 							})}
 							contentClassName="space-y-3"
 						>

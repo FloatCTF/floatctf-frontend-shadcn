@@ -32,6 +32,8 @@ export default {
 		hint: "If this keeps happening, refresh the page; your session will not be lost.",
 	},
 	toggleNav: "Toggle navigation",
+	navigation: "Navigation",
+	mobileNavDescription: "Every page entry; closes after you pick one.",
 	commandPlaceholder: "Search pages, challenges, accounts…",
 	commandEmpty: "No matching command",
 	commandHint: "Command palette",

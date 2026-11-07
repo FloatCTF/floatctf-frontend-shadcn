@@ -28,7 +28,7 @@ import type {
 	WireGuardConfigResponse,
 } from "@floatctf/sdk";
 
-import { call, callVoid } from "~/api/call";
+import { call, callMaybe, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { TonePill } from "~/components/app/badges";
@@ -569,7 +569,7 @@ function AwdWireGuardPanel({ eventId }: { eventId: string }): ReactNode {
 	const query = useQuery({
 		queryKey: qk.awd.wireguard(eventId),
 		queryFn: () =>
-			call<WireGuardConfigResponse>(
+			callMaybe<WireGuardConfigResponse>(
 				client.awd.player.wireguardConfig(eventId),
 				t("awd.actionNames.wireguard"),
 			),

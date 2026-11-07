@@ -125,11 +125,26 @@ export function unwrap<T>(response: unknown, what?: string): T {
 	return (envelope.data ?? undefined) as T;
 }
 
-/** 取数据：`const event = await call(client.service.events.get(id), "赛事详情")`。 */
+/**
+ * 取数据：`const event = await call(client.service.events.get(id), "赛事详情")`。
+ *
+ * 信封成功但 `data` 为空 → 视为**契约违约**并抛错（而不是把 `undefined` 交给 React Query）：
+ * 页面的 `QueryState` 会渲染可见错误，也不会再出现 `data cannot be undefined` 的静默告警。
+ * 对「空是合法业务态」的接口请显式用 {@link callMaybe}。
+ */
 export function call<T>(request: Promise<UniResponse<T>>, what?: string): Promise<T>;
 export function call<T>(request: Promise<unknown>, what?: string): Promise<T>;
 export async function call<T>(request: Promise<unknown>, what?: string): Promise<T> {
-	return unwrap<T>(await request, what);
+	const value = unwrap<T>(await request, what);
+	if (value === undefined) {
+		throw new FloatCTFError({
+			message: i18n.t("errors.emptyResponse", {
+				what: what ?? i18n.t("errors.requestFailed"),
+			}),
+			kind: "platform",
+		});
+	}
+	return value;
 }
 
 /** 取列表 + 分页 meta：`const { items, meta } = await callList(...)`。 */

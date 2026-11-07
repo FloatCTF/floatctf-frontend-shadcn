@@ -187,8 +187,9 @@ export function AdminAnnouncementsPage(): ReactNode {
 		{
 			id: "created_at",
 			header: t("adminCommunity.announcements.columns.createdAt"),
+			// 1280 下 6 列会挤出 ~20px：创建时间留到超宽屏，更新时间仍在。
+			hideBelow: "2xl",
 			align: "right",
-			hideBelow: "sm",
 			sortValue: (row) => Date.parse(row.created_at),
 			cell: (row) => <AbsoluteTime value={row.created_at} />,
 		},

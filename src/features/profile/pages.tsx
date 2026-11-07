@@ -12,7 +12,7 @@
  *   `onUploadProgress`（不自己拼 multipart，也不另开逃生舱）。
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, RotateCcw, Save, Upload } from "lucide-react";
@@ -57,6 +57,7 @@ export function ProfilePage(): ReactNode {
 	const [confirmPassword, setConfirmPassword] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
 	const [syncedId, setSyncedId] = useState<string | null>(null);
+	const avatarInputRef = useRef<HTMLInputElement>(null);
 	const [avatarFile, setAvatarFile] = useState<File | null>(null);
 	const [previewUrl, setPreviewUrl] = useState("");
 	const [progress, setProgress] = useState(0);
@@ -305,27 +306,30 @@ export function ProfilePage(): ReactNode {
 										</div>
 									</div>
 
-									<label className="inline-flex cursor-pointer">
-										<input
-											id="profile-avatar"
-											type="file"
-											accept="image/png,image/jpeg,image/webp,image/gif"
-											className="hidden"
-											disabled={upload.isPending}
-											onChange={(event) => {
-												const selected = event.target.files?.[0];
-												event.target.value = "";
-												if (!selected) return;
-												setAvatarFile(selected);
-												setPreviewUrl(URL.createObjectURL(selected));
-											}}
-										/>
-										<Button variant="outline" asChild disabled={upload.isPending}>
-											<span>
-												<Upload /> {t("profile.avatar.choose")}
-											</span>
-										</Button>
-									</label>
+									{/* 真按钮 + 隐藏 input：label 包 span 能点但键盘不可达，屏幕阅读器也不认。 */}
+									<input
+										ref={avatarInputRef}
+										id="profile-avatar"
+										type="file"
+										accept="image/png,image/jpeg,image/webp,image/gif"
+										className="sr-only"
+										tabIndex={-1}
+										disabled={upload.isPending}
+										onChange={(event) => {
+											const selected = event.target.files?.[0];
+											event.target.value = "";
+											if (!selected) return;
+											setAvatarFile(selected);
+											setPreviewUrl(URL.createObjectURL(selected));
+										}}
+									/>
+									<Button
+										variant="outline"
+										disabled={upload.isPending}
+										onClick={() => avatarInputRef.current?.click()}
+									>
+										<Upload aria-hidden="true" /> {t("profile.avatar.choose")}
+									</Button>
 
 									{avatarFile ? (
 										<div className="space-y-2">

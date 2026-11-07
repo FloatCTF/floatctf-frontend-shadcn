@@ -9,6 +9,7 @@ export default {
 	forbidden: "No access permission",
 	notFound: "Resource not found",
 	technicalDetails: "Technical details",
+	emptyResponse: "{{what}} returned no data",
 	whatFailed: "Failed: {{what}}",
 	requestFailed: "Request failed",
 	unexpected: "An unexpected error occurred",

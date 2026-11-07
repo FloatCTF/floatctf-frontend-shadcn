@@ -41,7 +41,7 @@ import type {
 	TrendItem,
 } from "@floatctf/sdk";
 import type { EventAnnouncements } from "@floatctf/sdk/entity";
-import { formatDateTime, formatRelative, formatScore } from "~/lib/format";
+import { formatDateTime, formatPoints, formatRelative, formatScore } from "~/lib/format";
 import { getLocale } from "~/lib/i18n";
 import { useNow } from "~/lib/hooks";
 
@@ -708,7 +708,7 @@ export function ArenaSummaryTab({ eventId }: { eventId: string }) {
 							/>
 							<StatCard
 								label={t("events.awd.score")}
-								value={formatScore(status.score)}
+								value={formatPoints(status.score)}
 								tone="success"
 								icon={<Swords className="size-5" aria-hidden="true" />}
 							/>

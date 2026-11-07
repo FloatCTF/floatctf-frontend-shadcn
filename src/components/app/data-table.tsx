@@ -39,7 +39,7 @@ export interface DataTableColumn<T> {
 	className?: string;
 	headerClassName?: string;
 	/** 在窄屏隐藏该列（表格视图）。 */
-	hideBelow?: "sm" | "md" | "lg" | "xl";
+	hideBelow?: "sm" | "md" | "lg" | "xl" | "2xl";
 }
 
 export interface DataTableProps<T> {
@@ -62,6 +62,7 @@ const hideClass: Record<NonNullable<DataTableColumn<unknown>["hideBelow"]>, stri
 	md: "hidden md:table-cell",
 	lg: "hidden lg:table-cell",
 	xl: "hidden xl:table-cell",
+	"2xl": "hidden 2xl:table-cell",
 };
 
 const alignClass = {

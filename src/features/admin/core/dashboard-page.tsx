@@ -32,7 +32,7 @@ import {
 	Users,
 } from "lucide-react";
 
-import { call } from "~/api/call";
+import { call, callMaybe } from "~/api/call";
 import { useAppQueryClient, useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { BooleanPill, TonePill } from "~/components/app/badges";
@@ -125,7 +125,7 @@ type MonitorQuery = {
 	isPending: boolean;
 	isError: boolean;
 	error: unknown;
-	data: SystemInformation | undefined;
+	data: SystemInformation | null | undefined;
 	refetch: () => void;
 };
 
@@ -167,8 +167,9 @@ export function AdminDashboardPage(): ReactNode {
 
 	const monitor = useQuery({
 		queryKey: qk.admin.system(),
+		// 宿主 helper 未就绪时后端可能返回空数据：这是「不可用」而非「加载失败」。
 		queryFn: () =>
-			call<SystemInformation>(
+			callMaybe<SystemInformation>(
 				client.admin.system.monitor(),
 				t("adminCore.actions.systemMonitor"),
 			),
@@ -362,7 +363,7 @@ function AttentionSection({
 	monitor,
 }: {
 	summary: DashboardSummary;
-	monitor: SystemInformation | undefined;
+	monitor: SystemInformation | null | undefined;
 }) {
 	const { t } = useTranslation();
 	const items: Array<{ key: string; tone: "danger" | "warning"; node: ReactNode }> = [];
@@ -637,7 +638,23 @@ function SystemMonitorSection({ monitor }: { monitor: MonitorQuery }) {
 				skeleton={<LoadingBlock label={t("adminCore.dashboard.system.loading")} />}
 				errorTitle={t("adminCore.dashboard.system.error")}
 			>
-				{(data) => (
+				{(data) => {
+					// 宿主 helper 不可用时后端会返回空数据：这里显示「不可用」而不是把页面打崩。
+					if (data === null || data === undefined) {
+						return (
+							<EmptyBlock
+								title={t("adminCore.dashboard.system.unavailable")}
+								description={t("adminCore.dashboard.system.unavailableHint")}
+								action={
+									<Button variant="outline" size="sm" onClick={() => monitor.refetch()}>
+										<RefreshCw className="size-4" aria-hidden="true" />
+										{t("common.retry")}
+									</Button>
+								}
+							/>
+						);
+					}
+					return (
 					<div className="space-y-5">
 						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 							<StatCard
@@ -712,7 +729,8 @@ function SystemMonitorSection({ monitor }: { monitor: MonitorQuery }) {
 						<NetworkSection interfaces={data.network_interfaces} />
 						<DockerImagesSection monitor={data} />
 					</div>
-				)}
+					);
+				}}
 			</QueryState>
 		</SectionCard>
 	);

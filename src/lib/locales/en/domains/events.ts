@@ -157,8 +157,8 @@ export default {
 		tabs: {
 			overview: "Overview",
 			challenges: "Challenges",
-			arena: "AWD",
-			lab: "AWDP",
+			arena: "AWD overview",
+			lab: "AWDP overview",
 			scoreboard: "Scoreboard",
 			trend: "Trend",
 			instances: "Instances",

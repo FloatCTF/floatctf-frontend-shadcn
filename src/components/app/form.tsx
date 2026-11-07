@@ -4,7 +4,7 @@
  * 让简单 CRUD 与复杂表单共享同一套版式。使用 react-hook-form 时可直接把 `FormItem` 放进 `Field`。
  */
 
-import type { ReactNode } from "react";
+import { cloneElement, isValidElement, useId, type ReactElement, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 
@@ -39,6 +39,18 @@ export function Field({
 	className?: string;
 	actions?: ReactNode;
 }) {
+	const errorId = useId();
+	const hintId = useId();
+	// 把 aria-invalid / aria-describedby 挂到真正的控件上：
+	// 只把错误写成红字，屏幕阅读器读不出来（theme.md §9 可访问性）。
+	const describedBy = error ? errorId : hint ? hintId : undefined;
+	const control = isValidElement(children)
+		? cloneElement(children as ReactElement<Record<string, unknown>>, {
+				"aria-invalid": error ? true : undefined,
+				"aria-describedby": describedBy,
+			})
+		: children;
+
 	return (
 		<div className={cn("space-y-1.5", className)}>
 			{label ? (
@@ -50,21 +62,25 @@ export function Field({
 					{actions}
 				</div>
 			) : null}
-			{children}
-			{hint && !error ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
-			{error ? <FieldError error={error} /> : null}
+			{control}
+			{hint && !error ? (
+				<p id={hintId} className="text-xs text-muted-foreground">
+					{hint}
+				</p>
+			) : null}
+			{error ? <FieldError error={error} id={errorId} /> : null}
 		</div>
 	);
 }
 
 /** 表单错误：字符串数组（zod flatten）与普通字符串都支持。 */
-export function FieldError({ error }: { error: unknown }) {
+export function FieldError({ error, id }: { error: unknown; id?: string }) {
 	if (!error) return null;
 	const messages = Array.isArray(error)
 		? error.map((item) => String(item))
 		: [typeof error === "string" ? error : String((error as { message?: string })?.message ?? error)];
 	return (
-		<ul className="space-y-0.5" role="alert">
+		<ul id={id} className="space-y-0.5" role="alert">
 			{messages.map((message) => (
 				<li key={message} className="text-sm text-destructive">
 					{message}

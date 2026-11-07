@@ -4,7 +4,7 @@
  * 所有文案走 i18n（`auth.*`），布局走 public-shell 的认证分屏。
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { useMutation } from "@tanstack/react-query";
@@ -38,6 +38,11 @@ export function LoginPage() {
 	const [params] = useSearchParams();
 	const [username, setUsername] = useState("");
 	const [password, setPassword] = useState("");
+	const [attempted, setAttempted] = useState(false);
+	const usernameRef = useRef<HTMLInputElement>(null);
+	const passwordRef = useRef<HTMLInputElement>(null);
+	const usernameMissing = username.trim() === "";
+	const passwordMissing = password === "";
 	const next = nextTarget(params.get("next"), "/");
 
 	const mutation = useMutation({
@@ -79,31 +84,48 @@ export function LoginPage() {
 		>
 			<form
 				className="space-y-5"
+				noValidate
 				onSubmit={(event) => {
 					event.preventDefault();
-					if (username.trim() === "" || password === "") {
-						toast.warning(t("auth.login.missingFields"));
+					setAttempted(true);
+					if (usernameMissing || passwordMissing) {
+						// 就近报错 + 把焦点送到第一个出错的字段（不依赖 toast 才能发现）。
+						(usernameMissing ? usernameRef : passwordRef).current?.focus();
 						return;
 					}
 					mutation.mutate({ username: username.trim(), password });
 				}}
 			>
-				<Field label={t("auth.fields.username")} htmlFor="login-username" required>
+				<Field
+					label={t("auth.fields.username")}
+					htmlFor="login-username"
+					required
+					error={attempted && usernameMissing ? t("auth.fields.required") : undefined}
+				>
 					<Input
+						ref={usernameRef}
 						id="login-username"
 						name="username"
 						autoComplete="username"
+						aria-invalid={attempted && usernameMissing}
 						value={username}
 						onChange={(event) => setUsername(event.target.value)}
 						placeholder={t("auth.login.usernamePlaceholder")}
 					/>
 				</Field>
-				<Field label={t("auth.fields.password")} htmlFor="login-password" required>
+				<Field
+					label={t("auth.fields.password")}
+					htmlFor="login-password"
+					required
+					error={attempted && passwordMissing ? t("auth.fields.required") : undefined}
+				>
 					<Input
+						ref={passwordRef}
 						id="login-password"
 						name="password"
 						type="password"
 						autoComplete="current-password"
+						aria-invalid={attempted && passwordMissing}
 						value={password}
 						onChange={(event) => setPassword(event.target.value)}
 					/>
@@ -130,6 +152,12 @@ export function RegisterPage() {
 		password: "",
 		confirm: "",
 	});
+	const [attempted, setAttempted] = useState(false);
+	const firstInvalidRef = useRef<HTMLInputElement>(null);
+	const missingUsername = form.username.trim() === "";
+	const missingNickname = form.nickname.trim() === "";
+	const missingPassword = form.password === "";
+	const passwordMismatch = form.confirm !== form.password;
 
 	const mutation = useMutation({
 		mutationFn: (input: {
@@ -160,14 +188,15 @@ export function RegisterPage() {
 		>
 			<form
 				className="space-y-5"
+				noValidate
 				onSubmit={(event) => {
 					event.preventDefault();
-					if (form.username.trim() === "" || form.password === "" || form.nickname.trim() === "") {
-						toast.warning(t("auth.register.missingFields"));
+					setAttempted(true);
+					if (missingUsername || missingPassword || missingNickname) {
+						firstInvalidRef.current?.focus();
 						return;
 					}
-					if (form.password !== form.confirm) {
-						toast.warning(t("auth.passwordMismatch"));
+					if (passwordMismatch) {
 						return;
 					}
 					mutation.mutate({
@@ -183,17 +212,26 @@ export function RegisterPage() {
 					htmlFor="register-username"
 					required
 					hint={t("auth.register.usernameHint")}
+					error={attempted && missingUsername ? t("auth.fields.required") : undefined}
 				>
 					<Input
+						ref={firstInvalidRef}
 						id="register-username"
 						autoComplete="username"
+						aria-invalid={attempted && missingUsername}
 						value={form.username}
 						onChange={(event) => setForm({ ...form, username: event.target.value })}
 					/>
 				</Field>
-				<Field label={t("auth.fields.nickname")} htmlFor="register-nickname" required>
+				<Field
+					label={t("auth.fields.nickname")}
+					htmlFor="register-nickname"
+					required
+					error={attempted && missingNickname ? t("auth.fields.required") : undefined}
+				>
 					<Input
 						id="register-nickname"
+						aria-invalid={attempted && missingNickname}
 						value={form.nickname}
 						onChange={(event) => setForm({ ...form, nickname: event.target.value })}
 					/>
@@ -207,20 +245,32 @@ export function RegisterPage() {
 						onChange={(event) => setForm({ ...form, email: event.target.value })}
 					/>
 				</Field>
-				<Field label={t("auth.fields.password")} htmlFor="register-password" required>
+				<Field
+					label={t("auth.fields.password")}
+					htmlFor="register-password"
+					required
+					error={attempted && missingPassword ? t("auth.fields.required") : undefined}
+				>
 					<Input
 						id="register-password"
 						type="password"
 						autoComplete="new-password"
+						aria-invalid={attempted && missingPassword}
 						value={form.password}
 						onChange={(event) => setForm({ ...form, password: event.target.value })}
 					/>
 				</Field>
-				<Field label={t("auth.fields.confirmPassword")} htmlFor="register-confirm" required>
+				<Field
+					label={t("auth.fields.confirmPassword")}
+					htmlFor="register-confirm"
+					required
+					error={attempted && passwordMismatch ? t("auth.passwordMismatch") : undefined}
+				>
 					<Input
 						id="register-confirm"
 						type="password"
 						autoComplete="new-password"
+						aria-invalid={attempted && passwordMismatch}
 						value={form.confirm}
 						onChange={(event) => setForm({ ...form, confirm: event.target.value })}
 					/>
@@ -405,6 +455,11 @@ export function AdminLoginPage() {
 	const [params] = useSearchParams();
 	const [username, setUsername] = useState("");
 	const [password, setPassword] = useState("");
+	const [attempted, setAttempted] = useState(false);
+	const usernameRef = useRef<HTMLInputElement>(null);
+	const passwordRef = useRef<HTMLInputElement>(null);
+	const usernameMissing = username.trim() === "";
+	const passwordMissing = password === "";
 	const next = nextTarget(params.get("next"), "/admin");
 
 	const mutation = useMutation({
@@ -435,28 +490,44 @@ export function AdminLoginPage() {
 		>
 			<form
 				className="space-y-5"
+				noValidate
 				onSubmit={(event) => {
 					event.preventDefault();
-					if (username.trim() === "" || password === "") {
-						toast.warning(t("auth.adminLogin.missingFields"));
+					setAttempted(true);
+					if (usernameMissing || passwordMissing) {
+						(usernameMissing ? usernameRef : passwordRef).current?.focus();
 						return;
 					}
 					mutation.mutate({ username: username.trim(), password });
 				}}
 			>
-				<Field label={t("auth.adminLogin.usernameLabel")} htmlFor="admin-username" required>
+				<Field
+					label={t("auth.adminLogin.usernameLabel")}
+					htmlFor="admin-username"
+					required
+					error={attempted && usernameMissing ? t("auth.fields.required") : undefined}
+				>
 					<Input
+						ref={usernameRef}
 						id="admin-username"
 						autoComplete="username"
+						aria-invalid={attempted && usernameMissing}
 						value={username}
 						onChange={(event) => setUsername(event.target.value)}
 					/>
 				</Field>
-				<Field label={t("auth.fields.password")} htmlFor="admin-password" required>
+				<Field
+					label={t("auth.fields.password")}
+					htmlFor="admin-password"
+					required
+					error={attempted && passwordMissing ? t("auth.fields.required") : undefined}
+				>
 					<Input
+						ref={passwordRef}
 						id="admin-password"
 						type="password"
 						autoComplete="current-password"
+						aria-invalid={attempted && passwordMissing}
 						value={password}
 						onChange={(event) => setPassword(event.target.value)}
 					/>

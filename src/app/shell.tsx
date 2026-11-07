@@ -164,32 +164,19 @@ export function AppShell({ navGroups, mobileNav, scope }: AppShellProps) {
 
 					<CommandTrigger className="hidden h-8 items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted md:inline-flex md:w-56" />
 
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<Button
-								variant="outline"
-								size="icon-sm"
-								className="bg-background/80 backdrop-blur"
-								aria-label={
-									theme === "dark" ? t("common.theme.toggleToLight") : t("common.theme.toggleToDark")
-								}
-								title={
-									theme === "dark" ? t("common.theme.toggleToLight") : t("common.theme.toggleToDark")
-								}
-							>
-								{theme === "dark" ? <Sun /> : <Moon />}
-							</Button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end">
-							<DropdownMenuLabel>{t("common.theme.label")}</DropdownMenuLabel>
-							<DropdownMenuItem onClick={() => setThemePreference("light")}>
-								<Sun /> {t("common.theme.light")}
-							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => setThemePreference("dark")}>
-								<Moon /> {t("common.theme.dark")}
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
+					{/* 单键切换亮/暗（theme.md §2.4 ThemeToggle）：一次点击即生效，不藏在菜单里。 */}
+					<Button
+						variant="outline"
+						size="icon-sm"
+						className="bg-background/80 backdrop-blur"
+						aria-label={
+							theme === "dark" ? t("common.theme.toggleToLight") : t("common.theme.toggleToDark")
+						}
+						title={theme === "dark" ? t("common.theme.toggleToLight") : t("common.theme.toggleToDark")}
+						onClick={() => setThemePreference(theme === "dark" ? "light" : "dark")}
+					>
+						{theme === "dark" ? <Sun /> : <Moon />}
+					</Button>
 
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>

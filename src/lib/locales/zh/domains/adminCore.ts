@@ -182,6 +182,8 @@ export default {
 			copyLabel: "版本号",
 		},
 		system: {
+			unavailable: "系统监控暂不可用",
+			unavailableHint: "宿主 helper 未就绪时会返回空数据；恢复后刷新即可。",
 			title: "系统监控",
 			description: "宿主 CPU / 内存 / 磁盘 / 网卡 / Docker 概况，每 60 秒刷新。",
 			loading: "读取系统信息…",

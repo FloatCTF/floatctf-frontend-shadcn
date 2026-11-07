@@ -153,7 +153,8 @@ export function DashboardPage(): ReactNode {
 		{
 			id: "start",
 			header: t("dashboard.myEvents.columns.start"),
-			hideBelow: "sm",
+			// 卡片只有半屏宽：1280 下四列会挤到出现横向滚动条，2xl 以上再显示开始时间。
+			hideBelow: "2xl",
 			cell: (row) => (
 				<span
 					className="tnum text-xs whitespace-nowrap text-muted-foreground"
