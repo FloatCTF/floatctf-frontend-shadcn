@@ -532,7 +532,9 @@ export function EventWorkspacePage() {
 														? t("events.workspace.participationOpen")
 														: participationGate(data.event, now.getTime()).kind === "closed"
 															? t("events.participation.notOpenHint")
-															: t("events.workspace.participationLocked")
+															: status === "ended"
+																? t("events.workspace.participationEnded")
+																: t("events.workspace.participationLocked")
 											}
 										>
 											{isTeam ? <TeamPanel info={data} /> : <JoinLeaveControl info={data} />}

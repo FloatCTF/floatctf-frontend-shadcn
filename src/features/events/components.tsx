@@ -37,6 +37,7 @@ import { formatRange, formatRelative } from "~/lib/format";
 import {
 	EVENT_STATUS_TONE,
 	computeEventStatus,
+	eventStatusOf,
 	participationGate,
 	type EventStatus,
 } from "~/lib/event-status";
@@ -155,6 +156,11 @@ export function JoinLeaveControl({ info }: { info: EventInfo }) {
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const now = useNow(30_000);
+	const status = computeEventStatus(
+		info.event.start_time,
+		info.event.end_time ?? null,
+		now.getTime(),
+	);
 	const gate = participationGate(info.event, now.getTime());
 	const canJoin = gate.kind === "open";
 
@@ -196,6 +202,13 @@ export function JoinLeaveControl({ info }: { info: EventInfo }) {
 					? t("events.participation.practiceHint")
 					: t("events.participation.systemManagedHint")}
 			</p>
+		);
+	}
+
+	// 已结束的赛事：报名/退出都已关闭，不再渲染一个永远点不动的按钮。
+	if (status === "ended") {
+		return (
+			<p className="text-sm text-muted-foreground">{t("events.participation.endedHint")}</p>
 		);
 	}
 
@@ -550,6 +563,7 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 export function MemberGateNotice({ event }: { event: Events }) {
 	const { t } = useTranslation();
 	const gate = participationGate(event);
+	const ended = eventStatusOf(event) === "ended";
 	const title =
 		gate.kind === "not-competition"
 			? t("events.gate.practiceTitle")
@@ -557,7 +571,9 @@ export function MemberGateNotice({ event }: { event: Events }) {
 				? t("events.gate.systemTitle")
 				: gate.kind === "closed"
 					? t("events.gate.closedTitle")
-					: t("events.gate.title");
+					: ended
+						? t("events.gate.endedTitle")
+						: t("events.gate.title");
 	const description =
 		gate.kind === "not-competition"
 			? t("events.gate.practiceDescription")
@@ -565,7 +581,9 @@ export function MemberGateNotice({ event }: { event: Events }) {
 				? t("events.gate.systemDescription")
 				: gate.kind === "closed"
 					? t("events.gate.closedDescription")
-					: t("events.gate.description");
+					: ended
+						? t("events.gate.endedDescription")
+						: t("events.gate.description");
 	return (
 		<div
 			role="status"

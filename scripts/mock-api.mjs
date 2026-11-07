@@ -84,6 +84,23 @@ const events = [
 		is_virtual: false,
 	},
 	{
+		id: "e0a1b2c3-0004-4a11-9a11-000000000004",
+		title: "2025 秋季新生赛",
+		description: "面向新生的入门解题赛。",
+		hidden: false,
+		start_time: iso(now - 30 * D),
+		end_time: iso(now - 29 * D),
+		rules: "赛后可以查看题解。",
+		allow_join: true,
+		flag_prefix: "flag{",
+		created_at: iso(now - 60 * D),
+		updated_at: iso(now - 29 * D),
+		family: "jeopardy",
+		purpose: "competition",
+		participant_mode: "individual",
+		is_virtual: false,
+	},
+	{
 		id: "e0a1b2c3-0003-4a11-9a11-000000000003",
 		title: "AWDP 自动化攻防 · 练习",
 		description: "自动化攻防练习赛：Break / Fix 轮次与自动评测。",
@@ -485,12 +502,16 @@ const routes = [
 	["GET", /^\/api\/events$/, (_m, res, req) =>
 		ok(
 			res,
-			events.map((event) => ({ id: event.id, event, joined: event.family !== "awdp" })),
+			events.map((event) => ({ id: event.id, event, joined: event.id.endsWith("0001") || event.id.endsWith("0002") })),
 			req,
 		)],
 	["GET", /^\/api\/events\/([^/]+)$/, (m, res) => {
 		const event = events.find((item) => item.id === m[1]) ?? events[0];
-		ok(res, { id: event.id, event, joined: event.family !== "awdp" });
+		ok(res, {
+			id: event.id,
+			event,
+			joined: event.id.endsWith("0001") || event.id.endsWith("0002"),
+		});
 	}],
 	["GET", /^\/api\/events\/([^/]+)\/challenges$/, (_m, res, req) => ok(res, eventChallenges, req)],
 	["GET", /^\/api\/events\/([^/]+)\/scoreboard$/, (_m, res) => ok(res, scoreboard)],

@@ -76,6 +76,7 @@ export default {
 		cannotLeaveStarted: "The event has started; leaving is closed",
 		lockedHint:
 			"The roster locks once the event starts (the backend also rejects join/leave requests at that point).",
+		endedHint: "The event has ended: joining and leaving are both closed.",
 		practiceHint: "Practice events need no sign-up — enter them from Challenges or Training.",
 		systemManagedHint: "This event is managed by the platform and does not support self sign-up.",
 		notOpenHint: "Self sign-up is disabled for this event (allow_join=false).",
@@ -135,6 +136,8 @@ export default {
 		ownAction: "My write-up",
 	},
 	gate: {
+		endedTitle: "This event has ended",
+		endedDescription: "The event is over; accounts that never joined cannot view its challenges or scoreboard.",
 		practiceTitle: "Practice events need no sign-up",
 		practiceDescription: "Practice runs are entered from Challenges or Training, not from the event workspace.",
 		systemTitle: "This event is managed by the platform",
@@ -166,6 +169,7 @@ export default {
 		teamCardDescription: "Creating or joining a team is how you enter this event; team changes close at start.",
 		teamCardDescriptionJoined: "Your team and membership for this event.",
 		participationOpen: "You can join or leave freely before the event starts.",
+		participationEnded: "The event has ended; the roster is archived.",
 		participationLocked: "The event is running; the roster is locked.",
 		quickLinks: "Quick links",
 		linkChallenges: "Event challenges",
