@@ -4,6 +4,7 @@
  */
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "~/lib/utils";
 
@@ -33,7 +34,7 @@ export function TrendChart({
 	formatY = (value: number) => String(Math.round(value)),
 	formatX,
 	className,
-	emptyText = "暂无趋势数据",
+	emptyText,
 }: {
 	series: TrendSeries[];
 	height?: number;
@@ -42,6 +43,7 @@ export function TrendChart({
 	className?: string;
 	emptyText?: string;
 }): ReactNode {
+	const { t } = useTranslation();
 	const [hoverX, setHoverX] = useState<number | null>(null);
 
 	const { minX, maxX, minY, maxY } = useMemo(() => {
@@ -72,7 +74,7 @@ export function TrendChart({
 				)}
 				style={{ height }}
 			>
-				{emptyText}
+				{emptyText ?? t("common.chart.empty")}
 			</div>
 		);
 	}
@@ -118,7 +120,7 @@ export function TrendChart({
 				className="w-full"
 				style={{ height }}
 				role="img"
-				aria-label="趋势图"
+				aria-label={t("common.chart.label")}
 				onMouseLeave={() => setHoverX(null)}
 				onMouseMove={(event) => {
 					const rect = event.currentTarget.getBoundingClientRect();

@@ -5,6 +5,7 @@
  */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
@@ -135,8 +136,8 @@ export function FormSheet({
 
 export function FormFooter({
 	onCancel,
-	submitLabel = "保存",
-	cancelLabel = "取消",
+	submitLabel,
+	cancelLabel,
 	isPending = false,
 	disabled = false,
 	formId,
@@ -151,18 +152,19 @@ export function FormFooter({
 	formId?: string;
 	hint?: ReactNode;
 }) {
+	const { t } = useTranslation();
 	return (
 		<div className="flex w-full flex-wrap items-center justify-between gap-2">
 			<span className="text-xs text-muted-foreground">{hint}</span>
 			<div className="flex items-center gap-2">
 				{onCancel ? (
 					<Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
-						{cancelLabel}
+						{cancelLabel ?? t("common.cancel")}
 					</Button>
 				) : null}
 				<Button type="submit" form={formId} disabled={isPending || disabled}>
 					{isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-					{submitLabel}
+					{submitLabel ?? t("common.save")}
 				</Button>
 			</div>
 		</div>

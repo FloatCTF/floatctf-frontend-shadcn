@@ -3,6 +3,7 @@
  */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { CircleDot, Loader2, PlugZap, RefreshCw, WifiOff } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
@@ -50,7 +51,7 @@ export function TonePill({
 /** SSE 连接状态 → 人类可读 + 颜色（断线必须显式可见，不能静默）。 */
 export function RealtimePill({
 	state,
-	label = "实时",
+	label,
 	onRefresh,
 	className,
 }: {
@@ -59,19 +60,25 @@ export function RealtimePill({
 	onRefresh?: () => void;
 	className?: string;
 }) {
+	const { t } = useTranslation();
 	const normalized = (state ?? "idle").toLowerCase();
+	const realtimeLabel = label ?? t("common.realtime.label");
 	const map: Record<string, { tone: PillTone; text: string; icon: ReactNode }> = {
-		connected: { tone: "success", text: "实时已连接", icon: <PlugZap /> },
-		connecting: { tone: "info", text: "连接中…", icon: <Loader2 className="animate-spin" /> },
+		connected: { tone: "success", text: t("common.realtime.connected"), icon: <PlugZap /> },
+		connecting: {
+			tone: "info",
+			text: t("common.realtime.connecting"),
+			icon: <Loader2 className="animate-spin" />,
+		},
 		reconnecting: {
 			tone: "warning",
-			text: "重连中（已降级轮询）",
+			text: t("common.realtime.reconnecting"),
 			icon: <RefreshCw className="animate-spin" />,
 		},
-		auth_error: { tone: "danger", text: "实时鉴权失败（需重新登录）", icon: <WifiOff /> },
-		error: { tone: "danger", text: "实时通道异常（已降级轮询）", icon: <WifiOff /> },
-		closed: { tone: "muted", text: "实时已断开（已降级轮询）", icon: <WifiOff /> },
-		idle: { tone: "muted", text: "实时未启用", icon: <CircleDot /> },
+		auth_error: { tone: "danger", text: t("common.realtime.authError"), icon: <WifiOff /> },
+		error: { tone: "danger", text: t("common.realtime.error"), icon: <WifiOff /> },
+		closed: { tone: "muted", text: t("common.realtime.closed"), icon: <WifiOff /> },
+		idle: { tone: "muted", text: t("common.realtime.idle"), icon: <CircleDot /> },
 	};
 	const entry = map[normalized] ?? {
 		tone: "muted" as PillTone,
@@ -81,11 +88,11 @@ export function RealtimePill({
 
 	return (
 		<span className={cn("inline-flex items-center gap-1.5", className)}>
-			<TonePill tone={entry.tone} icon={entry.icon} title={`${label}：${normalized}`}>
+			<TonePill tone={entry.tone} icon={entry.icon} title={`${realtimeLabel}: ${normalized}`}>
 				{entry.text}
 			</TonePill>
 			{onRefresh ? (
-				<Button variant="ghost" size="icon-xs" onClick={onRefresh} aria-label="立即刷新" title="立即刷新">
+				<Button variant="ghost" size="icon-xs" onClick={onRefresh} aria-label={t("common.realtime.refreshNow")} title={t("common.realtime.refreshNow")}>
 					<RefreshCw />
 				</Button>
 			) : null}
@@ -96,8 +103,8 @@ export function RealtimePill({
 /** 布尔/可空状态的通用「是 / 否 / 未知」标签（避免各页面自成一套）。 */
 export function BooleanPill({
 	value,
-	trueText = "是",
-	falseText = "否",
+	trueText,
+	falseText,
 	trueTone = "success",
 	falseTone = "muted",
 }: {
@@ -107,8 +114,11 @@ export function BooleanPill({
 	trueTone?: PillTone;
 	falseTone?: PillTone;
 }) {
-	if (value === null || value === undefined) return <TonePill tone="muted">未知</TonePill>;
+	const { t } = useTranslation();
+	if (value === null || value === undefined) return <TonePill tone="muted">{t("common.unknown")}</TonePill>;
 	return (
-		<TonePill tone={value ? trueTone : falseTone}>{value ? trueText : falseText}</TonePill>
+		<TonePill tone={value ? trueTone : falseTone}>
+			{value ? (trueText ?? t("common.yes")) : (falseText ?? t("common.no"))}
+		</TonePill>
 	);
 }

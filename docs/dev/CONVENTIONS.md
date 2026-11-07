@@ -331,3 +331,40 @@ mise exec -- pnpm --filter @floatctf/frontend-shadcn exec tsc --noEmit 2>&1 | gr
 3. 用到的**逃生舱**（`serviceHttp`/`adminHttp`/`transport`/原生 WebSocket/裸 fetch）及原因；
 4. 任何公共契约缺口（`PUBLIC SDK GAP: …`）——**不要**改后端或平台包；
 5. 未完成 / 有疑问的点。
+
+## 10. 主题与 i18n（自 v0.2.0 起，强制）
+
+视觉唯一事实源是主仓库的 **[`docs/theme.md`](../../../docs/theme.md)**（中性控制台主题）。
+本节只记本仓库的落地约定；两者冲突时以 theme.md 为准。
+
+### 10.1 主题
+
+- 颜色只用语义 token（`bg-card` / `text-muted-foreground` / `border-border` / `ring-ring`）。
+- 语义状态色**没有独立令牌**：成功 `emerald`、等待 `amber`、信息 `sky`、危险 `destructive` / `rose`，
+  且**必须**同时写暗色变体（`text-emerald-600 dark:text-emerald-400`）；填充用 `/10`、`/5` 透明底。
+- 状态标签统一 `TonePill`（`~/components/app/badges`），布尔/在线状态用 `BooleanPill` / `RealtimePill`。
+- 状态点 6px + 文字；颜色永不单独承载信息。
+- 数值一律 `tabular-nums`（`.tnum` 或 `tabular-nums`），ID/命令/flag 用 `font-mono`。
+- 图标只用 `lucide-react` 线性图标，默认 `size-4`；纯图标按钮必须有 `aria-label` + `title`。
+- 页面结构：`PageBody` + `PageHeader`（标题 + 一句说明 + 唯一主操作）+ `SectionCard`。
+- 三态：`QueryState`（loading / empty / error），空态用 `EmptyBlock`、错误用 `ErrorBlock`。
+- 破坏性操作：`useConfirm()`，`consequences` 写真实后果；禁止原生 `alert/confirm/prompt`。
+- 圆角来自令牌阶梯（控件 10px `rounded-lg`、卡片 14px `rounded-xl`、胶囊仅 Badge）。
+
+### 10.2 i18n
+
+- 所有用户可见文案走 `t()`：页面标题（`useDocumentTitle`）、按钮、表头、空态、toast、
+  `placeholder`、`aria-label`、`title`、确认弹窗。技术标识（错误码、ID、命令、工具名）保持原文。
+- 命名空间 = 功能域，资源在 `src/lib/locales/{zh,en}/domains/<域>.ts`；
+  域内 key 用嵌套语义路径，例如 `t("events.list.title")`、`t("adminEvents.tabs.members")`。
+- 新增文案**必须同时**补 `zh` 与 `en`；插值占位名一致（`{{count}}` / `{{name}}`）。
+- 不在 JSX 里拼接句子；用插值或整句 key。
+- 语言偏好持久化在 `shadcn.locale`，切换时同步 `<html lang>`；日期/数字格式跟随语言（`~/lib/format`）。
+- 一致性检查：`node scripts/i18n-check.mjs`（CI 与提交前必跑）。
+
+### 10.3 交付前自查（追加）
+
+- [ ] 我的域内没有硬编码中文文案（含 `aria-label` / `title` / `placeholder` / `toast`）
+- [ ] `zh` 与 `en` 的 key 集合一致、插值一致
+- [ ] 亮色/暗色两套都检查过：语义色有 `dark:` 变体
+- [ ] 360px / 768px / 1280px 无横向溢出

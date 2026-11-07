@@ -7,6 +7,7 @@
  */
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
 	flexRender,
 	getCoreRowModel,
@@ -82,6 +83,7 @@ export function DataTable<T>({
 	className,
 	empty,
 }: DataTableProps<T>) {
+	const { t } = useTranslation();
 	const [sorting, setSorting] = useState<SortingState>([]);
 
 	const tableColumns = useMemo<ColumnDef<T>[]>(() => {
@@ -100,14 +102,14 @@ export function DataTable<T>({
 									: false
 						}
 						onCheckedChange={(value) => table.toggleAllPageRowsSelected(value === true)}
-						aria-label="全选本页"
+						aria-label={t("common.table.selectAll")}
 					/>
 				),
 				cell: ({ row }) => (
 					<Checkbox
 						checked={row.getIsSelected()}
 						onCheckedChange={(value) => row.toggleSelected(value === true)}
-						aria-label="选择该行"
+						aria-label={t("common.table.selectRow")}
 						onClick={(event) => event.stopPropagation()}
 					/>
 				),
@@ -130,7 +132,7 @@ export function DataTable<T>({
 		if (rowActions) {
 			defs.push({
 				id: "__actions",
-				header: () => <span className="sr-only">操作</span>,
+				header: () => <span className="sr-only">{t("common.actions")}</span>,
 				cell: ({ row }) => (
 					<div
 						className="flex items-center justify-end gap-1"
@@ -181,7 +183,7 @@ export function DataTable<T>({
 			{mobileCard ? (
 				<div className="space-y-2 p-3 md:hidden">
 					{rows.length === 0 ? (
-						(empty ?? <p className="py-6 text-center text-sm text-muted-foreground">暂无数据</p>)
+						(empty ?? <p className="py-6 text-center text-sm text-muted-foreground">{t("common.table.emptyTitle")}</p>)
 					) : (
 						rows.map((row) => (
 							<div key={row.id} className="rounded-lg border p-3">
@@ -241,7 +243,7 @@ export function DataTable<T>({
 						{rows.length === 0 ? (
 							<TableRow>
 								<TableCell colSpan={tableColumns.length} className="h-24 text-center">
-									{empty ?? <span className="text-sm text-muted-foreground">暂无数据</span>}
+									{empty ?? <span className="text-sm text-muted-foreground">{t("common.table.emptyTitle")}</span>}
 								</TableCell>
 							</TableRow>
 						) : (

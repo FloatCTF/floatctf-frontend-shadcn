@@ -1,0 +1,27 @@
+/** 外壳（顶栏 / 侧栏 / 命令面板）文案。 */
+
+export default {
+	playerSubtitle: "Field · 选手工作区",
+	adminSubtitle: "Control Room · 运维控制台",
+	playerSession: "选手会话",
+	adminSession: "管理端会话",
+	adminLabel: "管理员",
+	notSignedIn: "未登录",
+	goPlayer: "前往选手端",
+	command: {
+		adminNav: "管理端导航",
+		playerNav: "选手端导航",
+		nav: "导航",
+		description: "搜索页面与操作",
+		searchPlaceholder: "搜索页面、赛事、题目或操作…",
+		empty: "没有匹配结果。",
+		contextual: "当前页面操作",
+		hints: "提示",
+		openPalette: "打开命令面板",
+		trigger: "搜索 / 命令",
+	},
+	toggleNav: "切换导航",
+	commandPlaceholder: "搜索页面、题目、账号…",
+	commandEmpty: "没有匹配的命令",
+	commandHint: "命令面板",
+};

@@ -4,6 +4,7 @@
  */
 
 import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff } from "lucide-react";
 
 import { Badge } from "~/components/ui/badge";
@@ -220,6 +221,8 @@ export function CopyText({
 	mono?: boolean;
 }) {
 	const { copied, copy } = useCopyToClipboard();
+	const { t } = useTranslation();
+	const name = label ?? t("common.misc.value");
 	return (
 		<span className={cn("inline-flex min-w-0 items-center gap-1.5", className)}>
 			<span className={cn("min-w-0 truncate", mono && "tnum font-mono text-xs")} title={value}>
@@ -229,8 +232,8 @@ export function CopyText({
 				variant="ghost"
 				size="icon-xs"
 				onClick={() => void copy(value)}
-				aria-label={copied ? (label ? `${label}已复制` : "已复制") : label ? `复制${label}` : "复制"}
-				title={label ? `复制${label}` : "复制"}
+				aria-label={copied ? t("common.copiedLabel", { name }) : t("common.copyLabel", { name })}
+				title={copied ? t("common.copied") : t("common.copyLabel", { name })}
 			>
 				{copied ? <Check className="text-emerald-600 dark:text-emerald-400" /> : <Copy />}
 			</Button>
@@ -248,8 +251,9 @@ export function CopyText({
 export function SecretValue({ value, label }: { value: string; label?: string }) {
 	const [shown, setShown] = useState(false);
 	const { copied, copy } = useCopyToClipboard();
+	const { t } = useTranslation();
 	if (!value) return <span className="text-xs text-muted-foreground">—</span>;
-	const name = label ?? "敏感值";
+	const name = label ?? t("common.misc.secret");
 	return (
 		<span className="inline-flex min-w-0 items-center gap-1.5">
 			<span
@@ -257,7 +261,7 @@ export function SecretValue({ value, label }: { value: string; label?: string })
 					"tnum min-w-0 truncate font-mono text-xs",
 					!shown && "blur-[3px] select-none",
 				)}
-				title={shown ? value : `${name}（已隐藏）`}
+				title={shown ? value : t("common.hiddenValue", { name })}
 			>
 				{value}
 			</span>
@@ -265,8 +269,8 @@ export function SecretValue({ value, label }: { value: string; label?: string })
 				variant="ghost"
 				size="icon-xs"
 				onClick={() => setShown((prev) => !prev)}
-				aria-label={shown ? `隐藏${name}` : `显示${name}`}
-				title={shown ? `隐藏${name}` : `显示${name}`}
+				aria-label={shown ? t("common.hideLabel", { name }) : t("common.showLabel", { name })}
+				title={shown ? t("common.hideLabel", { name }) : t("common.showLabel", { name })}
 			>
 				{shown ? <EyeOff /> : <Eye />}
 			</Button>
@@ -274,8 +278,8 @@ export function SecretValue({ value, label }: { value: string; label?: string })
 				variant="ghost"
 				size="icon-xs"
 				onClick={() => void copy(value)}
-				aria-label={copied ? `${name}已复制` : `复制${name}`}
-				title={copied ? "已复制" : `复制${name}`}
+				aria-label={copied ? t("common.copiedLabel", { name }) : t("common.copyLabel", { name })}
+				title={copied ? t("common.copied") : t("common.copyLabel", { name })}
 			>
 				{copied ? <Check className="text-emerald-600 dark:text-emerald-400" /> : <Copy />}
 			</Button>
@@ -298,13 +302,14 @@ export function PaginationBar({
 	onPageSizeChange?: (size: number) => void;
 	pageSizeOptions?: number[];
 }) {
+	const { t } = useTranslation();
 	const totalPages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
 	const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
 	const to = Math.min(total, page * pageSize);
 	return (
 		<div className="flex flex-wrap items-center justify-between gap-3">
 			<p className="tnum text-xs text-muted-foreground">
-				共 {total} 条{total > 0 ? ` · 显示 ${from}–${to}` : ""}
+					{total > 0 ? t("common.pagination.range", { total, from, to }) : t("common.pagination.total", { total })}
 			</p>
 			<div className="flex items-center gap-2">
 				{onPageSizeChange ? (
@@ -312,13 +317,13 @@ export function PaginationBar({
 						value={String(pageSize)}
 						onValueChange={(value) => onPageSizeChange(Number(value))}
 					>
-						<SelectTrigger size="sm" className="w-[110px]" aria-label="每页条数">
+						<SelectTrigger size="sm" className="w-[110px]" aria-label={t("common.pagination.pageSizeLabel")}>
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
 							{pageSizeOptions.map((size) => (
 								<SelectItem key={size} value={String(size)}>
-									每页 {size} 条
+									{t("common.pagination.pageSize", { size })}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -329,7 +334,7 @@ export function PaginationBar({
 					size="icon-sm"
 					disabled={page <= 1}
 					onClick={() => onPageChange(page - 1)}
-					aria-label="上一页"
+					aria-label={t("common.table.prevPage")}
 				>
 					<ChevronLeft />
 				</Button>
@@ -341,7 +346,7 @@ export function PaginationBar({
 					size="icon-sm"
 					disabled={page >= totalPages}
 					onClick={() => onPageChange(page + 1)}
-					aria-label="下一页"
+					aria-label={t("common.table.nextPage")}
 				>
 					<ChevronRight />
 				</Button>
@@ -350,14 +355,10 @@ export function PaginationBar({
 	);
 }
 
-export function TagList({
-	items,
-	emptyText = "—",
-}: {
-	items: string[];
-	emptyText?: string;
-}) {
-	if (items.length === 0) return <span className="text-xs text-muted-foreground">{emptyText}</span>;
+export function TagList({ items, emptyText }: { items: string[]; emptyText?: string }) {
+	const { t } = useTranslation();
+	const empty = emptyText ?? t("common.empty");
+	if (items.length === 0) return <span className="text-xs text-muted-foreground">{empty}</span>;
 	return (
 		<div className="flex flex-wrap gap-1">
 			{items.map((item) => (
@@ -373,12 +374,14 @@ export function TagList({
 export function ReadonlyBlock({
 	children,
 	className,
-	emptyText = "（空）",
+	emptyText,
 }: {
 	children: ReactNode;
 	className?: string;
 	emptyText?: string;
 }) {
+	const { t } = useTranslation();
+	const empty = emptyText ?? t("common.misc.emptyBlock");
 	const isEmpty =
 		children === null ||
 		children === undefined ||
@@ -390,7 +393,7 @@ export function ReadonlyBlock({
 				className,
 			)}
 		>
-			{isEmpty ? <span className="text-muted-foreground">{emptyText}</span> : children}
+			{isEmpty ? <span className="text-muted-foreground">{empty}</span> : children}
 		</div>
 	);
 }
