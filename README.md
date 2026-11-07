@@ -50,6 +50,10 @@ mise exec -- pnpm --filter @floatctf/frontend-shadcn theme:audit    # theme.md �
 
 # 开发服务器（默认 :13400，自己代理 /api 到开发入口 Caddy :7780）
 mise exec -- pnpm --filter @floatctf/frontend-shadcn dev
+
+# 只想看 UI（本机没有后端时）：起一个 dev-only 的 mock API 占住 :7780
+#   ⚠️ 数据是假的，仅用于视觉预览，绝不进制品；任意账号密码即可“登录”。
+mise exec -- pnpm --filter @floatctf/frontend-shadcn mock:api
 ```
 
 打开 **http://127.0.0.1:13400**（或局域网地址）。
