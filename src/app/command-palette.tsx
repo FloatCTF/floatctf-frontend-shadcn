@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { Search } from "lucide-react";
 import { create } from "zustand";
 
@@ -25,6 +25,8 @@ import {
 } from "~/components/ui/command";
 import { useIsAdminAuthenticated } from "~/auth/store";
 import { adminNav, flatNav, playerNav } from "./nav";
+
+const RECENT_KEY = "shadcn.recent-pages";
 
 export interface AppCommand {
 	id: string;
@@ -120,6 +122,44 @@ export function CommandPalette(): ReactNode {
 		return [{ key: "player", label: t("shell.command.nav"), items: sortNav(flatNav(playerNav)) }];
 	}, [isAdmin, t]);
 
+	// 最近访问：只在命中导航项时记录（子页面归并到所属一级页面）。
+	const allNavItems = useMemo(() => [...flatNav(playerNav), ...flatNav(adminNav)], []);
+	const [recent, setRecent] = useState<string[]>(() => {
+		try {
+			const raw = window.localStorage.getItem(RECENT_KEY);
+			const parsed: unknown = raw ? JSON.parse(raw) : [];
+			return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string").slice(0, 5) : [];
+		} catch {
+			return [];
+		}
+	});
+	const location = useLocation();
+	useEffect(() => {
+		const hit = allNavItems.find((item) =>
+			item.end
+				? location.pathname === item.to
+				: location.pathname === item.to || location.pathname.startsWith(`${item.to}/`),
+		);
+		if (!hit) return;
+		setRecent((prev) => {
+			if (prev[0] === hit.to) return prev;
+			const next = [hit.to, ...prev.filter((path) => path !== hit.to)].slice(0, 5);
+			try {
+				window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+			} catch {
+				/* 隐私模式：仅内存 */
+			}
+			return next;
+		});
+	}, [location.pathname, allNavItems]);
+	const recentItems = useMemo(
+		() =>
+			recent
+				.map((path) => allNavItems.find((item) => item.to === path))
+				.filter((item): item is NonNullable<typeof item> => Boolean(item) && item!.to !== location.pathname),
+		[recent, allNavItems, location.pathname],
+	);
+
 	const [shortcutHint, setShortcutHint] = useState("⌘K");
 	useEffect(() => {
 		if (typeof navigator !== "undefined" && !/Mac|iPhone|iPad/.test(navigator.platform)) {
@@ -158,6 +198,25 @@ export function CommandPalette(): ReactNode {
 						</CommandGroup>
 						<CommandSeparator />
 					</>
+				) : null}
+
+				{recentItems.length > 0 ? (
+					<CommandGroup heading={t("shell.command.recent")}>
+						{recentItems.map((item) => {
+							const Icon = item.icon;
+							return (
+								<CommandItem
+									key={`recent-${item.to}`}
+									value={`${t(item.labelKey)} ${item.to} recent`}
+									onSelect={() => go(item.to)}
+								>
+									<Icon className="size-4" aria-hidden="true" />
+									<span>{t(item.labelKey)}</span>
+									<CommandShortcut>{item.to}</CommandShortcut>
+								</CommandItem>
+							);
+						})}
+					</CommandGroup>
 				) : null}
 
 				{navigationGroups.map((group) => (

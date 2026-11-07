@@ -6,7 +6,7 @@
  * 版式对齐 docs/theme.md §6.1（侧栏 256/48、顶栏 sticky、面包屑式当前页标题）。
  */
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { ChevronsUpDown, Languages, LogOut, Moon, Sun, UserCircle } from "lucide-react";
@@ -61,9 +61,22 @@ export interface AppShellProps {
 	children?: ReactNode;
 }
 
+/**
+ * AWD 驾驶舱（/arena/:id）与 AWDP 工作台（/lab/:id）是赛事的子工作区，
+ * 但路由并不挂在 /events 下 —— 侧边栏仍应高亮父级「赛事」。
+ */
+const NAV_ALIASES: Record<string, string> = {
+	"/arena": "/events",
+	"/lab": "/events",
+};
+
 function isActivePath(pathname: string, item: NavItem): boolean {
 	if (item.end) return pathname === item.to;
-	return pathname === item.to || pathname.startsWith(`${item.to}/`);
+	const alias = Object.keys(NAV_ALIASES).find(
+		(prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+	);
+	const target = alias ? NAV_ALIASES[alias] : pathname;
+	return target === item.to || target.startsWith(`${item.to}/`);
 }
 
 function currentItem(groups: NavGroup[], pathname: string): NavItem | undefined {
@@ -105,8 +118,15 @@ export function AppShell({ navGroups, mobileNav, scope }: AppShellProps) {
 		await setLocale(next);
 	}
 
+	// shadcn 的 SidebarProvider 会把状态写进 cookie，但不会自己读回：
+	// 首次挂载时按 cookie 初始化，刷新后保持折叠/展开。
+	const sidebarDefaultOpen = useState(() => {
+		const match = document.cookie.match(/(?:^|;\s*)sidebar_state=(true|false)/);
+		return match ? match[1] === "true" : true;
+	})[0];
+
 	return (
-		<SidebarProvider>
+		<SidebarProvider defaultOpen={sidebarDefaultOpen}>
 			<Sidebar collapsible="icon">
 				<SidebarHeader>
 					<div className="flex items-center gap-2 px-1 py-1.5">

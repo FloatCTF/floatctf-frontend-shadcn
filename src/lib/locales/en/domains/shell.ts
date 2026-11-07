@@ -14,11 +14,12 @@ export default {
 		refresh: "Refresh this page",
 	},
 	command: {
+		recent: "Recent",
 		adminNav: "Admin navigation",
 		playerNav: "Player navigation",
 		nav: "Navigation",
 		description: "Search pages and actions",
-		searchPlaceholder: "Search pages, events, challenges or actions…",
+		searchPlaceholder: "Search pages or page actions…",
 		empty: "No matching result.",
 		contextual: "Current page actions",
 		hints: "Hints",

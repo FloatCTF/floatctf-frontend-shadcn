@@ -14,11 +14,12 @@ export default {
 		refresh: "刷新当前页面数据",
 	},
 	command: {
+		recent: "最近访问",
 		adminNav: "管理端导航",
 		playerNav: "选手端导航",
 		nav: "导航",
 		description: "搜索页面与操作",
-		searchPlaceholder: "搜索页面、赛事、题目或操作…",
+		searchPlaceholder: "搜索页面或当前页操作…",
 		empty: "没有匹配结果。",
 		contextual: "当前页面操作",
 		hints: "提示",
