@@ -130,3 +130,28 @@ node scripts/mock-check.mjs
 验证：`tsc` / `vite build` / i18n / theme / mock-check 全绿；选手端 + 管理端 56 条路由 sweep
 0 console error（训练场 Break 不可上传补丁为预期提示）。手动复测：创建/退出战队、成员封禁/解封、
 删除战队、添加成员、GameBox 配置保存后重开、密码重置后落登录页。
+
+## 第 4 轮补充（挂载写操作 / 运维动作 / 双语与社区细节）
+
+已完成：
+
+- **AWD 挂载 GameBox 真正新增**：此前 POST 无论选哪个都返回第一行（toast 显示 web-01、列表不变）；
+  现在按 `gamebox_id` 创建挂载行，自动分配 host_offset，并用库推荐资源；实测移除 pwn-02 →
+  重新挂载 pwn-ret2win，行数 1→2 且名称/资源正确。
+- **AWD 挂载默认值纠正**：宕机罚分默认 200 → 20、一血加成 20 → 50，与既有挂载行/后端语义一致。
+- **AWDP 挂载新增/解除真正生效**：此前同样返回第一行/空操作；现在挂载后列表出现 pwn-ret2win，
+  解除后回到 1 行。
+- **题集添加文案**：已加入题目现在直接禁用勾选，文案从“重复会被后端拒绝”改成“不可重复勾选”。
+
+深测通过（无代码改动）：
+
+- 战队创建 → 退出 → 非法 Team ID 加入（inline error + toast）。
+- 赛事 Writeup 上传（浏览器内构造 PDF）→ 已提交状态与文件名。
+- 计划任务立即执行（输入确认词 → 入队 toast）。
+- Docker 停止（STOP 确认）→ 已退出；启动 → 运行中。
+- SQL 控制台 SELECT（EXECUTE 确认）→ 结果表 + 1 条成功。
+- AWD 积分调整 +100 → 总分 4820→4920 并刷新积分榜。
+- AWDP Break → Fix（reset 确认）→ 阶段切换、回合 1/3、玩家工作台同步。
+- 中英切换后 10 条核心路由无 missing key 警告。
+
+验证：`vite build` / i18n / theme / mock-check 全绿；7 条重点路由 sweep 0 console error。
