@@ -114,3 +114,6 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 
 - 2026-11-08：AWDP 赛事工作区改为 Default 六子页：Overview / GameBoxes / Rounds /
   Scoreboard / Trend / Announcement；复用真实 AWDP 面板，概览使用 AWDP 状态摘要。
+
+- 2026-11-08：Jeopardy 工作区改为 Default 布局：Tab 顺序为总览 / 题目 / 实例 /
+  积分榜 / 趋势 / 公告；赛事事实与参赛控制收进总览右侧，移除跨 Tab 常驻侧栏。

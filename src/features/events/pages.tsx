@@ -508,11 +508,11 @@ export function EventWorkspacePage() {
 							: [
 								"overview",
 								...(caps.challenges && canAccessContent ? ["challenges"] : []),
+								...(caps.instances && canAccessContent ? ["instances"] : []),
 								...(caps.arena && canAccessContent ? ["arena"] : []),
 								...(caps.lab && canAccessContent ? ["lab"] : []),
 								...(caps.scoreboard ? ["scoreboard"] : []),
 								...(caps.trend ? ["trend"] : []),
-								...(caps.instances && canAccessContent ? ["instances"] : []),
 								"bulletin",
 							];
 					const activeTab = availableTabs.includes(tab) ? tab : "overview";
@@ -549,8 +549,7 @@ export function EventWorkspacePage() {
 								}
 							/>
 
-							<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-								<div className="min-w-0 space-y-4">
+							<div className="space-y-4">
 									{gated ? (
 										<MemberGateNotice event={data.event} />
 									) : (
@@ -602,6 +601,12 @@ export function EventWorkspacePage() {
 														{t("events.workspace.tabs.challenges")}
 													</TabsTrigger>
 												) : null}
+												{!isAwd && caps.instances && canAccessContent ? (
+													<TabsTrigger value="instances" className="shrink-0">
+														{t("events.workspace.tabs.instances")}
+													</TabsTrigger>
+												) : null}
+	
 												{!isAwd && caps.arena && canAccessContent ? (
 													<TabsTrigger value="arena" className="shrink-0">
 														{t("events.workspace.tabs.arena")}
@@ -622,11 +627,7 @@ export function EventWorkspacePage() {
 														{t("events.workspace.tabs.trend")}
 													</TabsTrigger>
 												) : null}
-												{!isAwd && caps.instances && canAccessContent ? (
-													<TabsTrigger value="instances" className="shrink-0">
-														{t("events.workspace.tabs.instances")}
-													</TabsTrigger>
-												) : null}
+
 												{!isAwd ? (
 													<TabsTrigger value="bulletin" className="shrink-0">
 														{t("events.workspace.tabs.bulletin")}
@@ -637,8 +638,19 @@ export function EventWorkspacePage() {
 											<TabsContent value="overview" className="mt-4">
 												{isAwdp ? (
 													<LabSummaryTab eventId={resolvedEventId} />
+												) : isAwd ? (
+													<ArenaSummaryTab eventId={resolvedEventId} />
 												) : (
-													<OverviewTab info={data} />
+													<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+														<OverviewTab info={data} />
+														<EventSidePanel
+															info={data}
+															status={status}
+															isTeam={isTeam}
+															liveBeforeWindow={liveBeforeWindow}
+															now={now}
+														/>
+													</div>
 												)}
 											</TabsContent>
 											{isAwd ? (
@@ -681,6 +693,11 @@ export function EventWorkspacePage() {
 													<ChallengesTab eventId={resolvedEventId} participantMode={data.event.participant_mode} />
 												</TabsContent>
 											) : null}
+											{!isAwd && caps.instances && canAccessContent ? (
+												<TabsContent value="instances" className="mt-4">
+													<InstancesTab eventId={resolvedEventId} />
+												</TabsContent>
+											) : null}
 											{!isAwd && caps.arena && canAccessContent ? (
 												<TabsContent value="arena" className="mt-4">
 													<ArenaSummaryTab eventId={resolvedEventId} />
@@ -701,11 +718,6 @@ export function EventWorkspacePage() {
 													<TrendTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
-											{!isAwd && caps.instances && canAccessContent ? (
-												<TabsContent value="instances" className="mt-4">
-													<InstancesTab eventId={resolvedEventId} />
-												</TabsContent>
-											) : null}
 											{!isAwd ? (
 												<TabsContent value="bulletin" className="mt-4">
 													<BulletinTab eventId={resolvedEventId} />
@@ -714,49 +726,64 @@ export function EventWorkspacePage() {
 										</Tabs>
 									)}
 								</div>
-
-								<div className="flex flex-col gap-4">
-									{/* 右侧栏：赛事事实 → 参赛状态。标签页已经承担跳转，不再重复放「快速跳转」卡片。 */}
-									<EventFactsCard event={data.event} />
-									{/* 只有正式赛才有「参赛」语义；练习赛 / 系统托管赛事在门禁提示里已经解释过。 */}
-									{participationGate(data.event, now.getTime()).kind === "not-competition" ||
-									participationGate(data.event, now.getTime()).kind === "system-managed" ? null : (
-										<SectionCard
-											title={
-												isTeam
-													? t("events.workspace.teamCardTitle")
-													: t("events.workspace.participationCardTitle")
-											}
-											description={
-												isTeam
-													? data.joined
-														? t("events.workspace.teamCardDescriptionJoined")
-														: t("events.workspace.teamCardDescription")
-													: liveBeforeWindow
-														? t("events.workspace.participationLocked")
-														: participationGate(data.event, now.getTime()).kind === "open"
-														? t("events.workspace.participationOpen")
-														: participationGate(data.event, now.getTime()).kind === "closed"
-															? t("events.participation.notOpenHint")
-															: status === "ended"
-																? t("events.workspace.participationEnded")
-																: t("events.workspace.participationLocked")
-											}
-										>
-											{isTeam ? (
-												<TeamPanel info={data} locked={liveBeforeWindow} />
-											) : (
-												<JoinLeaveControl info={data} locked={liveBeforeWindow} />
-											)}
-										</SectionCard>
-									)}
-								</div>
-							</div>
 						</>
 					);
 				}}
 			</QueryState>
 		</PageBody>
+	);
+}
+
+function EventSidePanel({
+	info,
+	status,
+	isTeam,
+	liveBeforeWindow,
+	now,
+}: {
+	info: EventInfo;
+	status: string;
+	isTeam: boolean;
+	liveBeforeWindow: boolean;
+	now: Date;
+}) {
+	const { t } = useTranslation();
+	const gate = participationGate(info.event, now.getTime());
+	return (
+		<div className="flex flex-col gap-4">
+			<EventFactsCard event={info.event} />
+			{/* 只有正式赛才有「参赛」语义；练习赛 / 系统托管赛事在门禁提示里已经解释过。 */}
+			{gate.kind === "not-competition" || gate.kind === "system-managed" ? null : (
+				<SectionCard
+					title={
+						isTeam
+							? t("events.workspace.teamCardTitle")
+							: t("events.workspace.participationCardTitle")
+					}
+					description={
+						isTeam
+							? info.joined
+								? t("events.workspace.teamCardDescriptionJoined")
+								: t("events.workspace.teamCardDescription")
+							: liveBeforeWindow
+								? t("events.workspace.participationLocked")
+								: gate.kind === "open"
+									? t("events.workspace.participationOpen")
+									: gate.kind === "closed"
+										? t("events.participation.notOpenHint")
+										: status === "ended"
+											? t("events.workspace.participationEnded")
+											: t("events.workspace.participationLocked")
+					}
+				>
+					{isTeam ? (
+						<TeamPanel info={info} locked={liveBeforeWindow} />
+					) : (
+						<JoinLeaveControl info={info} locked={liveBeforeWindow} />
+					)}
+				</SectionCard>
+			)}
+		</div>
 	);
 }
 
