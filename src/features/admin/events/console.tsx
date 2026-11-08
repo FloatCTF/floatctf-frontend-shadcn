@@ -41,6 +41,12 @@ import { EventInstancesTab } from "./tab-instances";
 import { EventLogsTab, EventWriteupsTab } from "./tab-records";
 import { EventDataTab } from "./tab-data";
 import { EventAwdpTab, EventAwdTab } from "./tab-ops";
+import { AwdConfigTab } from "~/features/admin/awd-ops/config-tab";
+import { AwdGameboxesTab } from "~/features/admin/awd-ops/gameboxes-tab";
+import { AwdNetworkTab } from "~/features/admin/awd-ops/network-tab";
+import { AwdPrecheckTab } from "~/features/admin/awd-ops/precheck-tab";
+import { AwdInstancesTab } from "~/features/admin/awd-ops/instances-tab";
+import { AwdTeamsTab } from "~/features/admin/awd-ops/teams-tab";
 import { EventFamilyPill, EventPurposePills, EventStatusPill, ParticipantModePill } from "./shared";
 
 const TAB_KEYS = [
@@ -282,17 +288,33 @@ export function EventConsolePage(): ReactNode {
 						) : (
 							<>
 								<TabsTrigger value="config">{t("adminEvents.console.tabs.config")}</TabsTrigger>
-								<TabsTrigger value="members">{t("adminEvents.console.tabs.members")}</TabsTrigger>
-								{event.participant_mode === "team" ? (
-									<TabsTrigger value="teams">{t("adminEvents.console.tabs.teams")}</TabsTrigger>
+								{event.family !== "awd" ? (
+									<>
+										<TabsTrigger value="members">{t("adminEvents.console.tabs.members")}</TabsTrigger>
+										{event.participant_mode === "team" ? (
+											<TabsTrigger value="teams">{t("adminEvents.console.tabs.teams")}</TabsTrigger>
+										) : null}
+									</>
+								) : null}
+								{event.family === "awd" ? (
+									<>
+										<TabsTrigger value="awd">{t("adminEvents.console.tabs.overview")}</TabsTrigger>
+										<TabsTrigger value="gameboxes">{t("adminEvents.console.tabs.gameboxes")}</TabsTrigger>
+										<TabsTrigger value="network">{t("adminEvents.console.tabs.network")}</TabsTrigger>
+										<TabsTrigger value="operations">{t("adminEvents.console.tabs.operations")}</TabsTrigger>
+										<TabsTrigger value="instances">{t("adminEvents.console.tabs.instance")}</TabsTrigger>
+										{event.participant_mode === "team" ? (
+											<TabsTrigger value="teams">{t("adminEvents.console.tabs.teams")}</TabsTrigger>
+										) : null}
+									</>
 								) : null}
 								<TabsTrigger value="announcements">
 									{t("adminEvents.console.tabs.announcements")}
 								</TabsTrigger>
-								<TabsTrigger value="logs">{t("adminEvents.console.tabs.logs")}</TabsTrigger>
 								{event.family === "awd" ? (
-									<TabsTrigger value="awd">{t("adminEvents.console.tabs.awd")}</TabsTrigger>
+									<TabsTrigger value="writeups">{t("adminEvents.console.tabs.writeups")}</TabsTrigger>
 								) : null}
+								<TabsTrigger value="logs">{t("adminEvents.console.tabs.logs")}</TabsTrigger>
 								{event.family === "awdp" ? (
 									<TabsTrigger value="awdp">{t("adminEvents.console.tabs.awdp")}</TabsTrigger>
 								) : null}
@@ -302,17 +324,23 @@ export function EventConsolePage(): ReactNode {
 				</div>
 
 				<TabsContent value="config" className="mt-4">
-					<EventConfigTab event={event} />
+					{event.family === "awd" ? (
+						<AwdConfigTab eventId={event.id} />
+					) : (
+						<EventConfigTab event={event} />
+					)}
 				</TabsContent>
 				{event.family === "jeopardy" ? (
 					<TabsContent value="challenges" className="mt-4">
 						<EventChallengesTab eventId={event.id} />
 					</TabsContent>
 				) : null}
-				<TabsContent value="members" className="mt-4">
-					<EventMembersTab eventId={event.id} participantMode={event.participant_mode} />
-				</TabsContent>
-				{event.participant_mode === "team" ? (
+				{event.family !== "awd" ? (
+					<TabsContent value="members" className="mt-4">
+						<EventMembersTab eventId={event.id} participantMode={event.participant_mode} />
+					</TabsContent>
+				) : null}
+				{event.family !== "awd" && event.participant_mode === "team" ? (
 					<TabsContent value="teams" className="mt-4">
 						<EventTeamsTab eventId={event.id} participantMode={event.participant_mode} />
 					</TabsContent>
@@ -328,7 +356,7 @@ export function EventConsolePage(): ReactNode {
 				<TabsContent value="logs" className="mt-4">
 					<EventLogsTab eventId={event.id} />
 				</TabsContent>
-				{event.family === "jeopardy" ? (
+				{event.family === "jeopardy" || event.family === "awd" ? (
 					<TabsContent value="writeups" className="mt-4">
 						<EventWriteupsTab eventId={event.id} />
 					</TabsContent>
@@ -339,9 +367,26 @@ export function EventConsolePage(): ReactNode {
 					</TabsContent>
 				) : null}
 				{event.family === "awd" ? (
-					<TabsContent value="awd" className="mt-4">
-						<EventAwdTab eventId={event.id} />
-					</TabsContent>
+					<>
+						<TabsContent value="awd" className="mt-4">
+							<EventAwdTab eventId={event.id} />
+						</TabsContent>
+						<TabsContent value="gameboxes" className="mt-4">
+							<AwdGameboxesTab eventId={event.id} />
+						</TabsContent>
+						<TabsContent value="network" className="mt-4">
+							<AwdNetworkTab eventId={event.id} />
+						</TabsContent>
+						<TabsContent value="operations" className="mt-4">
+							<AwdPrecheckTab eventId={event.id} />
+						</TabsContent>
+						<TabsContent value="instances" className="mt-4">
+							<AwdInstancesTab eventId={event.id} />
+						</TabsContent>
+						<TabsContent value="teams" className="mt-4">
+							<AwdTeamsTab eventId={event.id} />
+						</TabsContent>
+					</>
 				) : null}
 				{event.family === "awdp" ? (
 					<TabsContent value="awdp" className="mt-4">

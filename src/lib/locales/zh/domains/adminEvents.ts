@@ -128,6 +128,11 @@ export default {
 		tabsLabel: "赛事控制台标签",
 		tabs: {
 			config: "配置",
+			overview: "总览",
+			gameboxes: "靶机箱",
+			network: "网络",
+			operations: "运维操作",
+			instance: "实例",
 			challenges: "题目",
 			members: "用户",
 			teams: "战队",

@@ -148,3 +148,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：管理端题库列改为 Default 的 ID/题目/安全名/分类/版本构建/镜像/可见性。
 
 - 2026-11-08：管理端 Jeopardy 控制台 Tab 按 Default 顺序：题目/用户/公告/WriteUps/日志/数据大屏/实例，默认落在题目。
+
+- 2026-11-08：管理端 AWD 控制台增加 Default 的概览/靶机箱/网络/运维操作/实例/战队子页，复用真实 AWD 运维面板。

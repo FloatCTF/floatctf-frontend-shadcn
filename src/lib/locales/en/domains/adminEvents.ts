@@ -135,6 +135,11 @@ export default {
 		tabsLabel: "Event console tabs",
 		tabs: {
 			config: "Configuration",
+			overview: "Overview",
+			gameboxes: "GameBoxes",
+			network: "Network",
+			operations: "Operations",
+			instance: "Instance",
 			challenges: "Challenges",
 			members: "Users",
 			teams: "Teams",
