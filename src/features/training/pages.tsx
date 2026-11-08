@@ -127,16 +127,19 @@ export function TrainingCatalogPage(): ReactNode {
 	const result = query.data;
 	const startingGameboxId = startMutation.isPending ? startMutation.variables : undefined;
 
+	const runActionLabel = (row: GameBoxCatalogDto): string =>
+		row.active_training?.phase === "ended"
+			? t("training.catalog.actions.viewRun")
+			: row.active_training?.phase === "pending"
+				? t("training.catalog.actions.enter")
+				: t("training.catalog.actions.continue");
+
 	const startButton = (row: GameBoxCatalogDto): ReactNode =>
 		row.active_training ? (
 			<Button size="sm" asChild>
 				<Link to={`/training/runs/${row.active_training.run_id}`}>
 					<Play aria-hidden="true" />
-					{row.active_training.phase === "ended"
-						? t("training.catalog.actions.viewRun")
-						: row.active_training.phase === "pending"
-							? t("training.catalog.actions.enter")
-							: t("training.catalog.actions.continue")}
+					{runActionLabel(row)}
 				</Link>
 			</Button>
 		) : (
