@@ -73,6 +73,9 @@ export default {
 		archived: "Archived",
 		active: "Active",
 	},
+	form: {
+		localTimeHint: "Times use your local time zone and are stored as UTC.",
+	},
 	table: {
 		emptyTitle: "No data",
 		emptyDescription: "There is nothing to show under the current conditions.",

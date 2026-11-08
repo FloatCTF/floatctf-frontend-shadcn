@@ -41,7 +41,7 @@ import { qk } from "~/api/keys";
 import { BooleanPill, TonePill, type PillTone } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
-import { Field, FormFooter, FormGrid, FormSheet } from "~/components/app/form";
+import { Field, FormFooter, FormGrid, FormSheet, LocalTimeHint } from "~/components/app/form";
 import {
 	CopyText,
 	KeyValueList,
@@ -1042,6 +1042,7 @@ function ScheduledTaskFormSheet({
 						/>
 					</Field>
 				</FormGrid>
+				<LocalTimeHint />
 				<Field
 					label={t("adminPlatform.tasks.form.descriptionField")}
 					htmlFor="task-description"

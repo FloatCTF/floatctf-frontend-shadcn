@@ -205,6 +205,16 @@ export function FormFooter({
 	);
 }
 
+/** datetime-local 输入的时区提示：值按浏览器本地时区填写，提交时转 ISO/UTC。 */
+export function LocalTimeHint({ className }: { className?: string }) {
+	const { t } = useTranslation();
+	return (
+		<p className={cn("text-xs text-muted-foreground", className)}>
+			{t("common.form.localTimeHint")}
+		</p>
+	);
+}
+
 export function SubmitButton({
 	isPending,
 	children,

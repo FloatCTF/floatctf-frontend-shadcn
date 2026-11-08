@@ -72,6 +72,9 @@ export default {
 		archived: "已归档",
 		active: "进行中",
 	},
+	form: {
+		localTimeHint: "时间按你当前时区填写，保存时转换为 UTC。",
+	},
 	table: {
 		emptyTitle: "暂无数据",
 		emptyDescription: "当前条件下没有可展示的记录。",

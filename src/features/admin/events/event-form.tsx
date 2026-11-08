@@ -19,7 +19,7 @@ import { Wand2 } from "lucide-react";
 import { call } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
-import { Field, FormFooter, FormGrid, FormSheet } from "~/components/app/form";
+import { Field, FormFooter, FormGrid, FormSheet, LocalTimeHint } from "~/components/app/form";
 import { InlineError } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
@@ -359,6 +359,7 @@ export function EventFormSheet({
 						/>
 					</Field>
 				</FormGrid>
+				<LocalTimeHint />
 
 				<FormGrid>
 					<Field

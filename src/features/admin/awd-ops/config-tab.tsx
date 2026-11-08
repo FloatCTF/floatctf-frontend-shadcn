@@ -22,7 +22,7 @@ import { call } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { TonePill } from "~/components/app/badges";
-import { Field, FormFooter, FormGrid, FormSheet } from "~/components/app/form";
+import { Field, FormFooter, FormGrid, FormSheet, LocalTimeHint } from "~/components/app/form";
 import { KeyValueList, MonoText, SectionCard } from "~/components/app/page";
 import { EmptyBlock, QueryState } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
@@ -201,6 +201,7 @@ function ConfigFields({
 					onChange={(event) => onChange("planned_start_at", event.target.value)}
 				/>
 			</Field>
+			<LocalTimeHint className="sm:col-span-2" />
 		</FormGrid>
 	);
 }
