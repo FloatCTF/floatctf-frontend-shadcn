@@ -347,6 +347,11 @@ export default {
 			fullVersion: "Runtime full version",
 			fullVersionHint: "{{name}} (diagnostics only)",
 		},
+		rows: {
+			title: "Version information",
+			version: "Frontend artifact (floatctf-web)",
+			missing: "The backend returned no version",
+		},
 		loading: "Loading version…",
 		errorTitle: "Failed to load the platform version",
 		apiSection: {

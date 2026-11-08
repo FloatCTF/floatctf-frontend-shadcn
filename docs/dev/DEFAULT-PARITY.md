@@ -178,3 +178,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：管理端 Docker 容器列顺序按 Default 调整为容器 ID/名称/镜像/状态/端口/创建时间。
 
 - 2026-11-08：管理端 Docker 网络列顺序按 Default 调整为网络 ID/名称/驱动/作用域/子网/网关。
+
+- 2026-11-08：管理端版本页按 Default 收敛为 Version / floatctf-web / floatctf-api 三行，并注入构建期制品版本。

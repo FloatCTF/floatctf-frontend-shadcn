@@ -58,6 +58,8 @@ export default defineConfig({
 		// 制品是自包含浏览器应用：浏览器里没有 process。
 		"process.env.NODE_ENV": JSON.stringify("production"),
 		"process.env": JSON.stringify({ NODE_ENV: "production" }),
+		// 版本页展示的本前端版本：唯一真相源是制品 manifest。
+		__APP_VERSION__: JSON.stringify(sourceManifest.version),
 	},
 	plugins: [viteReact(), tailwindcss(), emitFrontendManifest()],
 	resolve: {

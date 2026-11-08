@@ -334,6 +334,11 @@ export default {
 			fullVersion: "运行时完整版本",
 			fullVersionHint: "{{name}}（仅诊断展示）",
 		},
+		rows: {
+			title: "版本信息",
+			version: "前端制品版本（floatctf-web）",
+			missing: "后端未返回版本号",
+		},
 		loading: "查询版本…",
 		errorTitle: "查询平台版本失败",
 		apiSection: {
