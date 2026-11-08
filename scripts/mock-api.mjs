@@ -733,14 +733,14 @@ const trainingRun = (phase = mockRunPhase, runId = "run-1") => ({
 	break_score: 100,
 	fix_round_score: 50,
 	total_rounds: 2,
-	started_at: iso(now - 5 * 60000),
+	started_at: phase === "pending" ? null : iso(now - 5 * 60000),
 	break_ends_at: iso(now + 25 * 60000),
 	fix_started_at: phase === "fix" ? iso(now - 60000) : null,
 	fix_ends_at: phase === "fix" ? iso(now + 19 * 60000) : null,
 	finished_at: null,
 	current_round: phase === "fix" ? 1 : 0,
 	next_action_at: iso(now + 25 * 60000),
-	my_score: 100,
+	my_score: phase === "pending" ? 0 : 100,
 	fix_round_penalty: 10,
 	source_code_dir: "src/web-shop",
 	instances: [currentRunInstance()],
@@ -1052,10 +1052,15 @@ const routes = [
 
 	// AWDP 训练场（目录 / Practice Run / 阶段动作 / 实例 / 评测 / 积分 / Writeup）
 	["GET", /^\/api\/service\/gameboxes$/, (_m, res, req) => ok(res, trainingCatalog, req)],
-	["POST", /^\/api\/service\/gameboxes\/([^/]+)\/awdp\/runs$/, (_m, res) => ok(res, trainingRun("pending"))],
+	["POST", /^\/api\/service\/gameboxes\/([^/]+)\/awdp\/runs$/, (_m, res) => {
+		mockRunPhase = "pending";
+		runInstanceState = "stopped";
+		return ok(res, trainingRun(mockRunPhase, "run-1"));
+	}],
 	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)$/, (m, res) => ok(res, trainingRun(mockRunPhase, m[1]))],
 	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/start$/, (m, res) => {
 		mockRunPhase = "break";
+		runInstanceState = "running";
 		return ok(res, trainingRun(mockRunPhase, m[1]));
 	}],
 	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/stop$/, (_m, res) => ok(res, null)],
@@ -1067,10 +1072,16 @@ const routes = [
 		mockRunPhase = "ended";
 		return ok(res, trainingRun(mockRunPhase, m[1]));
 	}],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/restart-training$/, (_m, res) => ok(res, trainingRun("pending", "run-2"))],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/restart-training$/, (_m, res) => {
+		mockRunPhase = "pending";
+		runInstanceState = "stopped";
+		return ok(res, trainingRun(mockRunPhase, "run-2"));
+	}],
 	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/phase$/, (m, res) => {
 		// 前端只会切到「另一个阶段」；mock 用反转模拟（不解析 body）。
 		mockRunPhase = mockRunPhase === "fix" ? "break" : "fix";
+		// 切阶段会把实例重置为 pristine 后继续运行。
+		runInstanceState = "running";
 		return ok(res, trainingRun(mockRunPhase, m[1]));
 	}],
 	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/rounds$/, (_m, res) => ok(res, runRounds)],
