@@ -667,3 +667,17 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 移动端无横向溢出。
 
 验证：`vite build` / i18n（5033 keys）/ theme 全绿。
+
+## 第 40 轮补充（静态 Flag 编辑遮蔽）
+
+题目标题列表已用 `SecretValue` 遮蔽静态 flag，但编辑 Sheet 的「静态 Flag（明文）」
+仍是普通 text input，打开就完整显示。
+
+- 编辑时默认 `type=password`；
+- 增加「显示静态 Flag / 隐藏静态 Flag」眼睛按钮；
+- 列表遮蔽与编辑输入使用同一份值，保存不受影响；
+- 普通字段不变。
+
+实测：Edit QA 的静态 flag 编辑默认 password，点按钮切 text，再点可隐藏。
+
+验证：`vite build` / i18n（5035 keys）/ theme 全绿。
