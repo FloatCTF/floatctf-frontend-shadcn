@@ -588,6 +588,7 @@ export default {
 			taskNameRequired: "Task name is required",
 			taskKeyRequired: "Task key is required",
 			executeAtRequired: "trigger_type=once requires an execute time (the backend rejects it too)",
+			cronShape: "Cron needs 7 fields: second minute hour day month weekday year (e.g. 0 */5 * * * * *).",
 			cronRequired: "trigger_type=cron requires a Cron expression (the backend rejects it too)",
 		},
 		toasts: {

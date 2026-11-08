@@ -30,6 +30,7 @@ import {
 	PaginationBar,
 	ReadonlyBlock,
 	SectionCard,
+	FilterChips,
 	Toolbar,
 } from "~/components/app/page";
 import {
@@ -259,6 +260,19 @@ export function AdminLogsPage(): ReactNode {
 								))}
 							</SelectContent>
 						</Select>
+						<FilterChips
+							filters={
+								level === "all"
+									? []
+									: [
+											{
+												key: "level",
+												label: t(`adminPlatform.logs.levels.${level.toLowerCase()}`),
+												onRemove: () => setLevel("all"),
+											},
+										]
+							}
+						/>
 						<SearchInput
 							value={list.search}
 							onChange={list.setSearch}

@@ -1116,6 +1116,59 @@ const mockTeamFor = (event) => ({
 	],
 });
 
+/** 计划任务（mock）：创建/编辑/删除都作用在这份状态上。 */
+let mockTasks = [
+		{
+			id: "t-1",
+			group_id: "system",
+			task_name: "清理过期实例",
+			description: "回收超过 24 小时的题目实例。",
+			task_key: "cleanup-stale-instances",
+			trigger_type: "cron",
+			status: "pending",
+			enabled: true,
+			protected: false,
+			cron_expr: "0 */6 * * * *",
+			created_at: iso(now - 30 * D),
+			updated_at: iso(now - 2 * H),
+			attempt_count: 0,
+			max_attempts: 3,
+		},
+		{
+			id: "t-3",
+			group_id: "system",
+			task_name: "启动时检查 helper 连接",
+			description: "API 启动后确认 helper-docker / helper-control socket 可用。",
+			task_key: "helper-healthcheck",
+			trigger_type: "startup",
+			status: "pending",
+			enabled: true,
+			protected: false,
+			cron_expr: null,
+			created_at: iso(now - 90 * D),
+			updated_at: iso(now - 3 * 60000),
+			attempt_count: 0,
+			max_attempts: 3,
+		},
+		{
+			id: "t-2",
+			group_id: "service",
+			task_name: "平台课程同步",
+			description: "从课程服务同步选课名单（示例任务）。",
+			task_key: "course-sync",
+			trigger_type: "cron",
+			status: "failed",
+			enabled: true,
+			protected: true,
+			cron_expr: "0 0 3 * * * *",
+			created_at: iso(now - 60 * D),
+			updated_at: iso(now - 45 * 60000),
+			attempt_count: 2,
+			max_attempts: 3,
+			last_error: "network timeout（示例）",
+		},
+		];
+
 const routes = [
 
 
@@ -1654,60 +1707,69 @@ const routes = [
 		ok(res, adminEvents.find((item) => item.id === m[1]) ?? adminEvents[0]);
 	}],
 	["GET", /^\/api\/admin\/scheduled_tasks$/, (_m, res, req) => {
-		const rows = [
-				{
-					id: "t-1",
-					group_id: "system",
-					task_name: "清理过期实例",
-					description: "回收超过 24 小时的题目实例。",
-					task_key: "cleanup-stale-instances",
-					trigger_type: "cron",
-					status: "pending",
-					enabled: true,
-					protected: false,
-					cron_expr: "0 */6 * * * *",
-					created_at: iso(now - 30 * D),
-					updated_at: iso(now - 2 * H),
-					attempt_count: 0,
-					max_attempts: 3,
-				},
-				{
-					id: "t-3",
-					group_id: "system",
-					task_name: "启动时检查 helper 连接",
-					description: "API 启动后确认 helper-docker / helper-control socket 可用。",
-					task_key: "helper-healthcheck",
-					trigger_type: "startup",
-					status: "pending",
-					enabled: true,
-					protected: false,
-					cron_expr: null,
-					created_at: iso(now - 90 * D),
-					updated_at: iso(now - 3 * 60000),
-					attempt_count: 0,
-					max_attempts: 3,
-				},
-				{
-					id: "t-2",
-					group_id: "service",
-					task_name: "平台课程同步",
-					description: "从课程服务同步选课名单（示例任务）。",
-					task_key: "course-sync",
-					trigger_type: "cron",
-					status: "failed",
-					enabled: true,
-					protected: true,
-					cron_expr: "0 0 3 * * * *",
-					created_at: iso(now - 60 * D),
-					updated_at: iso(now - 45 * 60000),
-					attempt_count: 2,
-					max_attempts: 3,
-					last_error: "network timeout（示例）",
-				},
-		];
-		// 后端的 `kind` 过滤对应任务分组（service / system / event），不是 trigger_type。
-		return ok(res, rows.filter((row) => mockFilterMatch(req, row, { kind: "group_id", name: "task_name" })), req);
+		const rows = mockTasks;
+		return okPage(res, rows.filter((row) => mockFilterMatch(req, row, { kind: "group_id", name: "task_name" })), req);
 	}],
+	["POST", /^\/api\/admin\/scheduled_tasks$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const name = String(body.task_name ?? "").trim();
+			const key = String(body.task_key ?? "").trim();
+			const trigger = String(body.trigger_type ?? "once");
+			if (!name || !key) {
+				return json(res, 200, { code: 400, message: "任务名称与任务键必填", data: null, meta: null });
+			}
+			if (trigger === "cron") {
+				const cron = String(body.cron_expr ?? "").trim();
+				// 后端用 cron 库校验（7 段：秒 分 时 日 月 周 年）；这里做同样的段数检查。
+				if (cron.split(/\s+/).filter(Boolean).length !== 7) {
+					return json(res, 200, { code: 400, message: "Cron 表达式需要 7 段（秒 分 时 日 月 周 年）", data: null, meta: null });
+				}
+			}
+			const task = {
+				id: `t-${Date.now()}`,
+				group_id: body.group_id ?? "system",
+				task_name: name,
+				description: String(body.description ?? ""),
+				task_key: key,
+				trigger_type: trigger,
+				status: "pending",
+				enabled: body.enabled !== false,
+				protected: false,
+				cron_expr: body.cron_expr ?? null,
+				execute_at: body.execute_at ?? null,
+				created_at: iso(now),
+				updated_at: iso(now),
+				attempt_count: 0,
+				max_attempts: 3,
+			};
+			mockTasks = [...mockTasks, task];
+			return ok(res, task);
+		})],
+	["PATCH", /^\/api\/admin\/scheduled_tasks\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const task = mockTasks.find((item) => item.id === m[1]);
+			if (!task) return json(res, 404, { code: 404, message: "任务不存在", data: null, meta: null });
+			if (task.protected) return json(res, 200, { code: 400, message: "受保护任务不可修改", data: null, meta: null });
+			Object.assign(task, {
+				task_name: body.task_name ?? task.task_name,
+				task_key: body.task_key ?? task.task_key,
+				trigger_type: body.trigger_type ?? task.trigger_type,
+				cron_expr: body.cron_expr ?? task.cron_expr,
+				execute_at: body.execute_at ?? task.execute_at,
+				expires_at: body.expires_at ?? task.expires_at,
+				description: body.description ?? task.description,
+				enabled: body.enabled ?? task.enabled,
+				updated_at: iso(now),
+			});
+			return ok(res, task);
+		})],
+	["DELETE", /^\/api\/admin\/scheduled_tasks$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const removable = mockTasks.filter((task) => ids.includes(task.id) && !task.protected);
+			mockTasks = mockTasks.filter((task) => !removable.some((item) => item.id === task.id));
+			return ok(res, removable.length);
+		})],
 	["POST", /^\/api\/admin\/scheduled_tasks\/([^/]+)\/run$/, (_m, res, req) =>
 		ok(
 			res,

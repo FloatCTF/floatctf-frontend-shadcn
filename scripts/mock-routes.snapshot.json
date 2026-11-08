@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T01:32:19.025Z",
+	"generatedAt": "2026-11-08T01:40:22.020Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -16,6 +16,10 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/roles\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/scheduled_tasks"
 		},
 		{
 			"method": "DELETE",
@@ -403,6 +407,10 @@
 		},
 		{
 			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/scheduled_tasks\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
 			"pattern": "\\/api\\/discussions\\/([^/]+)"
 		},
 		{
@@ -464,6 +472,10 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/admin\\/roles"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/scheduled_tasks"
 		},
 		{
 			"method": "POST",

@@ -72,6 +72,10 @@ export default {
 		archived: "已归档",
 		active: "进行中",
 	},
+	filters: {
+		remove: "移除筛选：{{filter}}",
+		clearAll: "清除全部筛选",
+	},
 	form: {
 		localTimeHint: "时间按你当前时区填写，保存时转换为 UTC。",
 	},

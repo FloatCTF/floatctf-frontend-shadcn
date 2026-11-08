@@ -5,7 +5,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, X } from "lucide-react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -282,6 +282,53 @@ export function SecretValue({ value, label }: { value: string; label?: string })
 				{copied ? <Check className="text-emerald-600 dark:text-emerald-400" /> : <Copy />}
 			</Button>
 		</span>
+	);
+}
+
+
+/** 已生效筛选的 chip 列表：让「我筛过什么」始终可见、可单独移除。 */
+export interface ActiveFilterChip {
+	key: string;
+	label: string;
+	onRemove: () => void;
+}
+
+export function FilterChips({
+	filters,
+	onClearAll,
+	className,
+}: {
+	filters: ActiveFilterChip[];
+	onClearAll?: () => void;
+	className?: string;
+}) {
+	const { t } = useTranslation();
+	if (filters.length === 0) return null;
+	return (
+		<div className={cn("flex flex-wrap items-center gap-1.5", className)}>
+			{filters.map((filter) => (
+				<span
+					key={filter.key}
+					className="inline-flex items-center gap-1 rounded-full border bg-muted/40 py-0.5 pl-2.5 pr-0.5 text-xs"
+				>
+					<span>{filter.label}</span>
+					<button
+						type="button"
+						onClick={filter.onRemove}
+						aria-label={t("common.filters.remove", { filter: filter.label })}
+						title={t("common.filters.remove", { filter: filter.label })}
+						className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+					>
+						<X className="size-3" aria-hidden="true" />
+					</button>
+				</span>
+			))}
+			{onClearAll ? (
+				<Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={onClearAll}>
+					{t("common.filters.clearAll")}
+				</Button>
+			) : null}
+		</div>
 	);
 }
 

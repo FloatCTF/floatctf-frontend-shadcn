@@ -51,6 +51,7 @@ import {
 	PaginationBar,
 	ReadonlyBlock,
 	SectionCard,
+	FilterChips,
 	Toolbar,
 } from "~/components/app/page";
 import {
@@ -430,6 +431,19 @@ export function AdminScheduledTasksPage(): ReactNode {
 								))}
 							</SelectContent>
 						</Select>
+						<FilterChips
+							filters={
+								kind === "all"
+									? []
+									: [
+											{
+												key: "kind",
+												label: t(`adminPlatform.tasks.filters.kinds.${kind}`),
+												onRemove: () => setKind("all"),
+											},
+										]
+							}
+						/>
 						<Select
 							value={field}
 							onValueChange={(value) => setField(value as SearchField)}
@@ -874,8 +888,14 @@ function ScheduledTaskFormSheet({
 		if (form.triggerType === "once" && form.executeAt.length === 0) {
 			nextErrors.executeAt = t("adminPlatform.tasks.validation.executeAtRequired");
 		}
-		if (form.triggerType === "cron" && form.cronExpr.trim().length === 0) {
-			nextErrors.cronExpr = t("adminPlatform.tasks.validation.cronRequired");
+		if (form.triggerType === "cron") {
+			const cron = form.cronExpr.trim();
+			if (cron.length === 0) {
+				nextErrors.cronExpr = t("adminPlatform.tasks.validation.cronRequired");
+			} else if (cron.split(/\s+/).filter(Boolean).length !== 7) {
+				// 后端用 cron 库校验 7 段（秒 分 时 日 月 周 年）：这里先给出即时反馈。
+				nextErrors.cronExpr = t("adminPlatform.tasks.validation.cronShape");
+			}
 		}
 		setErrors(nextErrors);
 		if (Object.keys(nextErrors).length > 0) return;

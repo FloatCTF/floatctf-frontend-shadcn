@@ -541,6 +541,7 @@ export default {
 			taskNameRequired: "任务名称不能为空",
 			taskKeyRequired: "任务键不能为空",
 			executeAtRequired: "触发方式 once 必须填写执行时间（后端同样会拒绝）",
+			cronShape: "Cron 表达式需要 7 段：秒 分 时 日 月 周 年（例如 0 */5 * * * * *）。",
 			cronRequired: "触发方式 cron 必须填写 Cron 表达式（后端同样会拒绝）",
 		},
 		toasts: {

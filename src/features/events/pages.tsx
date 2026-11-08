@@ -17,6 +17,7 @@ import { qk } from "~/api/keys";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import {
 	PageBody,
+	FilterChips,
 	PageHeader,
 	PaginationBar,
 	SectionCard,
@@ -304,6 +305,48 @@ export function EventsListPage() {
 					</Button>
 				</div>
 
+				<FilterChips
+					filters={[
+						...(family !== "all"
+							? [
+									{
+										key: "family",
+										label: t(`events.family.${family}`),
+										onRemove: () => {
+											setFamily("all");
+											setPage(1);
+										},
+									},
+								]
+							: []),
+						...(statusFilter !== "all"
+							? [
+									{
+										key: "status",
+										label: t(`events.status.${statusFilter}`),
+										onRemove: () => {
+											setStatusFilter("all");
+											setPage(1);
+										},
+									},
+								]
+							: []),
+						...(onlyJoined
+							? [
+									{
+										key: "joined",
+										label: t("events.list.onlyJoined"),
+										onRemove: () => {
+											setOnlyJoined(false);
+											setPage(1);
+										},
+									},
+								]
+							: []),
+					]}
+					onClearAll={clearFilters}
+					className="px-4"
+				/>
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={5} />}

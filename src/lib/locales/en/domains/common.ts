@@ -73,6 +73,10 @@ export default {
 		archived: "Archived",
 		active: "Active",
 	},
+	filters: {
+		remove: "Remove filter: {{filter}}",
+		clearAll: "Clear all filters",
+	},
 	form: {
 		localTimeHint: "Times use your local time zone and are stored as UTC.",
 	},
