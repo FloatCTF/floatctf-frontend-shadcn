@@ -649,7 +649,10 @@ const awdpAdminConfig = (eventId) => ({
 	next_action_at: iso(now + 40 * 60000),
 	...awdpAdminOverrides[eventId],
 });
+const awdpGameboxAdditions = {};
+const awdpGameboxRemoved = new Set();
 const awdpAdminGameboxes = (eventId) => [
+	...(awdpGameboxAdditions[eventId] ?? []),
 	{
 		id: "aegb-1",
 		event_id: eventId,
@@ -666,7 +669,8 @@ const awdpAdminGameboxes = (eventId) => [
 		awdp_source_code_dir: "src/web-shop",
 		build_status: "ready",
 	},
-];
+]
+	.filter((box) => !awdpGameboxRemoved.has(`${eventId}:${box.id}`));
 const awdpAdminInstances = [
 	{
 		instance_id: "ainst-1",
@@ -767,7 +771,9 @@ const awdEventNetwork = (eventId) => ({
 });
 const awdEventGameboxOverrides = {};
 const awdEventGameboxRemoved = new Set();
+const awdEventGameboxAdditions = {};
 const awdEventGameboxes = (eventId) => [
+	...(awdEventGameboxAdditions[eventId] ?? []),
 	{
 		id: "egb-1",
 		event_id: eventId,
@@ -1716,7 +1722,38 @@ const routes = [
 	["POST", /^\/api\/admin\/awd\/gameboxes\/check$/, (_m, res) => ok(res, [])],
 	["POST", /^\/api\/admin\/awd\/gameboxes\/build$/, (_m, res) => ok(res, [])],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => ok(res, awdEventGameboxes(m[1]))],
-	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => ok(res, awdEventGameboxes(m[1])[0])],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const lib = mockGameboxLibrary.find((row) => row.id === body.gamebox_id);
+			if (!lib) return json(res, 404, { code: 404, message: "GameBox 不存在", data: null, meta: null });
+			const current = awdEventGameboxes(m[1]);
+			if (current.some((box) => box.gamebox_id === lib.id)) {
+				return json(res, 200, { code: 409, message: "该 GameBox 已挂载到本赛事", data: null, meta: null });
+			}
+			const hostOffset = Number(body.host_offset ?? 0) || current.length + 1;
+			const box = {
+				id: `egb-${Date.now()}`,
+				event_id: m[1],
+				gamebox_id: lib.id,
+				gamebox_name: lib.name,
+				gamebox_safe_name: lib.safe_name,
+				gamebox_version: lib.version,
+				host_offset: hostOffset,
+				enabled: true,
+				hidden: Boolean(body.hidden ?? false),
+				cpu_millis: lib.cpu_millis,
+				memory_bytes: lib.memory_bytes,
+				pids_limit: lib.pids_limit,
+				judge_timeout_secs: lib.judge_timeout_secs,
+				judge_retry_interval_secs: lib.judge_retry_interval_secs,
+				attack_score: Number(body.attack_score ?? 100),
+				judge_down_penalty: Number(body.judge_down_penalty ?? 20),
+				first_bonus: Number(body.first_bonus ?? 50),
+				created_at: iso(now),
+			};
+			(awdEventGameboxAdditions[m[1]] ??= []).push(box);
+			return ok(res, box);
+		})],
 	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)$/, (m, res) => {
 		awdEventGameboxRemoved.add(`${m[1]}:${m[2]}`);
 		return ok(res, null);
@@ -1790,8 +1827,37 @@ const routes = [
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awdp\/break-to-fix$/, (m, res) => { awdpAdminPhase = "fix"; return ok(res, null); }],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awdp\/finish$/, (m, res) => { awdpAdminPhase = "ended"; return ok(res, null); }],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awdp\/gameboxes$/, (m, res) => ok(res, awdpAdminGameboxes(m[1]))],
-	["POST", /^\/api\/admin\/events\/([^/]+)\/awdp\/gameboxes$/, (m, res) => ok(res, awdpAdminGameboxes(m[1])[0])],
-	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awdp\/gameboxes$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const lib = mockGameboxLibrary.find((row) => row.id === body.gamebox_id);
+			if (!lib) return json(res, 404, { code: 404, message: "GameBox 不存在", data: null, meta: null });
+			const current = awdpAdminGameboxes(m[1]);
+			if (current.some((box) => box.gamebox_id === lib.id)) {
+				return json(res, 200, { code: 409, message: "该 GameBox 已挂载到本赛事", data: null, meta: null });
+			}
+			const box = {
+				id: `aegb-${Date.now()}`,
+				event_id: m[1],
+				gamebox_id: lib.id,
+				name: lib.name,
+				safe_name: lib.safe_name,
+				category: lib.category,
+				enabled: true,
+				hidden: Boolean(body.hidden ?? false),
+				cpu_millis: lib.cpu_millis,
+				memory_bytes: lib.memory_bytes,
+				pids_limit: lib.pids_limit,
+				awdp_capable: true,
+				awdp_source_code_dir: `src/${lib.safe_name}`,
+				build_status: lib.build_status,
+			};
+			(awdpGameboxAdditions[m[1]] ??= []).push(box);
+			return ok(res, box);
+		})],
+	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)$/, (m, res) => {
+		awdpGameboxRemoved.add(`${m[1]}:${m[2]}`);
+		return ok(res, null);
+	}],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awdp\/instances$/, (_m, res) => ok(res, awdpAdminInstances)],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awdp\/scores$/, (_m, res) => ok(res, awdpScores)],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awdp\/data$/, (m, res) => {
