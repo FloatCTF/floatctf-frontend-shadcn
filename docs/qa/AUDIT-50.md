@@ -216,3 +216,16 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 回归：AWD/AWDP 非 Jeopardy 标签收敛、E1 实例/Writeup 标签、社区删除无 404、移动端无横向溢出。
 
 验证：`vite build` / i18n / theme / mock-check 全绿。
+
+## 第 9 轮补充（无效题集 ID / 空状态去重）
+
+已完成：
+
+- **无效题集不再显示第一个题集**：mock 的管理端题集列表忽略 `filter=id:...`，导致
+  `/admin/challenge-sets/does-not-exist` 显示 set-1 的详情。现在按查询过滤；找不到时
+  显示「题集不存在 + 返回题集列表」。
+- **无效题集只显示一个空状态**：原先页面先渲染「题集里还没有题目」再渲染「题集不存在」；
+  现在确认无 meta 时提前返回 NotFoundBlock，不再出现「添加题目」等对无效 ID 可执行的动作。
+- 复测：`set-1` 正常显示名称/描述/题目；无效 ID 只有 not-found 块；题集添加/移出仍正常。
+
+验证：`vite build` / i18n / mock-check 全绿。
