@@ -1002,6 +1002,7 @@ const routes = [
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => ok(res, awdEventGameboxes(m[1]))],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => ok(res, awdEventGameboxes(m[1])[0])],
 	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)$/, (_m, res) => ok(res, null)],
+	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)$/, (m, res) => ok(res, awdEventGameboxes(m[1])[0])],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/instances$/, (_m, res) => ok(res, [])],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/teams$/, (m, res) => ok(res, awdTeams(m[1]))],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/teams\/([^/]+)\/ban$/, (_m, res) => ok(res, "team banned")],
@@ -1047,6 +1048,7 @@ const routes = [
 		});
 	}],
 	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, awdpInstance)],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, awdpInstance)],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => ok(res, awdpInstance)],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/break$/, (_m, res) =>
@@ -1096,6 +1098,7 @@ const routes = [
 			{ name: "NOP Sled", points: [{ name: "NOP Sled", score: 200, time: iso(now - 30 * 60000) }, { name: "NOP Sled", score: 200, time: iso(now - 10 * 60000) }] },
 		])],
 	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, awdpInstance)],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, awdpInstance)],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => ok(res, awdpInstance)],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/break$/, (_m, res) =>

@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T00:34:56.935Z",
+	"generatedAt": "2026-11-08T00:40:39.599Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -371,6 +371,10 @@
 		},
 		{
 			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp"
 		},
 		{
@@ -444,6 +448,10 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)\\/break"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)\\/instance"
 		},
 		{
 			"method": "POST",

@@ -160,10 +160,14 @@ export function AwdStatusPill({
 	finalSettlement?: boolean;
 }): ReactNode {
 	const { t } = useTranslation();
+	// 终态赛事不再有「当前阶段」：archived/finished 还显示「加固期」会误导。
+	const terminal = status === "finished" || status === "archived";
 	return (
 		<span className="inline-flex flex-wrap items-center gap-1.5">
 			<TonePill tone={awdStatusTone(status)}>{awdStatusLabel(status, t)}</TonePill>
-			{phase ? <TonePill tone={awdPhaseTone(phase)}>{awdPhaseLabel(phase, t)}</TonePill> : null}
+			{phase && !terminal ? (
+				<TonePill tone={awdPhaseTone(phase)}>{awdPhaseLabel(phase, t)}</TonePill>
+			) : null}
 			{finalSettlement ? (
 				<TonePill tone="warning" title={t("adminAwdOps.state.finalSettlementTitle")}>
 					{t("adminAwdOps.state.finalSettlement")}

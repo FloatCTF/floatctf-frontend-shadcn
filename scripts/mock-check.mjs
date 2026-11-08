@@ -91,12 +91,35 @@ const regexes = routes.map((route) => ({ method: route.method, re: new RegExp(`^
 const endpoints = sdkEndpoints();
 const uncovered = endpoints.filter((endpoint) => {
 	const [method, path] = endpoint.split(" ");
-	return !regexes.some((route) => route.method === method && route.re.test(path));
+	// 同一个 SDK 路径可能由管理端客户端加 `/admin` 前缀请求：两种都算覆盖。
+	const candidates = [path, path.replace(/^\/api\//, "/api/admin/")];
+	return !regexes.some(
+		(route) => route.method === method && candidates.some((candidate) => route.re.test(candidate)),
+	);
 });
 if (endpoints.length > 0) {
 	const covered = endpoints.length - uncovered.length;
 	console.log(`SDK 端点覆盖（信息）：${covered}/${endpoints.length}；未 mock ${uncovered.length} 个`);
 	if (process.argv.includes("--verbose")) {
 		for (const endpoint of uncovered) console.log(`  · ${endpoint}`);
+	}
+
+	// 关键能力（AWD / AWDP / 训练 run / 管理端运维）必须被 mock 覆盖：
+	// 这几组端点缺一条，页面上就是整块「没有返回数据」，构建与类型检查都发现不了。
+	const criticalPrefixes = [
+		"/api/events/11111111-1111-4111-8111-111111111111/awd",
+		"/api/events/11111111-1111-4111-8111-111111111111/awdp",
+		"/api/admin/events/11111111-1111-4111-8111-111111111111/awd",
+		"/api/admin/events/11111111-1111-4111-8111-111111111111/awdp",
+		"/api/service/awdp/runs/",
+		"/api/service/gameboxes/",
+	];
+	const criticalMissing = uncovered.filter((endpoint) =>
+		criticalPrefixes.some((prefix) => endpoint.includes(prefix)),
+	);
+	if (criticalMissing.length > 0) {
+		console.error(`关键能力端点未被 mock 覆盖（${criticalMissing.length} 个）：`);
+		for (const endpoint of criticalMissing) console.error(`  - ${endpoint}`);
+		process.exitCode = 1;
 	}
 }
