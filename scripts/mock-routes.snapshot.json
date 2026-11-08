@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T02:49:26.738Z",
+	"generatedAt": "2026-11-08T02:56:18.209Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -48,6 +48,10 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/scheduled_tasks"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/settings"
 		},
 		{
 			"method": "DELETE",
@@ -495,6 +499,10 @@
 		},
 		{
 			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/settings\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
 			"pattern": "\\/api\\/admin\\/weapons\\/([^/]+)"
 		},
 		{
@@ -616,6 +624,10 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/admin\\/scheduled_tasks\\/([^/]+)\\/run"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/settings"
 		},
 		{
 			"method": "POST",

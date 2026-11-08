@@ -1441,6 +1441,21 @@ const mockFrontendRegistry = {
 	},
 };
 
+
+/** 动态设置（mock）：FRONTEND_ACTIVE 与后端默认数据一致，标记为 protected。 */
+let mockSettings = [
+	{
+		id: "s-1",
+		key: "FRONTEND_ACTIVE",
+		value: "shadcn",
+		type: "string",
+		description: "当前生效的前端 ID（对应前端注册表；default 始终随平台发布）",
+		protected: true,
+		created_at: iso(now - 30 * D),
+		updated_at: iso(now - 30 * D),
+	},
+];
+
 const routes = [
 	["GET", /^\/__floatctf\/frontends\/registry\.json$/, (_m, res) => json(res, 200, mockFrontendRegistry)],
 
@@ -2464,24 +2479,44 @@ const routes = [
 		];
 		return okPage(res, rows.filter((row) => mockFilterMatch(req, row)), req);
 	}],
-	["GET", /^\/api\/admin\/settings$/, (_m, res, req) =>
-		ok(
-			res,
-			[
-				{
-					id: "s-1",
-					key: "FRONTEND_ACTIVE",
-					value: "shadcn",
-					type: "string",
-					description: "当前生效的前端 ID（对应前端注册表；default 始终随平台发布）",
-					// 后端默认数据把 FRONTEND_ACTIVE 标记为 protected：可改不可删。
-					protected: true,
-					created_at: iso(now - 30 * D),
-					updated_at: iso(now - 30 * D),
-				},
-			],
-			req,
-		)],
+	["GET", /^\/api\/admin\/settings$/, (_m, res) => ok(res, mockSettings)],
+	["POST", /^\/api\/admin\/settings$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const setting = {
+				id: `s-${Date.now()}`,
+				key: String(body.key ?? ""),
+				value: String(body.value ?? ""),
+				type: body.type ?? "string",
+				description: String(body.description ?? ""),
+				protected: Boolean(body.protected),
+				created_at: iso(now),
+				updated_at: iso(now),
+			};
+			mockSettings.push(setting);
+			return ok(res, setting);
+		})],
+	["PATCH", /^\/api\/admin\/settings\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const setting = mockSettings.find((row) => row.id === m[1]);
+			if (!setting) return json(res, 404, { code: 404, message: "设置不存在", data: null, meta: null });
+			setting.value = body.value ?? setting.value;
+			setting.type = body.type ?? setting.type;
+			setting.description = body.description ?? setting.description;
+			if (typeof body.protected === "boolean") setting.protected = body.protected;
+			setting.updated_at = iso(now);
+			return ok(res, setting);
+		})],
+	["DELETE", /^\/api\/admin\/settings$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const blocked = mockSettings.filter((row) => ids.includes(row.id) && row.protected);
+			if (blocked.length > 0) {
+				return json(res, 200, { code: 400, message: "protected setting can not be deleted", data: null, meta: null });
+			}
+			const removable = mockSettings.filter((row) => ids.includes(row.id));
+			mockSettings = mockSettings.filter((row) => !ids.includes(row.id));
+			return ok(res, removable.length);
+		})],
 	["GET", /^\/api\/admin\/system\/version$/, (_m, res) => ok(res, "1.0.6")],
 	["GET", /^\/api\/admin\/system\/monitor$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/admin\/docker\/containers\/([^/]+)\/stop$/, (m, res) => {
