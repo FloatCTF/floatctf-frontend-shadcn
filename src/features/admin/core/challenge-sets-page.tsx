@@ -186,18 +186,22 @@ export function AdminChallengeSetsPage(): ReactNode {
 
 	const columns: DataTableColumn<ChallengeSets>[] = [
 		{
+			id: "id",
+			header: t("adminCore.challengeSets.columns.id"),
+			sortValue: (row) => row.id,
+			cell: (row) => <MonoText className="text-muted-foreground">{row.id}</MonoText>,
+			hideBelow: "md",
+		},
+		{
 			id: "name",
 			header: t("adminCore.challengeSets.columns.set"),
 			cell: (row) => (
-				<div className="min-w-0">
-					<Link
-						to={`/admin/challenge-sets/${row.id}`}
-						className="truncate text-sm font-medium hover:underline"
-					>
-						{row.name}
-					</Link>
-					<MonoText className="text-muted-foreground">{row.id}</MonoText>
-				</div>
+				<Link
+					to={`/admin/challenge-sets/${row.id}`}
+					className="truncate text-sm font-medium hover:underline"
+				>
+					{row.name}
+				</Link>
 			),
 			sortValue: (row) => row.name,
 		},
@@ -219,16 +223,6 @@ export function AdminChallengeSetsPage(): ReactNode {
 				<span className="tnum text-xs text-muted-foreground">{formatDateTime(row.created_at)}</span>
 			),
 			sortValue: (row) => Date.parse(row.created_at),
-			hideBelow: "md",
-		},
-		{
-			id: "updated_at",
-			header: t("adminCore.challengeSets.columns.updatedAt"),
-			cell: (row) => (
-				<span className="tnum text-xs text-muted-foreground">{formatDateTime(row.updated_at)}</span>
-			),
-			sortValue: (row) => Date.parse(row.updated_at),
-			hideBelow: "lg",
 		},
 	];
 

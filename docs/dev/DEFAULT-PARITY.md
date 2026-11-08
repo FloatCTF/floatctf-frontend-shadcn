@@ -140,3 +140,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：讨论区补齐 All/My 导航并移除列表额外操作列；Writeups 列序按 Default 调整。
 
 - 2026-11-08：Profile 改为 Default 的只读/Edit 模式：左侧账号/昵称/邮箱/密码，右侧头像；移除确认密码与账号元数据卡片。
+
+- 2026-11-08：管理端题集列表列改为 Default 的 ID/名称/描述/创建时间。

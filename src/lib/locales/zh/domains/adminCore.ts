@@ -409,6 +409,7 @@ export default {
 			description: "没有名称 / 描述匹配「{{query}}」的题集。",
 		},
 		columns: {
+			id: "ID",
 			set: "题集",
 			description: "描述",
 			createdAt: "创建时间",

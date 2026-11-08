@@ -424,6 +424,7 @@ export default {
 			description: "No set matches “{{query}}” on name / description.",
 		},
 		columns: {
+			id: "ID",
 			set: "Set",
 			description: "Description",
 			createdAt: "Created",
