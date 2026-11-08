@@ -786,6 +786,14 @@ function NetworksTab(): ReactNode {
 
 	const columns: DataTableColumn<NetworkInfo>[] = [
 		{
+			id: "id",
+			header: t("adminInfra.docker.columns.networkId"),
+			hideBelow: "xl",
+			cell: (row) => (
+				<CopyText value={row.id} label={t("adminInfra.docker.columns.networkId")} />
+			),
+		},
+		{
 			id: "name",
 			header: t("adminInfra.docker.columns.name"),
 			sortValue: (row) => row.name,
@@ -815,14 +823,6 @@ function NetworksTab(): ReactNode {
 			header: t("adminInfra.docker.columns.gateway"),
 			hideBelow: "lg",
 			cell: (row) => <MonoText className="text-muted-foreground">{row.gateway ?? empty}</MonoText>,
-		},
-		{
-			id: "id",
-			header: t("adminInfra.docker.columns.networkId"),
-			hideBelow: "xl",
-			cell: (row) => (
-				<CopyText value={row.id} label={t("adminInfra.docker.columns.networkId")} />
-			),
 		},
 	];
 
