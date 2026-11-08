@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T05:24:03.737Z",
+	"generatedAt": "2026-11-08T05:44:38.353Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -20,6 +20,14 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/challenges"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/discussions"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/discussions\\/([^/]+)\\/comments\\/([^/]+)"
 		},
 		{
 			"method": "DELETE",
@@ -156,6 +164,14 @@
 		{
 			"method": "GET",
 			"pattern": "\\/api\\/admin\\/discussions"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/discussions\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/discussions\\/([^/]+)\\/comments"
 		},
 		{
 			"method": "GET",

@@ -284,16 +284,17 @@ const eventChallenges = challenges.map((challenge, index) => ({
 }));
 
 const teams = [
-	["0x7f", 4820, 9],
-	["NOP Sled", 4410, 8],
-	["SegFault Club", 3980, 7],
-	["Byte Me", 3520, 6],
-	["午夜场", 3120, 6],
+	// 解出题数不能超过题库题目数（当前 6 题）。
+	["0x7f", 4820, 6],
+	["NOP Sled", 4410, 6],
+	["SegFault Club", 3980, 5],
+	["Byte Me", 3520, 5],
+	["午夜场", 3120, 4],
 	["李明", 2450, 3],
-	["Kernel Panic", 2210, 4],
-	["Stack Smashers", 1980, 3],
+	["Kernel Panic", 2210, 3],
+	["Stack Smashers", 1980, 2],
 	["Null Pointer", 1760, 2],
-	["Hex Hazard", 1540, 2],
+	["Hex Hazard", 1540, 1],
 ];
 
 // 当前账号在 mock 的 AWD 赛事里属于 Byte Me（teams[3]）。
@@ -723,6 +724,7 @@ function awdStatusFor(eventId) {
 }
 const awdAdminState = (eventId) => {
 	const status = awdStatusFor(eventId);
+	const event = events.find((item) => item.id === eventId);
 	return {
 		event_id: eventId,
 		status,
@@ -736,7 +738,9 @@ const awdAdminState = (eventId) => {
 		judge_default_timeout_secs: 120,
 		judge_retry_interval_secs: 30,
 		archive_retention_hours: 72,
-		planned_start_at: iso(now - 2 * H),
+		planned_start_at: event
+			? iso(new Date(event.start_time).getTime() - 10 * 60000)
+			: iso(now - 2 * H),
 		verified_at: status === "draft" || status === "configuring" ? null : iso(now - 3 * H),
 		started_at: ["running", "paused", "finished", "archived"].includes(status)
 			? iso(now - 40 * 60000)
@@ -746,6 +750,7 @@ const awdAdminState = (eventId) => {
 		...awdAdminOverrides[eventId],
 	};
 };
+const awdNetworkOverrides = {};
 const awdEventNetwork = (eventId) => ({
 	event_id: eventId,
 	allocation_mode: "automatic",
@@ -758,7 +763,10 @@ const awdEventNetwork = (eventId) => ({
 	wireguard_listen_port: 51823,
 	docker_network_name: "floatctf-awd-3",
 	locked: false,
+	...awdNetworkOverrides[eventId],
 });
+const awdEventGameboxOverrides = {};
+const awdEventGameboxRemoved = new Set();
 const awdEventGameboxes = (eventId) => [
 	{
 		id: "egb-1",
@@ -800,7 +808,12 @@ const awdEventGameboxes = (eventId) => [
 		first_bonus: 50,
 		created_at: iso(now - 3 * D),
 	},
-];
+]
+	.filter((box) => !awdEventGameboxRemoved.has(`${eventId}:${box.id}`))
+	.map((box) => ({
+		...box,
+		...(awdEventGameboxOverrides[`${eventId}:${box.id}`] ?? {}),
+	}));
 const awdPrecheckRuns = (eventId) => [
 	{
 		id: "pc-1",
@@ -1040,6 +1053,7 @@ const awdpRounds = () =>
 		? [
 				{ id: "r-1", sequence: 1, starts_at: iso(now - 10 * 60000), cutoff_at: iso(now + 20 * 60000), status: "pending" },
 				{ id: "r-2", sequence: 2, starts_at: iso(now + 20 * 60000), cutoff_at: iso(now + 50 * 60000), status: "pending" },
+				{ id: "r-3", sequence: 3, starts_at: iso(now + 50 * 60000), cutoff_at: iso(now + 80 * 60000), status: "pending" },
 			]
 		: [];
 const awdpEvaluations = () =>
@@ -1659,7 +1673,14 @@ const routes = [
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/prechecks$/, (m, res) => ok(res, awdPrecheckRuns(m[1]))],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/scores$/, (_m, res) => ok(res, awdScoreRows())],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/network$/, (m, res) => ok(res, awdEventNetwork(m[1]))],
-	["PUT", /^\/api\/admin\/events\/([^/]+)\/awd\/network$/, (m, res) => ok(res, null)],
+	["PUT", /^\/api\/admin\/events\/([^/]+)\/awd\/network$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			awdNetworkOverrides[m[1]] = {
+				...(awdNetworkOverrides[m[1]] ?? {}),
+				...body,
+			};
+			return ok(res, null);
+		})],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/network\/reallocate$/, (_m, res) => ok(res, null)],
 	["GET", /^\/api\/admin\/awd\/gameboxes$/, (_m, res, req) => okPage(res, mockGameboxLibrary.filter((row) => mockFilterMatch(req, row)), req)],
 	["POST", /^\/api\/admin\/awd\/gameboxes\/([^/]+)\/hide$/, (m, res) => {
@@ -1675,9 +1696,12 @@ const routes = [
 			Object.assign(box, {
 				name: body.name ?? box.name,
 				description: body.description ?? box.description,
-				cpu_millis: body.cpu_millis ?? box.cpu_millis,
-				memory_bytes: body.memory_bytes ?? box.memory_bytes,
-				pids_limit: body.pids_limit ?? box.pids_limit,
+				// 管理页提交的是 recommended_*（库模板的推荐值），内部字段是 cpu_millis 等。
+				cpu_millis: body.recommended_cpu_millis ?? body.cpu_millis ?? box.cpu_millis,
+				memory_bytes:
+					body.recommended_memory_bytes ?? body.memory_bytes ?? box.memory_bytes,
+				pids_limit: body.recommended_pids_limit ?? body.pids_limit ?? box.pids_limit,
+				...(body.hidden !== undefined ? { hidden: Boolean(body.hidden) } : {}),
 			});
 			return ok(res, box);
 		})],
@@ -1693,8 +1717,34 @@ const routes = [
 	["POST", /^\/api\/admin\/awd\/gameboxes\/build$/, (_m, res) => ok(res, [])],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => ok(res, awdEventGameboxes(m[1]))],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => ok(res, awdEventGameboxes(m[1])[0])],
-	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)$/, (_m, res) => ok(res, null)],
-	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)$/, (m, res) => ok(res, awdEventGameboxes(m[1])[0])],
+	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)$/, (m, res) => {
+		awdEventGameboxRemoved.add(`${m[1]}:${m[2]}`);
+		return ok(res, null);
+	}],
+	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const key = `${m[1]}:${m[2]}`;
+			const fields = [
+				"enabled",
+				"hidden",
+				"cpu_millis",
+				"memory_bytes",
+				"pids_limit",
+				"judge_timeout_secs",
+				"judge_retry_interval_secs",
+				"attack_score",
+				"judge_down_penalty",
+				"first_bonus",
+			];
+			const patch = {};
+			for (const field of fields) {
+				if (body[field] !== undefined && body[field] !== null) patch[field] = body[field];
+			}
+			awdEventGameboxOverrides[key] = { ...(awdEventGameboxOverrides[key] ?? {}), ...patch };
+			const box = awdEventGameboxes(m[1]).find((item) => item.id === m[2]);
+			if (!box) return json(res, 404, { code: 404, message: "赛事 GameBox 不存在", data: null, meta: null });
+			return ok(res, box);
+		})],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/instances$/, (_m, res) => ok(res, [])],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/teams$/, (m, res) => ok(res, awdTeams(m[1]))],
 	["DELETE", /^\/api\/admin\/events\/([^/]+)\/teams$/, (m, res, req) =>
@@ -1947,6 +1997,13 @@ const routes = [
 		});
 	}],
 	["POST", /^\/api\/users\/reset_password$/, (_m, res) => ok(res, "ok")],
+	["POST", /^\/api\/users\/reset$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			if (String(body.password ?? "") !== String(body.confirmed_password ?? "")) {
+				return json(res, 200, { code: 400, message: "两次输入的密码不一致", data: null, meta: null });
+			}
+			return ok(res, "ok");
+		})],
 	["POST", /^\/api\/users\/reset$/, (_m, res) => ok(res, "ok")],
 	["GET", /^\/api\/users\/me$/, (_m, res) => ok(res, me)],
 	["PATCH", /^\/api\/users\/me$/, (_m, res, req) =>
@@ -1980,7 +2037,8 @@ const routes = [
 			req,
 		)],
 	["GET", /^\/api\/events\/([^/]+)$/, (m, res) => {
-		const event = events.find((item) => item.id === m[1]) ?? events[0];
+		const event = events.find((item) => item.id === m[1]);
+		if (!event) return json(res, 404, { code: 404, message: "未找到该赛事", data: null, meta: null });
 		const baseJoined = baseJoinedEvent(event.id);
 		const dynamicTeam = mockTeamResult(event);
 		const joined = baseJoined || mockEventJoined.has(event.id);
@@ -2062,7 +2120,9 @@ const routes = [
 	// 题目
 	["GET", /^\/api\/challenges$/, (_m, res, req) => ok(res, challenges, req)],
 	["GET", /^\/api\/challenges\/([^/]+)$/, (m, res) => {
-		ok(res, challenges.find((item) => item.id === m[1]) ?? challenges[0]);
+		const challenge = challenges.find((item) => item.id === m[1]);
+		if (!challenge) return json(res, 404, { code: 404, message: "题目不存在", data: null, meta: null });
+		return ok(res, challenge);
 	}],
 	["POST", /^\/api\/instances\/launch$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
@@ -2130,7 +2190,12 @@ const routes = [
 			}
 			return ok(res, null);
 		})],
-	["GET", /^\/api\/challenges\/([^/]+)\/writeups$/, (_m, res, req) => ok(res, challengeWriteups, req)],
+	["GET", /^\/api\/challenges\/([^/]+)\/writeups$/, (m, res, req) =>
+		ok(
+			res,
+			challengeWriteups.filter((item) => item.challenge.id === m[1]),
+			req,
+		)],
 	["GET", /^\/api\/challenges\/([^/]+)\/my_writeup$/, (m, res) => ok(res, mockMyWriteups[m[1]] ?? null)],
 	["POST", /^\/api\/challenges\/([^/]+)\/my_writeup$/, (m, res, req) =>
 		readJsonBody(req).then((body) => {
@@ -2164,7 +2229,24 @@ const routes = [
 	["GET", /^\/api\/solves$/, (_m, res, req) => okPage(res, solves.filter((row) => mockFilterMatch(req, row)), req)],
 	["GET", /^\/api\/solves\/top15users$/, (_m, res) => ok(res, topUsers)],
 	["GET", /^\/api\/writeups$/, (_m, res, req) => ok(res, unifiedWriteups, req)],
-	["GET", /^\/api\/writeups\/([^/]+)$/, (_m, res) => ok(res, unifiedWriteupDetail)],
+	["GET", /^\/api\/writeups\/([^/]+)$/, (m, res) => {
+		const base = unifiedWriteups.find((item) => item.id === m[1]);
+		if (!base) return json(res, 404, { code: 404, message: "题解不存在", data: null, meta: null });
+		return ok(res, {
+			...unifiedWriteupDetail,
+			id: base.id,
+			writeup_type: base.writeup_type,
+			content_id: base.content_id,
+			content_name: base.content_name,
+			nickname: base.nickname,
+			email: base.email,
+			updated_at: base.updated_at,
+			content:
+				base.writeup_type === "gamebox"
+					? "## 修复记录\n\nGameBox 的 SESSION 伪造漏洞已修复，补丁通过官方判定。"
+					: unifiedWriteupDetail.content,
+		});
+	}],
 	["GET", /^\/api\/discussions$/, (_m, res, req) =>
 		okPage(res, discussions.filter((d) => mockFilterMatch(req, d)), req)],
 	["POST", /^\/api\/discussions$/, (_m, res, req) =>
@@ -2208,7 +2290,9 @@ const routes = [
 		return ok(res, null);
 	}],
 	["GET", /^\/api\/discussions\/([^/]+)$/, (m, res) => {
-		ok(res, discussions.find((item) => item.id === m[1]) ?? discussions[0]);
+		const discussion = discussions.find((item) => item.id === m[1]);
+		if (!discussion) return json(res, 404, { code: 404, message: "讨论不存在", data: null, meta: null });
+		return ok(res, discussion);
 	}],
 	["POST", /^\/api\/discussions\/([^/]+)\/like$/, (m, res) => {
 		const target = discussions.find((d) => d.id === m[1]);
@@ -3214,6 +3298,45 @@ const routes = [
 			return ok(res, before - announcements.length);
 		})],
 	["GET", /^\/api\/admin\/discussions$/, (_m, res, req) => okPage(res, discussions.filter((d) => mockFilterMatch(req, d)), req)],
+	["GET", /^\/api\/admin\/discussions\/([^/]+)$/, (m, res) => {
+		const discussion = discussions.find((item) => item.id === m[1]);
+		if (!discussion) return json(res, 404, { code: 404, message: "讨论不存在", data: null, meta: null });
+		return ok(res, discussion);
+	}],
+	["DELETE", /^\/api\/admin\/discussions$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const before = discussions.length;
+			for (let index = discussions.length - 1; index >= 0; index -= 1) {
+				if (ids.includes(discussions[index].id)) discussions.splice(index, 1);
+			}
+			return ok(res, before - discussions.length);
+		})],
+	["GET", /^\/api\/admin\/discussions\/([^/]+)\/comments$/, (m, res, req) =>
+		ok(
+			res,
+			discussionComments
+				.filter((comment) => comment.discussion_id === m[1])
+				.map((comment) => ({
+					...comment,
+					author_nickname: comment.author_nickname ?? "未知",
+					author_avatar: null,
+				})),
+			req,
+		)],
+	["DELETE", /^\/api\/admin\/discussions\/([^/]+)\/comments\/([^/]+)$/, (m, res) => {
+		const before = discussionComments.length;
+		discussionComments = discussionComments.filter(
+			(comment) => !(comment.discussion_id === m[1] && comment.id === m[2]),
+		);
+		const discussion = discussions.find((item) => item.id === m[1]);
+		if (discussion) {
+			discussion.comment_count = discussionComments.filter(
+				(comment) => comment.discussion_id === m[1],
+			).length;
+		}
+		return ok(res, before === discussionComments.length ? null : null);
+	}],
 	["POST", /^\/api\/admin\/weapons$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const weapon = {

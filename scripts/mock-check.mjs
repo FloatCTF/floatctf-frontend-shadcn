@@ -90,7 +90,9 @@ if (update) {
 const regexes = routes.map((route) => ({ method: route.method, re: new RegExp(`^${route.pattern}$`) }));
 const endpoints = sdkEndpoints();
 const uncovered = endpoints.filter((endpoint) => {
-	const [method, path] = endpoint.split(" ");
+	const [method, rawPath] = endpoint.split(" ");
+	// SDK 端点模板可能带查询串（如 /users/reset?token=…）；路由匹配只看 path。
+	const path = rawPath.split("?")[0];
 	// 同一个 SDK 路径可能由管理端客户端加 `/admin` 前缀请求：两种都算覆盖。
 	const candidates = [path, path.replace(/^\/api\//, "/api/admin/")];
 	return !regexes.some(
