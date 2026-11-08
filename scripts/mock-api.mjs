@@ -884,11 +884,13 @@ const awdScoreRows = () =>
 	teams
 		.map(([name, base], index) => {
 			const score = base + (index === 0 ? mockAwdBonus : 0);
+			// 防守分用「合计 - 攻击」反推，避免两边各自四舍五入导致 攻击+防守≠合计。
+			const attack = Math.round(score * 0.55);
 			return {
 				team_id: `team-${index}`,
 				team_name: name,
-				attack_score: Math.round(score * 0.55),
-				defense_score: Math.round(score * 0.45),
+				attack_score: attack,
+				defense_score: score - attack,
 				total_score: score,
 			};
 		})
