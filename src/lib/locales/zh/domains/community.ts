@@ -229,6 +229,9 @@ export default {
 			accountLoading: "读取当前账号…",
 		},
 		detail: {
+			notFoundTitle: "讨论不存在",
+			notFoundDescription: "该讨论可能已被删除，或链接已失效。",
+			backToDiscussions: "返回讨论区",
 			documentTitle: "{{title}} · FloatCTF",
 			documentTitleFallback: "讨论详情 · FloatCTF",
 			titleFallback: "讨论详情",

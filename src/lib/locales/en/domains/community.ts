@@ -239,6 +239,9 @@ export default {
 			accountLoading: "Reading the current account…",
 		},
 		detail: {
+			notFoundTitle: "Discussion not found",
+			notFoundDescription: "This discussion may have been deleted, or the link is invalid.",
+			backToDiscussions: "Back to discussions",
 			documentTitle: "{{title}} · FloatCTF",
 			documentTitleFallback: "Discussion details · FloatCTF",
 			titleFallback: "Discussion details",

@@ -29,6 +29,7 @@ import type { DiscussionWithAuthor } from "@floatctf/sdk";
 import type { Users } from "@floatctf/sdk/entity";
 
 import { call, callList, callVoid } from "~/api/call";
+import { isNotFound } from "~/api/errors";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { useMe } from "~/auth/store";
@@ -47,6 +48,7 @@ import {
 	EmptyBlock,
 	ErrorBlock,
 	LoadingBlock,
+	NotFoundBlock,
 	QueryState,
 	RefreshingBadge,
 	TableSkeleton,
@@ -617,6 +619,7 @@ export function DiscussionDetailPage(): ReactNode {
 			: t("community.discussions.detail.documentTitleFallback"),
 	);
 
+
 	const like = useMutation({
 		mutationFn: () => callVoid(client.service.discussions.like(discussionId), t("community.requests.like")),
 		onSuccess: () => {
@@ -728,6 +731,24 @@ export function DiscussionDetailPage(): ReactNode {
 			confirmText: t("community.discussions.comment.deleteConfirm"),
 		});
 		if (ok) deleteComment.mutate(commentId);
+	}
+
+	if (discussionQuery.isError && isNotFound(discussionQuery.error)) {
+		return (
+			<PageBody>
+				<NotFoundBlock
+					title={t("community.discussions.detail.notFoundTitle")}
+					description={t("community.discussions.detail.notFoundDescription")}
+					action={
+						<Button asChild variant="outline">
+							<Link to="/community/discussions">
+								{t("community.discussions.detail.backToDiscussions")}
+							</Link>
+						</Button>
+					}
+				/>
+			</PageBody>
+		);
 	}
 
 	return (
