@@ -381,3 +381,25 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 
 测试数据已清理：删除 AWD 赛事、test-g GameBox 与镜像；保留运行时基础镜像供后续真实 AWD 回归。
 验证：`vite build` / i18n / theme 全绿；清理后 10 条重点路由 0 console error。
+
+## 第 19 轮补充（真实 AWDP 训练）
+
+已完成真实 AWDP 全链路：
+
+- 导入 `examples/test-g`（AWDP-capable）→ 练习目录「开始训练」→ Break 阶段实例启动；
+- 错误 flag 被拒绝；真实 flag 提交成功，Break +540，实例标记「已被攻破」；
+- 进入 Fix 阶段，实例重置且物化 6 个 Fix 回合；
+- `patch.tar.gz` 上传成功；Test Check 返回 Healthcheck 通过 / Judge 通过 / Exploit 已不可利用；
+- ALL Check 通过，run 直接结束，总分 1440（Break 540 + Fix 6×150），实例停止。
+
+真实 API 下发现并修复：
+
+- **补丁上传格式前后端不一致**：页面文案和 `accept` 让用户传 `.sh / .patch / .diff / .txt / .zip`，
+  但后端只接受 `patch.tar.gz`（gzip tar，根目录含 `patch.sh`）。用户选了 `.sh` 后才收到
+  「请上传 patch.tar.gz」。训练场和赛事 AWDP 两处都已改为：
+  - `accept=".tar.gz,.tgz,application/gzip"`；
+  - 标签改为 `patch.tar.gz`，hint 说明 gzip tar + 根目录 patch.sh；
+  - onChange 先做扩展名校验并 toast，不再把格式错误发给后端。
+- 补中英文 `patchFormat` 文案。
+
+验证：`vite build` / i18n / theme 全绿（i18n 5019 keys）。
