@@ -47,6 +47,7 @@ import { useNow } from "~/lib/hooks";
 
 import { EventWriteupPanel } from "./components";
 import {
+	AwdFlagPanel,
 	AwdGameboxPanel,
 	AwdScoreboardPanel,
 	AwdSshPanel,
@@ -756,6 +757,8 @@ export function ArenaSummaryTab({
 								hint={status.final_settlement ? t("events.awd.finalSettlement") : undefined}
 							/>
 						</div>
+						<AwdFlagPanel eventId={eventId} status={status} />
+
 						<SectionCard
 							title={t("events.awd.cockpitTitle")}
 							description={t("events.awd.cockpitDescription")}
