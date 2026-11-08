@@ -182,3 +182,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：管理端版本页按 Default 收敛为 Version / floatctf-web / floatctf-api 三行，并注入构建期制品版本。
 
 - 2026-11-08：版本页去掉重复 Version 行，仅保留 floatctf-web / floatctf-api。
+
+- 2026-11-08：选手端讨论详情改为 Default 单列：正文在上、评论区在下，不再左右分栏。

@@ -804,7 +804,7 @@ export function DiscussionDetailPage(): ReactNode {
 				errorTitle={t("community.discussions.detail.loadError")}
 			>
 				{(data) => (
-					<div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
+					<div className="space-y-5">
 						<SectionCard
 							title={t("community.discussions.detail.contentTitle")}
 							description={t("community.discussions.detail.contentStats", {
