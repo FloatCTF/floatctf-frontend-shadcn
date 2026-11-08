@@ -194,9 +194,16 @@ export default {
 			clearSearch: "清除搜索",
 			loadError: "加载讨论失败",
 		},
+		tabs: {
+			all: "全部讨论",
+			mine: "我的讨论",
+		},
 		table: {
 			title: "标题",
 			author: "作者",
+			views: "浏览",
+			likes: "点赞",
+			comments: "评论",
 			interactions: "互动",
 			createdAt: "创建",
 			updatedAt: "更新",

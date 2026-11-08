@@ -17,8 +17,6 @@ import type { TFunction } from "i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ArrowLeft,
-	Eye,
-	MessageSquare,
 	MessagesSquare,
 	Pencil,
 	ThumbsUp,
@@ -36,6 +34,7 @@ import { useMe } from "~/auth/store";
 import { TonePill } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
+import { FilterBar, type FilterKey } from "~/components/app/filter-bar";
 import { MarkdownView } from "~/components/app/markdown";
 import {
 	PageBody,
@@ -56,6 +55,8 @@ import {
 import { toast } from "~/components/app/toast";
 import { RelativeTime, UserAvatar, UserCell } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { formatDateTime } from "~/lib/format";
 import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
 
 import {
@@ -150,51 +151,31 @@ function discussionColumns(
 			),
 		},
 		{
-			id: "stats",
-			header: t("community.discussions.table.interactions"),
+			id: "view_count",
+			header: t("community.discussions.table.views"),
 			align: "right",
-			cell: (row) => (
-				<div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
-					<span
-						className="tnum inline-flex items-center gap-1"
-						title={t("community.discussions.table.viewCount")}
-						aria-label={t("community.discussions.table.viewCountAria", { count: row.view_count })}
-					>
-						<Eye aria-hidden="true" className="size-4" />
-						{row.view_count}
-					</span>
-					<span
-						className="tnum inline-flex items-center gap-1"
-						title={t("community.discussions.table.likeCount")}
-						aria-label={t("community.discussions.table.likeCountAria", { count: row.like_count })}
-					>
-						<ThumbsUp aria-hidden="true" className="size-4" />
-						{row.like_count}
-					</span>
-					<span
-						className="tnum inline-flex items-center gap-1"
-						title={t("community.discussions.table.commentCount")}
-						aria-label={t("community.discussions.table.commentCountAria", { count: row.comment_count })}
-					>
-						<MessageSquare aria-hidden="true" className="size-4" />
-						{row.comment_count}
-					</span>
-				</div>
-			),
+			sortValue: (row) => row.view_count,
+			cell: (row) => <span className="tnum text-sm">{row.view_count}</span>,
+		},
+		{
+			id: "like_count",
+			header: t("community.discussions.table.likes"),
+			align: "right",
+			sortValue: (row) => row.like_count,
+			cell: (row) => <span className="tnum text-sm">{row.like_count}</span>,
+		},
+		{
+			id: "comment_count",
+			header: t("community.discussions.table.comments"),
+			align: "right",
+			sortValue: (row) => row.comment_count,
+			cell: (row) => <span className="tnum text-sm">{row.comment_count}</span>,
 		},
 		{
 			id: "created_at",
 			header: t("community.discussions.table.createdAt"),
-			hideBelow: "md",
 			sortValue: (row) => row.created_at,
-			cell: (row) => <RelativeTime value={row.created_at} />,
-		},
-		{
-			id: "updated_at",
-			header: t("community.discussions.table.updatedAt"),
-			hideBelow: "lg",
-			sortValue: (row) => row.updated_at,
-			cell: (row) => <RelativeTime value={row.updated_at} />,
+			cell: (row) => <span className="tnum text-xs">{formatDateTime(row.created_at)}</span>,
 		},
 	];
 }
@@ -246,14 +227,13 @@ export function DiscussionsPage(): ReactNode {
 	const navigate = useNavigate();
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
-	const [search, setSearch] = useState("");
+	const [draftFilter, setDraftFilter] = useState("");
+	const [appliedFilter, setAppliedFilter] = useState("");
 	const [formOpen, setFormOpen] = useState(false);
-	const debouncedSearch = useDebouncedValue(search, 300);
 	const deleteAction = useDeleteDiscussion();
 	const columns = discussionColumns(t, me?.id);
 
-	const trimmed = debouncedSearch.trim();
-	const filter = trimmed === "" ? undefined : `title:${trimmed}`;
+	const filter = appliedFilter.trim() || undefined;
 
 	const query = useQuery({
 		queryKey: qk.discussions.list({ page, limit: pageSize, filter }),
@@ -282,21 +262,39 @@ export function DiscussionsPage(): ReactNode {
 				}
 			/>
 
+			<Tabs
+				value="all"
+				onValueChange={(value) => {
+					if (value === "mine") void navigate("/community/discussions/mine");
+				}}
+			>
+				<TabsList>
+					<TabsTrigger value="all">{t("community.discussions.tabs.all")}</TabsTrigger>
+					<TabsTrigger value="mine">{t("community.discussions.tabs.mine")}</TabsTrigger>
+				</TabsList>
+			</Tabs>
+
 			<SectionCard
 				title={t("community.discussions.list.sectionTitle")}
 				description={t("community.discussions.list.sectionDescription")}
 				actions={
-					<Toolbar>
-						<RefreshingBadge active={query.isFetching && !query.isPending} />
-						<SearchField
-							value={search}
-							placeholder={t("community.discussions.list.searchPlaceholder")}
-							onChange={(value) => {
-								setSearch(value);
-								setPage(1);
-							}}
-						/>
-					</Toolbar>
+					<FilterBar
+						keys={[
+							{ key: "title", label: t("community.discussions.table.title") },
+						] satisfies FilterKey[]}
+						value={draftFilter}
+						onChange={setDraftFilter}
+						onApply={() => {
+							setAppliedFilter(draftFilter.trim());
+							setPage(1);
+						}}
+						onClear={() => {
+							setDraftFilter("");
+							setAppliedFilter("");
+							setPage(1);
+						}}
+						placeholder={t("common.filter.placeholder")}
+					/>
 				}
 				contentClassName="px-0"
 				footer={
@@ -318,7 +316,7 @@ export function DiscussionsPage(): ReactNode {
 					errorTitle={t("community.discussions.list.loadError")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
-						trimmed === "" ? (
+						appliedFilter === "" ? (
 							<EmptyBlock
 								title={t("community.discussions.list.emptyTitle")}
 								description={t("community.discussions.list.emptyDescription")}
@@ -334,10 +332,13 @@ export function DiscussionsPage(): ReactNode {
 								variant="filtered"
 								title={t("community.discussions.list.filteredTitle")}
 								description={t("community.discussions.list.filteredDescription", {
-									query: trimmed,
+									query: appliedFilter,
 								})}
 								action={
-									<Button size="sm" variant="outline" onClick={() => setSearch("")}>
+									<Button size="sm" variant="outline" onClick={() => {
+										setDraftFilter("");
+										setAppliedFilter("");
+									}}>
 										{t("community.discussions.list.clearSearch")}
 									</Button>
 								}

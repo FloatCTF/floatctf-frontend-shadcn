@@ -194,3 +194,25 @@ Gameboxes 位置与列对齐，训练 run 仍保留独立页。
 - 默认只读，点 `Edit` 才可修改 Nickname / Email / Password；Username 永远不可改；
 - 头像区域点击选择图片，再上传；
 - 没有额外的账号元数据卡片。
+
+## 13. 选手端 · Discussions（Default）
+
+入口：`/service/discussions`
+
+![](./discussions-list.png)
+
+- 顶部 `All / My Discussions` 两个 Tab；
+- 表头：标题、作者、浏览、点赞、评论、创建时间；
+- 标题链接进入讨论详情；
+- 工具栏：每页条数、Add Filter、过滤输入、Clear、Apply Filters。
+
+## 14. 选手端 · Writeups（Default）
+
+入口：`/service/writeups`
+
+![](./writeups-list.png)
+
+- 表头：内容、作者、类型、邮箱、更新时间；
+- 内容链接进入 Writeup 详情；
+- 工具栏：每页条数、Add Filter、过滤输入、Clear、Apply Filters；
+- 没有额外的统计卡片。

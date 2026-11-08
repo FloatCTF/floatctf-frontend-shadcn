@@ -25,6 +25,7 @@ import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { TonePill } from "~/components/app/badges";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
+import { FilterBar, type FilterKey } from "~/components/app/filter-bar";
 import { MarkdownView } from "~/components/app/markdown";
 import {
 	PageBody,
@@ -38,14 +39,13 @@ import {
 	LoadingBlock,
 	NotFoundBlock,
 	QueryState,
-	RefreshingBadge,
 	TableSkeleton,
 } from "~/components/app/states";
 import { RelativeTime, UserAvatar, UserCell } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
-import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
+import { formatDateTime } from "~/lib/format";
+import { useDocumentTitle } from "~/lib/hooks";
 
-import { SearchField } from "./components";
 
 function writeupTypeLabel(t: TFunction, type: UnifiedWriteupResult["writeup_type"]): string {
 	return type === "gamebox"
@@ -64,25 +64,32 @@ export function WriteupsPage(): ReactNode {
 	const client = useClient();
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
-	const [search, setSearch] = useState("");
-	const debouncedSearch = useDebouncedValue(search, 300);
+	const [draftFilter, setDraftFilter] = useState("");
+	const [appliedFilter, setAppliedFilter] = useState("");
 
 	const query = useQuery({
 		queryKey: qk.writeups.list({}),
 		queryFn: () => callList<UnifiedWriteupResult>(client.service.challenges.getAllWriteups()),
 	});
 
-	const trimmed = debouncedSearch.trim().toLowerCase();
 	const filtered = useMemo(() => {
 		const items = query.data?.items ?? [];
-		if (trimmed === "") return items;
-		return items.filter(
-			(item) =>
-				item.content_name.toLowerCase().includes(trimmed) ||
-				item.nickname.toLowerCase().includes(trimmed) ||
-				item.email.toLowerCase().includes(trimmed),
+		const clauses = appliedFilter
+			.split("&")
+			.map((clause) => clause.trim())
+			.filter(Boolean);
+		if (clauses.length === 0) return items;
+		return items.filter((item) =>
+			clauses.every((clause) => {
+				const separator = clause.indexOf(":");
+				const key = (separator >= 0 ? clause.slice(0, separator) : "").trim();
+				const value = (separator >= 0 ? clause.slice(separator + 1) : clause).trim().toLowerCase();
+				const record = item as Record<string, unknown>;
+				if (key in record) return String(record[key] ?? "").toLowerCase().includes(value);
+				return `${item.content_name} ${item.nickname} ${item.email}`.toLowerCase().includes(clause.toLowerCase());
+			}),
 		);
-	}, [query.data, trimmed]);
+	}, [query.data, appliedFilter]);
 
 	const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
 
@@ -95,17 +102,6 @@ export function WriteupsPage(): ReactNode {
 				<Link to={`/writeups/${row.id}`} className="text-sm font-medium hover:underline">
 					{row.content_name}
 				</Link>
-			),
-		},
-		{
-			id: "writeup_type",
-			header: t("community.writeups.columns.type"),
-			hideBelow: "sm",
-			sortValue: (row) => row.writeup_type,
-			cell: (row) => (
-				<TonePill tone={writeupTypeTone(row.writeup_type)}>
-					{writeupTypeLabel(t, row.writeup_type)}
-				</TonePill>
 			),
 		},
 		{
@@ -122,17 +118,22 @@ export function WriteupsPage(): ReactNode {
 			),
 		},
 		{
+			id: "writeup_type",
+			header: t("community.writeups.columns.type"),
+			sortValue: (row) => row.writeup_type,
+			cell: (row) => (
+				<TonePill tone={writeupTypeTone(row.writeup_type)}>
+					{writeupTypeLabel(t, row.writeup_type)}
+				</TonePill>
+			),
+		},
+		{
 			id: "email",
 			header: t("community.writeups.columns.email"),
-			hideBelow: "lg",
 			sortValue: (row) => row.email,
 			cell: (row) =>
 				row.email ? (
-					<a
-						href={`mailto:${row.email}`}
-						className="inline-flex items-center gap-1 text-xs hover:underline"
-					>
-						<Mail aria-hidden="true" className="size-4" />
+					<a href={`mailto:${row.email}`} className="text-xs hover:underline">
 						{row.email}
 					</a>
 				) : (
@@ -142,9 +143,8 @@ export function WriteupsPage(): ReactNode {
 		{
 			id: "updated_at",
 			header: t("community.writeups.columns.updatedAt"),
-			align: "right",
 			sortValue: (row) => row.updated_at,
-			cell: (row) => <RelativeTime value={row.updated_at} />,
+			cell: (row) => <span className="tnum text-xs">{formatDateTime(row.updated_at)}</span>,
 		},
 	];
 
@@ -160,17 +160,23 @@ export function WriteupsPage(): ReactNode {
 				title={t("community.writeups.section.title")}
 				description={t("community.writeups.section.description")}
 				actions={
-					<Toolbar>
-						<RefreshingBadge active={query.isFetching && !query.isPending} />
-						<SearchField
-							value={search}
-							placeholder={t("community.writeups.search.placeholder")}
-							onChange={(value) => {
-								setSearch(value);
-								setPage(1);
-							}}
-						/>
-					</Toolbar>
+					<FilterBar
+						keys={[
+							{ key: "challenge_id", label: t("community.writeups.columns.content") },
+						] satisfies FilterKey[]}
+						value={draftFilter}
+						onChange={setDraftFilter}
+						onApply={() => {
+							setAppliedFilter(draftFilter.trim());
+							setPage(1);
+						}}
+						onClear={() => {
+							setDraftFilter("");
+							setAppliedFilter("");
+							setPage(1);
+						}}
+						placeholder={t("common.filter.placeholder")}
+					/>
 				}
 				contentClassName="px-0"
 				footer={
@@ -193,7 +199,7 @@ export function WriteupsPage(): ReactNode {
 					// 搜索是视图内的：过滤后为空也要走空态（而不是让表格显示空白）。
 					isEmpty={() => filtered.length === 0}
 					empty={
-						trimmed === "" ? (
+						appliedFilter === "" ? (
 							<EmptyBlock
 								title={t("community.writeups.empty.title")}
 								description={t("community.writeups.empty.description")}
@@ -210,10 +216,13 @@ export function WriteupsPage(): ReactNode {
 								title={t("community.writeups.filtered.title")}
 								description={t("community.writeups.filtered.description", {
 									count: query.data?.items.length ?? 0,
-									query: debouncedSearch.trim(),
+									query: appliedFilter,
 								})}
 								action={
-									<Button size="sm" variant="outline" onClick={() => setSearch("")}>
+									<Button size="sm" variant="outline" onClick={() => {
+										setDraftFilter("");
+										setAppliedFilter("");
+									}}>
 										{t("community.writeups.filtered.clear")}
 									</Button>
 								}

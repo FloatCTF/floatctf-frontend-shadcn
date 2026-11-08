@@ -201,9 +201,16 @@ export default {
 			clearSearch: "Clear search",
 			loadError: "Failed to load discussions",
 		},
+		tabs: {
+			all: "All",
+			mine: "My Discussions",
+		},
 		table: {
 			title: "Title",
 			author: "Author",
+			views: "Views",
+			likes: "Likes",
+			comments: "Comments",
 			interactions: "Activity",
 			createdAt: "Created",
 			updatedAt: "Updated",
