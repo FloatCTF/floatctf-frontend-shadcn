@@ -753,3 +753,15 @@ SQL 控制台的 int2/int4 后端映射 bug 仍待后端修复；前端保持如
 
 评论编辑 / 删除按钮在桌面端 hover 或键盘 focus 后显示，不是缺失；移动端常显。
 SQL 控制台的 int2/int4 后端映射 bug 仍待后端修复。
+
+## 第 46 轮补充（390 / 320 路由回归）
+
+对管理端与选手端主要路由做两档移动端回归，均无横向溢出、无控制台错误：
+
+- 390×844：`/admin`、events、challenges、gameboxes、challenge-sets、weapons、
+  settings、tasks、首页、events、challenges、training、discussions、rank、profile；
+- 320×568：再覆盖 admin 首页、events、challenges、challenge-sets、settings、
+  tasks、SQL 控制台、选手 events / challenges / training / discussions / profile；
+- 所有路由 `scrollWidth - innerWidth = 0`，console error 为空。
+
+本轮未发现新的前端逻辑错误。
