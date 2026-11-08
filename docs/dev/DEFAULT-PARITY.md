@@ -190,3 +190,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：选手端未加入赛事时保留概览/公告 Tab，概览内展示参赛提示，不再隐藏整个 Tabs。
 
 - 2026-11-08：选手端 Writeup 详情去掉额外元信息卡，作者/邮箱/时间并入页头，正文直接展示，贴近 Default。
+
+- 2026-11-08：选手端 AWD 概览补 Default 的赛事规则卡；概览保留阶段/轮次/得分/参赛状态与驾驶舱入口。

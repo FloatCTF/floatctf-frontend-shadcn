@@ -584,7 +584,7 @@ export function EventWorkspacePage() {
 												{isAwdp ? (
 													<LabSummaryTab eventId={resolvedEventId} />
 												) : isAwd ? (
-													<ArenaSummaryTab eventId={resolvedEventId} />
+													<ArenaSummaryTab eventId={resolvedEventId} rules={data.event.rules} />
 												) : (
 													<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
 														<OverviewTab info={data} />
@@ -645,7 +645,7 @@ export function EventWorkspacePage() {
 											) : null}
 											{!isAwd && caps.arena && canAccessContent ? (
 												<TabsContent value="arena" className="mt-4">
-													<ArenaSummaryTab eventId={resolvedEventId} />
+													<ArenaSummaryTab eventId={resolvedEventId} rules={data.event.rules} />
 												</TabsContent>
 											) : null}
 											{!isAwd && !isAwdp && caps.lab && canAccessContent ? (

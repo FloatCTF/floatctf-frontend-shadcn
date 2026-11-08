@@ -696,7 +696,13 @@ export function BulletinTab({ eventId }: { eventId: string }) {
 
 /* ── AWD / AWDP 概览（只读摘要 + 进入专用工作区） ────────────────────────── */
 
-export function ArenaSummaryTab({ eventId }: { eventId: string }) {
+export function ArenaSummaryTab({
+	eventId,
+	rules,
+}: {
+	eventId: string;
+	rules?: string | null;
+}) {
 	const { t } = useTranslation();
 	const awdStatus = useEnumLabel(AWD_STATUS_KEYS);
 	const awdPhase = useEnumLabel(AWD_PHASE_KEYS);
@@ -710,6 +716,12 @@ export function ArenaSummaryTab({ eventId }: { eventId: string }) {
 
 	return (
 		<div className="space-y-4">
+			<SectionCard
+				title={t("events.overview.rulesTitle")}
+				description={t("events.awd.rulesDescription")}
+			>
+				<MarkdownView emptyText={t("events.overview.rulesEmpty")}>{rules}</MarkdownView>
+			</SectionCard>
 			<QueryState
 				query={query}
 				skeleton={<LoadingBlock label={t("events.awd.loading")} />}
