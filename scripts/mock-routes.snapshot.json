@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T01:02:36.895Z",
+	"generatedAt": "2026-11-08T01:12:54.218Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -12,6 +12,10 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/users"
 		},
 		{
 			"method": "DELETE",

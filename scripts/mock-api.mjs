@@ -519,6 +519,22 @@ const json = (res, status, body) => {
 	res.end(JSON.stringify(body));
 };
 
+
+/** 服务端分页：按 page/limit 切片并回填 meta.total（对齐真实后端行为）。 */
+const okPage = (res, rows, req) => {
+	const url = new URL(req?.url ?? "/", "http://localhost");
+	const limit = Math.max(1, Number(url.searchParams.get("limit") ?? 20) || 20);
+	const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
+	const total = rows.length;
+	const start = (page - 1) * limit;
+	json(res, 200, {
+		code: 0,
+		message: "OK",
+		data: rows.slice(start, start + limit),
+		meta: { offset: start, limit, page, filter: url.searchParams.get("filter"), total },
+	});
+};
+
 const ok = (res, data, req) => {
 	const url = new URL(req?.url ?? "/", "http://localhost");
 	const limit = Number(url.searchParams.get("limit") ?? 20);
@@ -1033,6 +1049,33 @@ const sse = (res, req) => {
 let mockWriteup = null;
 let mockAwdBonus = 0;
 
+
+/** 25 个账号（mock）：足够覆盖分页、筛选后回到第 1 页、跨页多选与批量删除。 */
+let mockUsers = [
+	{ ...me, permissions: undefined, grants_all: undefined },
+	{
+		id: "u-2",
+		username: "2024007",
+		nickname: "Byte Me",
+		email: "byte@example.edu",
+		avatar: null,
+		created_at: iso(now - 30 * D),
+		updated_at: iso(now - 30 * D),
+	},
+	...Array.from({ length: 23 }, (_, index) => {
+		const no = index + 8;
+		return {
+			id: `u-${no}`,
+			username: `20240${String(no).padStart(2, "0")}`,
+			nickname: `选手 ${no}`,
+			email: `player${no}@example.edu`,
+			avatar: null,
+			created_at: iso(now - (30 - index) * D),
+			updated_at: iso(now - index * H),
+		};
+	}),
+];
+
 const routes = [
 
 
@@ -1338,7 +1381,7 @@ const routes = [
 	["GET", /^\/api\/writeups$/, (_m, res, req) => ok(res, unifiedWriteups, req)],
 	["GET", /^\/api\/writeups\/([^/]+)$/, (_m, res) => ok(res, unifiedWriteupDetail)],
 	["GET", /^\/api\/discussions$/, (_m, res, req) =>
-		ok(res, discussions.filter((d) => mockFilterMatch(req, d)), req)],
+		okPage(res, discussions.filter((d) => mockFilterMatch(req, d)), req)],
 	["POST", /^\/api\/discussions$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const title = String(body.title ?? "").trim();
@@ -1657,23 +1700,17 @@ const routes = [
 			scoreboard_top10: scoreboard.slice(0, 10),
 			trend,
 		})],
-	["GET", /^\/api\/admin\/challenges$/, (_m, res, req) => ok(res, challenges.filter((c) => mockFilterMatch(req, c)), req)],
+	["GET", /^\/api\/admin\/challenges$/, (_m, res, req) => okPage(res, challenges.filter((c) => mockFilterMatch(req, c)), req)],
 	["GET", /^\/api\/admin\/challenge_sets$/, (_m, res, req) => ok(res, [], req)],
-	["GET", /^\/api\/admin\/users$/, (_m, res, req) => {
-		const rows = [
-			{ ...me, permissions: undefined, grants_all: undefined },
-			{
-				id: "u-2",
-				username: "2024007",
-				nickname: "Byte Me",
-				email: "byte@example.edu",
-				avatar: null,
-				created_at: iso(now - 30 * D),
-				updated_at: iso(now - 30 * D),
-			},
-		];
-		return ok(res, rows.filter((row) => mockFilterMatch(req, row)), req);
-	}],
+	["GET", /^\/api\/admin\/users$/, (_m, res, req) =>
+		okPage(res, mockUsers.filter((row) => mockFilterMatch(req, row)), req)],
+	["DELETE", /^\/api\/admin\/users$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const before = mockUsers.length;
+			mockUsers = mockUsers.filter((row) => !ids.includes(row.id));
+			return ok(res, before - mockUsers.length);
+		})],
 	["GET", /^\/api\/admin\/users\/([^/]+)\/roles$/, (m, res) =>
 		ok(res, { user_id: m[1], username: me.username, roles: [], permissions: [] })],
 	["GET", /^\/api\/admin\/permissions$/, (_m, res) =>
@@ -1732,7 +1769,7 @@ const routes = [
 					actor_user_id: me.id,
 				},
 		];
-		return ok(res, rows.filter((row) => mockFilterMatch(req, row)), req);
+		return okPage(res, rows.filter((row) => mockFilterMatch(req, row)), req);
 	}],
 	["GET", /^\/api\/admin\/settings$/, (_m, res, req) =>
 		ok(
@@ -1756,8 +1793,8 @@ const routes = [
 	["GET", /^\/api\/admin\/docker\/containers$/, (_m, res, req) => ok(res, [], req)],
 	["GET", /^\/api\/admin\/docker\/images$/, (_m, res, req) => ok(res, [], req)],
 	["GET", /^\/api\/admin\/docker\/networks$/, (_m, res, req) => ok(res, [], req)],
-	["GET", /^\/api\/admin\/announcements$/, (_m, res, req) => ok(res, announcements.filter((a) => mockFilterMatch(req, a)), req)],
-	["GET", /^\/api\/admin\/discussions$/, (_m, res, req) => ok(res, discussions.filter((d) => mockFilterMatch(req, d)), req)],
+	["GET", /^\/api\/admin\/announcements$/, (_m, res, req) => okPage(res, announcements.filter((a) => mockFilterMatch(req, a)), req)],
+	["GET", /^\/api\/admin\/discussions$/, (_m, res, req) => okPage(res, discussions.filter((d) => mockFilterMatch(req, d)), req)],
 	["GET", /^\/api\/admin\/weapons$/, (_m, res, req) => ok(res, [], req)],
 ];
 
