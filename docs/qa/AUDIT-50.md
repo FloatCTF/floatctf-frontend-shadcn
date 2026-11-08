@@ -681,3 +681,20 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 实测：Edit QA 的静态 flag 编辑默认 password，点按钮切 text，再点可隐藏。
 
 验证：`vite build` / i18n（5035 keys）/ theme 全绿。
+
+## 第 41 轮补充（SQL 控制台后端类型映射）
+
+真实 SQL 控制台执行 `select 1 as x`：前端如实显示 `x = NULL`。逐类型验证：
+
+- `select 1::int2` → `null`
+- `select 1::int4` → `null`
+- `select 1::int8` → `1`
+- `select 1.5::float8` → `1.5`
+- `select true` → `true`
+
+根因在后端 `apps/api/src/modules/platform/operations/database.rs::rows_to_json`：
+INT2 / INT4 也走 `try_get::<i64>`，sqlx Postgres 无法把 int2/int4 解码为 i64，
+`map_or(Value::Null, ...)` 把它们吞成 NULL；INT8 正常。
+
+这是后端行映射 bug，不是前端渲染问题；按前端任务边界未擅自修改后端，建议后端按
+INT2 → i16、INT4 → i32、INT8 → i64 分别解码。前端已如实展示后端数据。
