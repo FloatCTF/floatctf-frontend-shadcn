@@ -117,3 +117,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 
 - 2026-11-08：Jeopardy 工作区改为 Default 布局：Tab 顺序为总览 / 题目 / 实例 /
   积分榜 / 趋势 / 公告；赛事事实与参赛控制收进总览右侧，移除跨 Tab 常驻侧栏。
+
+- 2026-11-08：题库列表列顺序改为 Default：名称 / 分类 / 已解出 / 作者 / 版本 / 更新时间。

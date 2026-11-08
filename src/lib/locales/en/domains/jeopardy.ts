@@ -40,6 +40,7 @@ export default {
 			category: "Category",
 			version: "Version",
 			author: "Author",
+			updatedAt: "Updated",
 			status: "Status",
 			actions: "Actions",
 		},

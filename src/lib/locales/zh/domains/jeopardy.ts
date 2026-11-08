@@ -39,6 +39,7 @@ export default {
 			category: "分类",
 			version: "版本",
 			author: "作者",
+			updatedAt: "更新时间",
 			status: "状态",
 			actions: "操作",
 		},

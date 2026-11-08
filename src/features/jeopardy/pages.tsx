@@ -70,6 +70,7 @@ export function ChallengesCatalogPage() {
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
 	const debouncedSearch = useDebouncedValue(search, 300);
+	const now = useNow(60_000);
 
 	const clearFilters = () => {
 		setSearch("");
@@ -136,12 +137,17 @@ export function ChallengesCatalogPage() {
 			),
 		},
 		{
-			id: "version",
-			header: t("jeopardy.list.columns.version"),
-			hideBelow: "sm",
-			sortValue: (row) => row.version ?? "",
+			id: "solved",
+			header: t("jeopardy.list.columns.status"),
+			sortValue: (row) => (row.solved ? 1 : 0),
 			cell: (row) =>
-				row.version ? <MonoText>{row.version}</MonoText> : <EmptyCell />,
+				row.solved ? (
+					<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
+						{t("jeopardy.common.solved")}
+					</TonePill>
+				) : (
+					<TonePill tone="muted">{t("jeopardy.common.unsolved")}</TonePill>
+				),
 		},
 		{
 			id: "author",
@@ -157,29 +163,22 @@ export function ChallengesCatalogPage() {
 				),
 		},
 		{
-			id: "solved",
-			header: t("jeopardy.list.columns.status"),
-			sortValue: (row) => (row.solved ? 1 : 0),
+			id: "version",
+			header: t("jeopardy.list.columns.version"),
+			hideBelow: "sm",
+			sortValue: (row) => row.version ?? "",
 			cell: (row) =>
-				row.solved ? (
-					<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
-						{t("jeopardy.common.solved")}
-					</TonePill>
-				) : (
-					<TonePill tone="muted">{t("jeopardy.common.unsolved")}</TonePill>
-				),
+				row.version ? <MonoText>{row.version}</MonoText> : <EmptyCell />,
 		},
 		{
-			id: "actions",
-			header: <span className="sr-only">{t("jeopardy.list.columns.actions")}</span>,
-			align: "right",
+			id: "updated_at",
+			header: t("jeopardy.list.columns.updatedAt"),
+			hideBelow: "lg",
+			sortValue: (row) => Date.parse(row.updated_at),
 			cell: (row) => (
-				<Button variant="ghost" size="sm" asChild>
-					<Link to={`/challenges/${row.id}`}>
-						{t("jeopardy.list.start")}
-						<ChevronRight aria-hidden="true" />
-					</Link>
-				</Button>
+				<span className="tnum text-xs text-muted-foreground">
+					{formatRelative(row.updated_at, now)}
+				</span>
 			),
 		},
 	];
