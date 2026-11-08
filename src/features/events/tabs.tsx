@@ -733,14 +733,6 @@ export function ArenaSummaryTab({
 					<TeamPanel info={info} />
 				</SectionCard>
 			) : null}
-			{!info.joined ? (
-				<SectionCard
-					title={t("events.workspace.teamCardTitle")}
-					description={t("events.workspace.teamCardDescription")}
-				>
-					<TeamPanel info={info} />
-				</SectionCard>
-			) : null}
 			<QueryState
 				query={query}
 				skeleton={<LoadingBlock label={t("events.awd.loading")} />}
@@ -859,6 +851,14 @@ export function LabSummaryTab({
 					{info.event.rules}
 				</MarkdownView>
 			</SectionCard>
+			{!info.joined ? (
+				<SectionCard
+					title={t("events.workspace.teamCardTitle")}
+					description={t("events.workspace.teamCardDescription")}
+				>
+					<TeamPanel info={info} />
+				</SectionCard>
+			) : null}
 			<QueryState
 				query={query}
 				skeleton={<LoadingBlock label={t("events.awdp.loading")} />}
