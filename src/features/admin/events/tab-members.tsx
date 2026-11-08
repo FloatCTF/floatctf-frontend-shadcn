@@ -382,7 +382,6 @@ export function EventMembersTab({
 				<AddMembersSheet
 					eventId={eventId}
 					participantMode={participantMode}
-					existingIds={(query.data?.items ?? []).map((row) => row.user.id)}
 					onClose={() => setAddOpen(false)}
 					onDone={invalidate}
 				/>
@@ -396,14 +395,11 @@ export function EventMembersTab({
 function AddMembersSheet({
 	eventId,
 	participantMode,
-	existingIds,
 	onClose,
 	onDone,
 }: {
 	eventId: string;
 	participantMode: string;
-	/** 当前页已在本赛事中的成员：这些行不可再勾选，避免提交后被后端拒绝。 */
-	existingIds: string[];
 	onClose: () => void;
 	onDone: () => void;
 }): ReactNode {
@@ -425,6 +421,20 @@ function AddMembersSheet({
 		queryKey: qk.admin.users({ page, limit: pageSize, filter }),
 		queryFn: () => callList<Users>(client.admin.users.fetch({ page, limit: pageSize, filter })),
 	});
+
+	// 「已在赛事」必须按全量成员判断，而不是只看当前页；否则跨页选择已参赛账号，
+	// 提交后会被后端以重复成员拒绝。
+	const membersQuery = useQuery({
+		queryKey: qk.admin.eventUsers(eventId, { page: 1, limit: 1000 }),
+		queryFn: () =>
+			callList<EventUserResult>(
+				client.admin.event_users.fetch(eventId)({ page: 1, limit: 1000 }),
+			),
+	});
+	const attachedIds = useMemo(
+		() => new Set((membersQuery.data?.items ?? []).map((row) => row.user.id)),
+		[membersQuery.data],
+	);
 
 	const add = useMutation({
 		// 后端该接口返回 data:null（UniResponse<null>），必须用 callVoid，不能用 call。
@@ -535,7 +545,9 @@ function AddMembersSheet({
 							columns={columns}
 							getRowId={(row) => row.id}
 							selectable
-							isRowSelectable={(row) => !existingIds.includes(row.id)}
+							isRowSelectable={(row) =>
+								!membersQuery.isPending && !attachedIds.has(row.id)
+							}
 							selectedIds={selectedIds}
 							onSelectionChange={setSelectedIds}
 							empty={

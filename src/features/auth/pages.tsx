@@ -374,6 +374,9 @@ export function ResetPasswordPage() {
 		mutationFn: (input: { token: string; password: string; confirmed_password: string }) =>
 			call<string>(client.service.users.reset(input), t("auth.reset.submit")),
 		onSuccess: () => {
+			// 重置密码后旧会话必须失效：否则路由守卫会把已登录用户送回控制台，
+			// 与「请使用新密码登录」的提示自相矛盾。
+			useAuthStore.getState().clearAll();
 			toast.success(t("auth.reset.success"), t("auth.reset.successHint"));
 			void navigate("/login", { replace: true });
 		},

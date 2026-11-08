@@ -160,6 +160,8 @@ export default {
 		documentTitle: "{{title}} · FloatCTF",
 		loading: "Loading event…",
 		loadError: "Failed to load the event",
+		notFoundTitle: "Event not found",
+		notFoundDescription: "This event may have been deleted, hidden, or the link is invalid.",
 		joinedBadge: "Participating",
 		backToList: "Back to events",
 		tabs: {

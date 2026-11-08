@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, ChevronRight, Search } from "lucide-react";
 
 import { call, callList } from "~/api/call";
+import { isNotFound } from "~/api/errors";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
@@ -428,6 +429,23 @@ export function EventWorkspacePage() {
 			: t("events.list.documentTitle"),
 	);
 
+	// 404 不是「加载失败」：重试不会让一个不存在的赛事出现，直接给返回入口。
+	if (query.isError && isNotFound(query.error)) {
+		return (
+			<PageBody>
+				<NotFoundBlock
+					title={t("events.workspace.notFoundTitle")}
+					description={t("events.workspace.notFoundDescription")}
+					action={
+						<Button asChild variant="outline">
+							<Link to="/events">{t("events.workspace.backToList")}</Link>
+						</Button>
+					}
+				/>
+			</PageBody>
+		);
+	}
+
 	return (
 		<PageBody>
 			<QueryState
@@ -663,6 +681,22 @@ export function EventChallengePage() {
 			? t("events.challengePage.documentTitle", { title: item.challenge.name })
 			: t("events.challengePage.fallbackDocumentTitle"),
 	);
+
+	if (eventQuery.isError && isNotFound(eventQuery.error)) {
+		return (
+			<PageBody>
+				<NotFoundBlock
+					title={t("events.workspace.notFoundTitle")}
+					description={t("events.workspace.notFoundDescription")}
+					action={
+						<Button asChild variant="outline">
+							<Link to="/events">{t("events.workspace.backToList")}</Link>
+						</Button>
+					}
+				/>
+			</PageBody>
+		);
+	}
 
 	return (
 		<PageBody>
