@@ -437,3 +437,17 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 入口自动做 `DeployFailed -> Configuring` 的恢复转移，避免要求用户改一个无关字段。
 
 验证：`vite build` / i18n（5023 keys）/ theme 全绿。
+
+## 第 22 轮补充（AWDP 手动开赛与赛事工作台）
+
+真实 AWDP 赛事链路：
+
+- 创建 `Real AWDP QA`（个人赛），挂载 test-g，选手加入后管理员手动开始比赛；
+- 管理员处于 Break 阶段时，选手 `/lab/:eventId` 仍显示「赛事尚未开始」——和上一轮 AWD
+  一样，选手端只按 `event.start_time` 判断，忽略了 AWDP 已经真实开赛。
+- 现在 AWDP 工作台会先拉 overview；`started_at != null` 时即使 event 时间仍是 upcoming
+  也放行。实测手动开赛后选手能看到 Break 阶段、test-g 实例与 360 分 Break 规则。
+- 事件 AWDP 的 Break 提交实测 +360；进入 Fix 后错误 `.sh` 会被前端按
+  `patch.tar.gz` 规则拒绝，确认两处 AWDP 组件的补丁格式修复都生效。
+
+验证：`vite build` / i18n（5023 keys）/ theme 全绿。
