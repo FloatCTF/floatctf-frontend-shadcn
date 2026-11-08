@@ -293,3 +293,16 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 复测：`/challenge-sets/does-not-exist` 只有 not-found；`set-1` 正常显示 1 道题与已解出状态。
 
 验证：`vite build` / i18n / theme / mock-check 全绿（i18n 5013 keys）。
+
+## 第 15 轮补充（AWD Flag 提交）
+
+已完成：
+
+- **AWD 提交 flag 不再接受任意 flag**：mock 的 `/events/:id/awd/submissions` 只校验
+  `flag{...}` 形状，`flag{wrong}` 也会成功。现在改为精确比对 mock 正确 flag，
+  错误返回业务错误（toast + inline error），正确才加攻击分并广播 SSE。
+- 实测：E2 提交 `flag{wrong}` → 「提交 flag 失败 / flag 错误」；提交
+  `flag{mock_awd_flag}` → 「flag 已提交」，我的分数 3520→3620。
+- 移除重复的 submissions 路由，只保留一条并复用 `mockAwdBonus`，避免两份实现分叉。
+
+验证：`vite build` / i18n / theme / mock-check 全绿。
