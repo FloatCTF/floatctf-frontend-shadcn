@@ -92,7 +92,11 @@ export function EventConsolePage(): ReactNode {
 		event !== null &&
 		((rawTab === "awd" && event.family !== "awd") ||
 			(rawTab === "awdp" && event.family !== "awdp") ||
-			((rawTab === "challenges" || rawTab === "data") && event.family !== "jeopardy"));
+			((rawTab === "challenges" ||
+				rawTab === "data" ||
+				rawTab === "instances" ||
+				rawTab === "writeups") &&
+				event.family !== "jeopardy"));
 	const tab: TabKey = familyMismatch ? "config" : rawTab;
 
 	function changeTab(next: string) {
@@ -263,11 +267,17 @@ export function EventConsolePage(): ReactNode {
 						<TabsTrigger value="announcements">
 							{t("adminEvents.console.tabs.announcements")}
 						</TabsTrigger>
-						<TabsTrigger value="instances">{t("adminEvents.console.tabs.instances")}</TabsTrigger>
+						{event.family === "jeopardy" ? (
+							<TabsTrigger value="instances">
+								{t("adminEvents.console.tabs.instances")}
+							</TabsTrigger>
+						) : null}
 						<TabsTrigger value="logs">{t("adminEvents.console.tabs.logs")}</TabsTrigger>
-						<TabsTrigger value="writeups">
-							{t("adminEvents.console.tabs.writeups")}
-						</TabsTrigger>
+						{event.family === "jeopardy" ? (
+							<TabsTrigger value="writeups">
+								{t("adminEvents.console.tabs.writeups")}
+							</TabsTrigger>
+						) : null}
 						{event.family === "jeopardy" ? (
 							<TabsTrigger value="data">{t("adminEvents.console.tabs.data")}</TabsTrigger>
 						) : null}
@@ -297,15 +307,19 @@ export function EventConsolePage(): ReactNode {
 				<TabsContent value="announcements" className="mt-4">
 					<EventAnnouncementsTab eventId={event.id} />
 				</TabsContent>
-				<TabsContent value="instances" className="mt-4">
-					<EventInstancesTab eventId={event.id} />
-				</TabsContent>
+				{event.family === "jeopardy" ? (
+					<TabsContent value="instances" className="mt-4">
+						<EventInstancesTab eventId={event.id} />
+					</TabsContent>
+				) : null}
 				<TabsContent value="logs" className="mt-4">
 					<EventLogsTab eventId={event.id} />
 				</TabsContent>
-				<TabsContent value="writeups" className="mt-4">
-					<EventWriteupsTab eventId={event.id} />
-				</TabsContent>
+				{event.family === "jeopardy" ? (
+					<TabsContent value="writeups" className="mt-4">
+						<EventWriteupsTab eventId={event.id} />
+					</TabsContent>
+				) : null}
 				{event.family === "jeopardy" ? (
 					<TabsContent value="data" className="mt-4">
 						<EventDataTab eventId={event.id} />
