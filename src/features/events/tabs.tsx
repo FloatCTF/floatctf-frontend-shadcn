@@ -45,7 +45,7 @@ import { formatDateTime, formatPoints, formatRelative, formatScore } from "~/lib
 import { getLocale } from "~/lib/i18n";
 import { useNow } from "~/lib/hooks";
 
-import { EventWriteupPanel } from "./components";
+import { EventWriteupPanel, TeamPanel } from "./components";
 import {
 	AwdFlagPanel,
 	AwdGameboxPanel,
@@ -725,6 +725,22 @@ export function ArenaSummaryTab({
 					{info.event.rules}
 				</MarkdownView>
 			</SectionCard>
+			{!info.joined ? (
+				<SectionCard
+					title={t("events.workspace.teamCardTitle")}
+					description={t("events.workspace.teamCardDescription")}
+				>
+					<TeamPanel info={info} />
+				</SectionCard>
+			) : null}
+			{!info.joined ? (
+				<SectionCard
+					title={t("events.workspace.teamCardTitle")}
+					description={t("events.workspace.teamCardDescription")}
+				>
+					<TeamPanel info={info} />
+				</SectionCard>
+			) : null}
 			<QueryState
 				query={query}
 				skeleton={<LoadingBlock label={t("events.awd.loading")} />}

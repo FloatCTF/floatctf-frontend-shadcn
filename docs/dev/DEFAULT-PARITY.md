@@ -202,3 +202,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：选手端 Jeopardy 赛事移除 Default 没有的 Arena/Lab Tab，只保留概览/题目/实例/积分榜/趋势/公告。
 
 - 2026-11-08：管理端终端连接后切换为全屏布局（Default 的终端占满内容区），空闲态仍保留高危确认。
+
+- 2026-11-08：选手端 AWD/AWDP 未参赛概览补 Default 的建队/入队表单，修复未开始赛事无法报名的问题。
