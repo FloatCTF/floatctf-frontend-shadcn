@@ -49,6 +49,8 @@ export default {
 		uploading: "上传中 {{percent}}%",
 		upload: "上传头像",
 		updated: "头像已更新",
+		invalidType: "仅支持 PNG / JPEG / WebP / GIF 图片。",
+		tooLarge: "图片不能超过 50MB。",
 		uploadFailed: "头像上传失败",
 		hint: "先选择图片，再点「上传头像」；上传过程会显示进度。",
 	},

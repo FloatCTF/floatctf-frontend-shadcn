@@ -49,6 +49,8 @@ export default {
 		uploading: "Uploading {{percent}}%",
 		upload: "Upload avatar",
 		updated: "Avatar updated",
+		invalidType: "Only PNG / JPEG / WebP / GIF images are allowed.",
+		tooLarge: "The image must be 50MB or smaller.",
 		uploadFailed: "Avatar upload failed",
 		hint: "Choose an image first, then click “Upload avatar”; progress is shown while uploading.",
 	},

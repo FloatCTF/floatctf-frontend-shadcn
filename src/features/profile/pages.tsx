@@ -44,6 +44,10 @@ import { useDocumentTitle } from "~/lib/hooks";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** 与后端一致：PNG / JPEG / WebP / GIF，单文件最大 50MB。 */
+const AVATAR_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const AVATAR_MAX_BYTES = 50 * 1024 * 1024;
+
 export function ProfilePage(): ReactNode {
 	const { t } = useTranslation();
 	useDocumentTitle(t("profile.documentTitle"));
@@ -324,6 +328,15 @@ export function ProfilePage(): ReactNode {
 											const selected = event.target.files?.[0];
 											event.target.value = "";
 											if (!selected) return;
+											// 客户端先校验类型与大小，避免把后端必然拒绝的文件传上去。
+											if (!AVATAR_TYPES.includes(selected.type)) {
+												toast.error(t("profile.avatar.invalidType"));
+												return;
+											}
+											if (selected.size > AVATAR_MAX_BYTES) {
+												toast.error(t("profile.avatar.tooLarge"));
+												return;
+											}
 											setAvatarFile(selected);
 											setPreviewUrl(URL.createObjectURL(selected));
 										}}
