@@ -105,7 +105,33 @@ export function MarkdownEditor({
 	const [tab, setTab] = useState("write");
 	const [uploading, setUploading] = useState(false);
 
+	function decodable(file: File): Promise<boolean> {
+		return new Promise((resolve) => {
+			const url = URL.createObjectURL(file);
+			const probe = new Image();
+			probe.onload = () => {
+				URL.revokeObjectURL(url);
+				resolve(true);
+			};
+			probe.onerror = () => {
+				URL.revokeObjectURL(url);
+				resolve(false);
+			};
+			probe.src = url;
+		});
+	}
+
 	async function handleFile(file: File) {
+		if (!file.type.startsWith("image/")) {
+			toast.error(t("common.markdown.invalidImage"));
+			return;
+		}
+		// accept=image/* 与 MIME 都可能不准确；上传前让浏览器真实解码一次，
+		// 否则坏文件会拿到图床 URL，Markdown 里留下一个永远裂开的图片。
+		if (!(await decodable(file))) {
+			toast.error(t("common.markdown.invalidImage"));
+			return;
+		}
 		setUploading(true);
 		try {
 			// 逃生舱之外的常规门面：`client.service.uploads.upload_image` 返回图片 URL。

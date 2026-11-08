@@ -135,6 +135,7 @@ export default {
 	},
 	markdown: {
 		insertImage: "Insert image",
+		invalidImage: "The image could not be decoded; choose a valid image file.",
 		placeholder: "Markdown (GFM) supported.",
 		uploaded: "Image uploaded",
 		uploadFailed: "Image upload failed",

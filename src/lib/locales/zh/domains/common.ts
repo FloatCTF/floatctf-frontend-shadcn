@@ -134,6 +134,7 @@ export default {
 	},
 	markdown: {
 		insertImage: "插入图片",
+		invalidImage: "图片无法解码，请选择有效的图片文件。",
 		placeholder: "支持 Markdown（GFM）。",
 		uploaded: "插图已上传",
 		uploadFailed: "插图上传失败",
