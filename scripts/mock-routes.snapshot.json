@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T01:40:22.020Z",
+	"generatedAt": "2026-11-08T01:43:58.937Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -40,6 +40,10 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/events\\/([^/]+)\\/leave"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/team\\/([^/]+)"
 		},
 		{
 			"method": "GET",
@@ -532,6 +536,14 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/events\\/([^/]+)\\/join"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/team"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/team\\/([^/]+)\\/join"
 		},
 		{
 			"method": "POST",

@@ -120,6 +120,23 @@ const events = [
 		participant_mode: "individual",
 		is_virtual: false,
 	},
+	{
+		id: "e0a1b2c3-0005-4a11-9a11-000000000005",
+		title: "AWD 新生杯 · 报名中",
+		description: "尚未开始的战队赛：可以创建或加入战队，开赛后锁定。",
+		hidden: false,
+		start_time: iso(now + 2 * H),
+		end_time: iso(now + 8 * H),
+		rules: "每队 2–4 人；开赛后不可更换战队。",
+		allow_join: true,
+		flag_prefix: "flag{",
+		created_at: iso(now - 2 * D),
+		updated_at: iso(now - 2 * H),
+		family: "awd",
+		purpose: "competition",
+		participant_mode: "team",
+		is_virtual: false,
+	},
 ];
 
 const challenges = [
@@ -1169,6 +1186,25 @@ let mockTasks = [
 		},
 		];
 
+
+/** 赛事战队（mock）：E5 这类未开始赛事可创建/加入/退出。 */
+let mockEventTeams = {};
+const mockEventJoined = new Set();
+
+const mockTeamResult = (event) => {
+	const team = mockEventTeams[event.id];
+	if (!team) return undefined;
+	return {
+		team,
+		members: [
+			{
+				member_name: me.nickname,
+				member: { event_id: event.id, team_id: team.id, user_id: me.id, role: "captain", joined_at: team.created_at },
+			},
+		],
+	};
+};
+
 const routes = [
 
 
@@ -1444,13 +1480,60 @@ const routes = [
 		)],
 	["GET", /^\/api\/events\/([^/]+)$/, (m, res) => {
 		const event = events.find((item) => item.id === m[1]) ?? events[0];
-		const joined = event.id.endsWith("0001") || event.id.endsWith("0002");
+		const baseJoined = event.id.endsWith("0001") || event.id.endsWith("0002");
+		const dynamicTeam = mockTeamResult(event);
+		const joined = baseJoined || mockEventJoined.has(event.id);
 		ok(res, {
 			id: event.id,
 			event,
 			joined,
-			...(joined && event.participant_mode === "team" ? { team_result: mockTeamFor(event) } : {}),
+			...(dynamicTeam
+				? { team_result: dynamicTeam }
+				: joined && event.participant_mode === "team"
+					? { team_result: mockTeamFor(event) }
+					: {}),
 		});
+	}],
+	["POST", /^\/api\/events\/([^/]+)\/team$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const eventId = m[1];
+			const name = String(body.name ?? "").trim();
+			if (!name) return json(res, 200, { code: 400, message: "战队名称不能为空", data: null, meta: null });
+			if (mockEventJoined.has(eventId)) {
+				return json(res, 200, { code: 409, message: "你已在该赛事的战队中，先退出再加入其它战队", data: null, meta: null });
+			}
+			const team = {
+				id: `team-${Date.now()}`,
+				event_id: eventId,
+				name,
+				description: "",
+				points: 0,
+				created_at: iso(now),
+				updated_at: iso(now),
+				banned: false,
+			};
+			mockEventTeams[eventId] = team;
+			mockEventJoined.add(eventId);
+			return ok(res, team);
+		})],
+	["POST", /^\/api\/events\/([^/]+)\/team\/([^/]+)\/join$/, (m, res) => {
+		const eventId = m[1];
+		const team = mockEventTeams[eventId];
+		if (!team || team.id !== m[2]) {
+			return json(res, 200, { code: 404, message: "战队不存在", data: null, meta: null });
+		}
+		mockEventJoined.add(eventId);
+		return ok(res, null);
+	}],
+	["DELETE", /^\/api\/events\/([^/]+)\/team\/([^/]+)$/, (m, res) => {
+		const eventId = m[1];
+		const team = mockEventTeams[eventId];
+		if (!team || team.id !== m[2]) {
+			return json(res, 200, { code: 404, message: "战队不存在", data: null, meta: null });
+		}
+		// 退出 = 离开成员关系；战队本身保留，仍可用 Team ID 重新加入。
+		mockEventJoined.delete(eventId);
+		return ok(res, null);
 	}],
 	["GET", /^\/api\/events\/([^/]+)\/challenges$/, (_m, res, req) => ok(res, eventChallenges, req)],
 	["GET", /^\/api\/events\/([^/]+)\/scoreboard$/, (_m, res) => ok(res, scoreboard)],

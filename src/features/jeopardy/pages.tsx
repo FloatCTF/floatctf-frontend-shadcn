@@ -17,6 +17,7 @@ import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import {
 	MonoText,
 	PageBody,
+	FilterChips,
 	PageHeader,
 	PaginationBar,
 	SectionCard,
@@ -273,6 +274,36 @@ export function ChallengesCatalogPage() {
 							: t("jeopardy.list.includeSolved")}
 					</Button>
 				</Toolbar>
+				<FilterChips
+					filters={[
+						...(category !== "all"
+							? [
+									{
+										key: "category",
+										label: category,
+										onRemove: () => {
+											setCategory("all");
+											setPage(1);
+										},
+									},
+								]
+							: []),
+						...(onlyUnsolved
+							? [
+									{
+										key: "unsolved",
+										label: t("jeopardy.list.onlyUnsolved"),
+										onRemove: () => {
+											setOnlyUnsolved(false);
+											setPage(1);
+										},
+									},
+								]
+							: []),
+					]}
+					onClearAll={clearFilters}
+					className="px-4"
+				/>
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={8} columns={5} />}
