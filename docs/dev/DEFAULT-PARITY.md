@@ -138,3 +138,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：讨论区恢复 All/My Discussions Tab 与 Default 列（标题/作者/浏览/点赞/评论/创建）；题解恢复内容/作者/类型/邮箱/更新列与 FilterBar。
 
 - 2026-11-08：讨论区补齐 All/My 导航并移除列表额外操作列；Writeups 列序按 Default 调整。
+
+- 2026-11-08：Profile 改为 Default 的只读/Edit 模式：左侧账号/昵称/邮箱/密码，右侧头像；移除确认密码与账号元数据卡片。

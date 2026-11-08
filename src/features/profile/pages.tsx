@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2, RotateCcw, Save, Upload } from "lucide-react";
+import { Loader2, Pencil, Save, Upload, X } from "lucide-react";
 
 import type { MeDto } from "@floatctf/sdk";
 
@@ -24,22 +24,13 @@ import { useAppQueryClient, useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { useAuthStore, useMe } from "~/auth/store";
 import { Field } from "~/components/app/form";
-import {
-	CopyText,
-	KeyValueList,
-	MonoText,
-	PageBody,
-	PageHeader,
-	SectionCard,
-	Toolbar,
-} from "~/components/app/page";
+import { MonoText, PageBody, PageHeader, SectionCard } from "~/components/app/page";
 import { InlineError, LoadingBlock, QueryState } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { UserAvatar } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Progress } from "~/components/ui/progress";
-import { formatDateTime } from "~/lib/format";
 import { useDocumentTitle } from "~/lib/hooks";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,11 +46,14 @@ export function ProfilePage(): ReactNode {
 	const queryClient = useAppQueryClient();
 	const cachedMe = useMe();
 
+	const [editable, setEditable] = useState(false);
 	const [nickname, setNickname] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
-	const [confirmPassword, setConfirmPassword] = useState("");
-	const [formError, setFormError] = useState<{ message: string; field?: "nickname" | "email" | "password" | "confirm" } | null>(null);
+	const [formError, setFormError] = useState<{
+		message: string;
+		field?: "nickname" | "email" | "password";
+	} | null>(null);
 	const [syncedId, setSyncedId] = useState<string | null>(null);
 	const avatarInputRef = useRef<HTMLInputElement>(null);
 	const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -73,7 +67,6 @@ export function ProfilePage(): ReactNode {
 
 	const me = query.data;
 
-	// 只在「第一次拿到该账号的数据」时回填表单，避免刷新时覆盖用户未保存的输入。
 	useEffect(() => {
 		if (!me || syncedId === me.id) return;
 		setNickname(me.nickname ?? "");
@@ -81,7 +74,6 @@ export function ProfilePage(): ReactNode {
 		setSyncedId(me.id);
 	}, [me, syncedId]);
 
-	// 释放预览用的 object URL（每次切换 / 卸载都会回收上一个）。
 	useEffect(
 		() => () => {
 			if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -107,10 +99,9 @@ export function ProfilePage(): ReactNode {
 			),
 		onSuccess: (_data, input) => {
 			toast.success(t("profile.save.success"));
+			setEditable(false);
 			setPassword("");
-			setConfirmPassword("");
 			setFormError(null);
-			// 后端 PATCH 不返回资料：用刚刚提交的值立即更新会话，再靠失效拉取权威数据。
 			const current = useAuthStore.getState().me;
 			if (current) {
 				useAuthStore.getState().setMe({
@@ -150,12 +141,16 @@ export function ProfilePage(): ReactNode {
 		setNickname(me?.nickname ?? "");
 		setEmail(me?.email ?? "");
 		setPassword("");
-		setConfirmPassword("");
 		setFormError(null);
 	}
 
+	function cancelEdit(): void {
+		resetForm();
+		setEditable(false);
+	}
+
 	function handleSubmit(): void {
-		if (!me) return;
+		if (!me || !editable) return;
 		const nextNickname = nickname.trim();
 		const nextEmail = email.trim();
 		if (nextNickname === "") {
@@ -166,15 +161,9 @@ export function ProfilePage(): ReactNode {
 			setFormError({ message: t("profile.errors.emailInvalid"), field: "email" });
 			return;
 		}
-		if (password !== "") {
-			if (password.length < 8) {
-				setFormError({ message: t("profile.errors.passwordTooShort"), field: "password" });
-				return;
-			}
-			if (password !== confirmPassword) {
-				setFormError({ message: t("profile.errors.passwordMismatch"), field: "confirm" });
-				return;
-			}
+		if (password !== "" && password.length < 8) {
+			setFormError({ message: t("profile.errors.passwordTooShort"), field: "password" });
+			return;
 		}
 		setFormError(null);
 		save.mutate({
@@ -190,7 +179,27 @@ export function ProfilePage(): ReactNode {
 
 	return (
 		<PageBody>
-			<PageHeader title={t("profile.title")} description={t("profile.description")} />
+			<PageHeader
+				title={t("profile.title")}
+				description={t("profile.description")}
+				actions={
+					editable ? (
+						<div className="flex items-center gap-2">
+							<Button variant="outline" disabled={save.isPending} onClick={cancelEdit}>
+								<X aria-hidden="true" /> {t("common.cancel")}
+							</Button>
+							<Button disabled={save.isPending} onClick={handleSubmit}>
+								{save.isPending ? <Loader2 className="animate-spin" /> : <Save />}
+								{t("profile.save.submit")}
+							</Button>
+						</div>
+					) : (
+						<Button variant="outline" onClick={() => setEditable(true)}>
+							<Pencil aria-hidden="true" /> {t("common.edit")}
+						</Button>
+					)
+				}
+			/>
 
 			<QueryState
 				query={query}
@@ -198,237 +207,156 @@ export function ProfilePage(): ReactNode {
 				errorTitle={t("profile.load.failed")}
 			>
 				{(data) => (
-					<div className="space-y-5">
-						<div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
-							<SectionCard title={t("profile.basic.title")} description={t("profile.basic.description")}>
-								<div className="space-y-4">
-									<Field
-										label={t("profile.fields.username")}
-										htmlFor="profile-username"
-										hint={t("profile.fields.usernameHint")}
-									>
-										<Input id="profile-username" value={data.username} disabled readOnly />
-									</Field>
-									<Field
-										label={t("profile.fields.nickname")}
-										htmlFor="profile-nickname"
-										required
-										hint={t("profile.fields.nicknameHint")}
-										error={formError?.field === "nickname" ? formError.message : undefined}
-									>
-										<Input
-											id="profile-nickname"
-											value={nickname}
-											maxLength={64}
-											disabled={save.isPending}
-											onChange={(event) => setNickname(event.target.value)}
-										/>
-									</Field>
-									<Field
-										label={t("profile.fields.email")}
-										htmlFor="profile-email"
-										hint={t("profile.fields.emailHint")}
-										error={formError?.field === "email" ? formError.message : undefined}
-									>
-										<Input
-											id="profile-email"
-											type="email"
-											autoComplete="email"
-											value={email}
-											disabled={save.isPending}
-											onChange={(event) => setEmail(event.target.value)}
-										/>
-									</Field>
-									<div className="grid gap-4 sm:grid-cols-2">
-										<Field
-											label={t("profile.fields.newPassword")}
-											htmlFor="profile-password"
-											hint={t("profile.fields.newPasswordHint")}
-											error={formError?.field === "password" ? formError.message : undefined}
-										>
-											<Input
-												id="profile-password"
-												type="password"
-												autoComplete="new-password"
-												value={password}
-												disabled={save.isPending}
-												onChange={(event) => setPassword(event.target.value)}
-											/>
-										</Field>
-										<Field
-											label={t("profile.fields.confirmNewPassword")}
-											htmlFor="profile-password-confirm"
-											hint={t("profile.fields.confirmNewPasswordHint")}
-											error={formError?.field === "confirm" ? formError.message : undefined}
-										>
-											<Input
-												id="profile-password-confirm"
-												type="password"
-												autoComplete="new-password"
-												value={confirmPassword}
-												disabled={save.isPending || password === ""}
-												onChange={(event) => setConfirmPassword(event.target.value)}
-											/>
-										</Field>
-									</div>
-									{formError && !formError.field ? (
-										<InlineError error={formError.message} />
-									) : null}
-									<Toolbar>
-										<Button
-											disabled={save.isPending}
-											onClick={handleSubmit}
-										>
-											{save.isPending ? (
-												<Loader2 className="animate-spin" />
-											) : (
-												<Save />
-											)}
-											{t("profile.save.submit")}
-										</Button>
-										<Button
-											variant="outline"
-											disabled={save.isPending}
-											onClick={resetForm}
-										>
-											<RotateCcw /> {t("common.reset")}
-										</Button>
-									</Toolbar>
-								</div>
-							</SectionCard>
-
-							<SectionCard title={t("profile.avatar.title")} description={t("profile.avatar.description")}>
-								<div className="space-y-4">
-									<div className="flex items-center gap-4">
-										<UserAvatar
-											name={displayName}
-											avatar={avatarSrc}
-											size="lg"
-											className="size-24"
-										/>
-										<div className="min-w-0 space-y-1">
-											<p className="truncate text-sm font-medium">{displayName}</p>
-											<MonoText className="block">{data.username}</MonoText>
-											<p className="text-xs text-muted-foreground">
-												{data.avatar ? t("profile.avatar.current") : t("profile.avatar.none")}
-											</p>
-										</div>
-									</div>
-
-									{/* 真按钮 + 隐藏 input：label 包 span 能点但键盘不可达，屏幕阅读器也不认。 */}
-									<input
-										ref={avatarInputRef}
-										id="profile-avatar"
-										type="file"
-										accept="image/png,image/jpeg,image/webp,image/gif"
-										className="sr-only"
-										tabIndex={-1}
-										disabled={upload.isPending}
-										onChange={(event) => {
-											const selected = event.target.files?.[0];
-											event.target.value = "";
-											if (!selected) return;
-											// 客户端先校验类型与大小，避免把后端必然拒绝的文件传上去。
-											if (!AVATAR_TYPES.includes(selected.type)) {
-												toast.error(t("profile.avatar.invalidType"));
-												return;
-											}
-											if (selected.size > AVATAR_MAX_BYTES) {
-												toast.error(t("profile.avatar.tooLarge"));
-												return;
-											}
-											// MIME/大小正确不代表图片可解码；先让浏览器解码一次，
-											// 避免把坏文件传到后端后才显示“头像已更新”但页面仍是占位符。
-											const url = URL.createObjectURL(selected);
-											const probe = new Image();
-											probe.onload = () => {
-												setAvatarFile(selected);
-												setPreviewUrl(url);
-											};
-											probe.onerror = () => {
-												URL.revokeObjectURL(url);
-												toast.error(t("profile.avatar.invalidImage"));
-											};
-											probe.src = url;
-										}}
+					<div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+						<SectionCard
+							title={t("profile.basic.title")}
+							description={t("profile.basic.description")}
+						>
+							<div className="max-w-[600px] space-y-5">
+								<Field label={t("profile.fields.username")} htmlFor="profile-username">
+									<Input id="profile-username" value={data.username} disabled readOnly />
+									<p className="mt-1 text-xs text-muted-foreground">
+										{t("profile.fields.usernameHint")}
+									</p>
+								</Field>
+								<Field
+									label={t("profile.fields.nickname")}
+									htmlFor="profile-nickname"
+									required
+									hint={t("profile.fields.nicknameHint")}
+									error={formError?.field === "nickname" ? formError.message : undefined}
+								>
+									<Input
+										id="profile-nickname"
+										value={nickname}
+										maxLength={64}
+										disabled={!editable || save.isPending}
+										onChange={(event) => setNickname(event.target.value)}
 									/>
-									<Button
-										variant="outline"
-										disabled={upload.isPending}
-										onClick={() => avatarInputRef.current?.click()}
-									>
-										<Upload aria-hidden="true" /> {t("profile.avatar.choose")}
-									</Button>
+								</Field>
+								<Field
+									label={t("profile.fields.email")}
+									htmlFor="profile-email"
+									hint={t("profile.fields.emailHint")}
+									error={formError?.field === "email" ? formError.message : undefined}
+								>
+									<Input
+										id="profile-email"
+										type="email"
+										autoComplete="email"
+										value={email}
+										disabled={!editable || save.isPending}
+										onChange={(event) => setEmail(event.target.value)}
+									/>
+								</Field>
+								<Field
+									label={t("profile.fields.newPassword")}
+									htmlFor="profile-password"
+									hint={t("profile.fields.newPasswordHint")}
+									error={formError?.field === "password" ? formError.message : undefined}
+								>
+									<Input
+										id="profile-password"
+										type="password"
+										autoComplete="new-password"
+										value={password}
+										disabled={!editable || save.isPending}
+										onChange={(event) => setPassword(event.target.value)}
+									/>
+								</Field>
+								{formError && !formError.field ? <InlineError error={formError.message} /> : null}
+							</div>
+						</SectionCard>
 
-									{avatarFile ? (
-										<div className="space-y-2">
-											<p className="truncate text-xs text-muted-foreground">
-												{t("profile.avatar.pending", { name: avatarFile.name })}
-											</p>
-											{upload.isPending ? (
-												<div className="space-y-1">
-													<Progress value={progress} aria-label={t("profile.avatar.progressLabel")} />
-													<p className="tnum text-xs text-muted-foreground">
-														{t("profile.avatar.uploading", { percent: progress })}
-													</p>
-												</div>
-											) : null}
-											<Toolbar>
-												<Button
-													disabled={upload.isPending}
-													onClick={() => upload.mutate(avatarFile)}
-												>
-													{upload.isPending ? (
-														<Loader2 className="animate-spin" />
-													) : (
-														<Upload />
-													)}
-													{t("profile.avatar.upload")}
-												</Button>
-												<Button
-													variant="outline"
-													disabled={upload.isPending}
-													onClick={() => {
-														setAvatarFile(null);
-														setPreviewUrl("");
-														setProgress(0);
-													}}
-												>
-														{t("common.cancel")}
-												</Button>
-											</Toolbar>
-										</div>
-									) : (
-										<p className="text-xs text-muted-foreground">{t("profile.avatar.hint")}</p>
-									)}
+						<SectionCard
+							title={t("profile.avatar.title")}
+							description={t("profile.avatar.description")}
+						>
+							<div className="space-y-4">
+								<div className="flex flex-col items-start gap-3">
+									<UserAvatar name={displayName} avatar={avatarSrc} size="lg" className="size-40" />
+									<div className="min-w-0">
+										<p className="truncate text-sm font-medium">{displayName}</p>
+										<MonoText className="block">{data.username}</MonoText>
+									</div>
 								</div>
-							</SectionCard>
-						</div>
 
-						<SectionCard title={t("profile.meta.title")} description={t("profile.meta.description")}>
-							<KeyValueList
-								columns={2}
-								items={[
-									{ key: t("profile.meta.username"), value: <MonoText>{data.username}</MonoText> },
-									{
-										key: t("profile.meta.nickname"),
-										value: data.nickname ? data.nickname : "—",
-									},
-									{ key: t("profile.meta.email"), value: data.email ? data.email : "—" },
-									{
-										key: t("profile.meta.createdAt"),
-										value: formatDateTime(data.created_at, { seconds: true }),
-									},
-									{
-										key: t("profile.meta.updatedAt"),
-										value: formatDateTime(data.updated_at, { seconds: true }),
-									},
-									{
-										key: t("profile.meta.userId"),
-										value: <CopyText value={data.id} label={t("profile.meta.userId")} />,
-									},
-								]}
-							/>
+								<input
+									ref={avatarInputRef}
+									id="profile-avatar"
+									type="file"
+									accept="image/png,image/jpeg,image/webp,image/gif"
+									className="sr-only"
+									tabIndex={-1}
+									disabled={upload.isPending}
+									onChange={(event) => {
+										const selected = event.target.files?.[0];
+										event.target.value = "";
+										if (!selected) return;
+										if (!AVATAR_TYPES.includes(selected.type)) {
+											toast.error(t("profile.avatar.invalidType"));
+											return;
+										}
+										if (selected.size > AVATAR_MAX_BYTES) {
+											toast.error(t("profile.avatar.tooLarge"));
+											return;
+										}
+										const url = URL.createObjectURL(selected);
+										const probe = new Image();
+										probe.onload = () => {
+											setAvatarFile(selected);
+											setPreviewUrl(url);
+										};
+										probe.onerror = () => {
+											URL.revokeObjectURL(url);
+											toast.error(t("profile.avatar.invalidImage"));
+										};
+										probe.src = url;
+									}}
+								/>
+								<Button
+									variant="outline"
+									disabled={upload.isPending}
+									onClick={() => avatarInputRef.current?.click()}
+								>
+									<Upload aria-hidden="true" /> {t("profile.avatar.choose")}
+								</Button>
+
+								{avatarFile ? (
+									<div className="space-y-2">
+										<p className="truncate text-xs text-muted-foreground">
+											{t("profile.avatar.pending", { name: avatarFile.name })}
+										</p>
+										{upload.isPending ? (
+											<div className="space-y-1">
+												<Progress value={progress} aria-label={t("profile.avatar.progressLabel")} />
+												<p className="tnum text-xs text-muted-foreground">
+													{t("profile.avatar.uploading", { percent: progress })}
+												</p>
+											</div>
+										) : null}
+										<div className="flex flex-wrap gap-2">
+											<Button disabled={upload.isPending} onClick={() => upload.mutate(avatarFile)}>
+												{upload.isPending ? <Loader2 className="animate-spin" /> : <Upload />}
+												{t("profile.avatar.upload")}
+											</Button>
+											<Button
+												variant="outline"
+												disabled={upload.isPending}
+												onClick={() => {
+													setAvatarFile(null);
+													setPreviewUrl("");
+													setProgress(0);
+												}}
+											>
+												{t("common.cancel")}
+											</Button>
+										</div>
+									</div>
+								) : (
+									<p className="text-xs text-muted-foreground">{t("profile.avatar.hint")}</p>
+								)}
+							</div>
 						</SectionCard>
 					</div>
 				)}
