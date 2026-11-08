@@ -392,6 +392,51 @@ export function AdminTerminalPage(): ReactNode {
 	const busy = status === "authorizing" || status === "connecting";
 	const wsEndpoint = `${adminBaseUrl.replace(/\/+$/, "")}/terminal/ws`;
 
+	if (attempt > 0) {
+		return (
+			<PageBody className="flex h-[calc(100svh-3.5rem)] min-h-[28rem] max-w-none flex-col gap-3">
+				<div className="flex flex-wrap items-center justify-between gap-2">
+					<div className="flex min-w-0 items-center gap-2">
+						<TerminalSquare className="size-5 shrink-0" aria-hidden="true" />
+						<h1 className="truncate text-lg font-semibold">
+							{t("adminInfra.terminal.title")}
+						</h1>
+						<TonePill tone={statusMeta.tone} icon={<PlugZap />}>
+							{statusMeta.text}
+						</TonePill>
+					</div>
+					<Toolbar>
+						<Button size="sm" onClick={() => void requestSession()} disabled={busy}>
+							<RotateCw className="size-4" aria-hidden="true" />
+							{t("adminInfra.terminal.actions.reconnect")}
+						</Button>
+					</Toolbar>
+				</div>
+
+				{error ? (
+					<div
+						className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm"
+						role="alert"
+					>
+						<span className="text-destructive">{error}</span>
+						<Button variant="outline" size="sm" onClick={() => void requestSession()}>
+							<RotateCw className="size-4" aria-hidden="true" />
+							{t("common.retry")}
+						</Button>
+					</div>
+				) : null}
+
+				<div className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-background p-2">
+					<div ref={containerRef} className="h-full w-full" />
+				</div>
+
+				<p className="truncate text-xs text-muted-foreground">
+					<MonoText>{wsEndpoint}</MonoText>
+				</p>
+			</PageBody>
+		);
+	}
+
 	return (
 		<PageBody>
 			<PageHeader
