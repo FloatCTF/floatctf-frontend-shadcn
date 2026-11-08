@@ -149,7 +149,11 @@ export default {
 			},
 		},
 		columns: {
-			time: "Time",
+			time: "Created",
+			id: "ID",
+			actor: "Actor ID",
+			details: "Details",
+
 			level: "Level",
 			category: "Category",
 			action: "Action",

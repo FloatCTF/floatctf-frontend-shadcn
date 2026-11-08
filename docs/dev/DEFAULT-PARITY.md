@@ -156,3 +156,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：管理端用户列改为 Default 的 ID/用户名/昵称/邮箱。
 
 - 2026-11-08：管理端角色列改为 Default 的 ID/标识/名称/说明/权限/内置/持有账号。
+
+- 2026-11-08：管理端日志列改为 Default 的 ID/分类/操作/级别/消息/操作主体/IP/详情/创建时间。

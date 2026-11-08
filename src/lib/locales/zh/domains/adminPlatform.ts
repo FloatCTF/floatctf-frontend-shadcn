@@ -141,7 +141,11 @@ export default {
 			},
 		},
 		columns: {
-			time: "时间",
+			time: "创建时间",
+			id: "ID",
+			actor: "操作主体 ID",
+			details: "详情",
+
 			level: "级别",
 			category: "分类",
 			action: "操作",

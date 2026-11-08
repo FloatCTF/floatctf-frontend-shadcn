@@ -147,10 +147,23 @@ export function AdminLogsPage(): ReactNode {
 
 	const columns: DataTableColumn<Logs>[] = [
 		{
-			id: "created_at",
-			header: t("adminPlatform.logs.columns.time"),
-			sortValue: (row) => Date.parse(row.created_at),
-			cell: (row) => <AbsoluteTime value={row.created_at} seconds />,
+			id: "id",
+			header: t("adminPlatform.logs.columns.id"),
+			sortValue: (row) => row.id,
+			cell: (row) => <MonoText className="text-xs text-muted-foreground">{row.id}</MonoText>,
+			hideBelow: "lg",
+		},
+		{
+			id: "category",
+			header: t("adminPlatform.logs.columns.category"),
+			sortValue: (row) => row.category,
+			cell: (row) => <MonoText>{row.category}</MonoText>,
+		},
+		{
+			id: "action",
+			header: t("adminPlatform.logs.columns.action"),
+			sortValue: (row) => row.action,
+			cell: (row) => <MonoText>{row.action}</MonoText>,
 		},
 		{
 			id: "level",
@@ -163,19 +176,6 @@ export function AdminLogsPage(): ReactNode {
 			),
 		},
 		{
-			id: "category",
-			header: t("adminPlatform.logs.columns.category"),
-			hideBelow: "sm",
-			sortValue: (row) => row.category,
-			cell: (row) => <MonoText>{row.category}</MonoText>,
-		},
-		{
-			id: "action",
-			header: t("adminPlatform.logs.columns.action"),
-			sortValue: (row) => row.action,
-			cell: (row) => <MonoText>{row.action}</MonoText>,
-		},
-		{
 			id: "message",
 			header: t("adminPlatform.logs.columns.message"),
 			cell: (row) => (
@@ -185,14 +185,33 @@ export function AdminLogsPage(): ReactNode {
 			),
 		},
 		{
+			id: "actor_user_id",
+			header: t("adminPlatform.logs.columns.actor"),
+			cell: (row) => <MonoText className="text-muted-foreground">{row.actor_user_id ?? "—"}</MonoText>,
+			hideBelow: "lg",
+		},
+		{
 			id: "ip_address",
 			header: t("adminPlatform.logs.columns.ip"),
-			align: "right",
-			hideBelow: "lg",
 			sortValue: (row) => row.ip_address ?? "",
+			cell: (row) => <MonoText className="text-muted-foreground">{row.ip_address ?? "—"}</MonoText>,
+			hideBelow: "lg",
+		},
+		{
+			id: "details",
+			header: t("adminPlatform.logs.columns.details"),
 			cell: (row) => (
-				<MonoText className="text-muted-foreground">{row.ip_address ?? "—"}</MonoText>
+				<span className="line-clamp-2 max-w-md break-all text-xs text-muted-foreground">
+					{jsonText(row.details)}
+				</span>
 			),
+			hideBelow: "xl",
+		},
+		{
+			id: "created_at",
+			header: t("adminPlatform.logs.columns.time"),
+			sortValue: (row) => Date.parse(row.created_at),
+			cell: (row) => <AbsoluteTime value={row.created_at} seconds />,
 		},
 	];
 
