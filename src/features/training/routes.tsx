@@ -10,6 +10,8 @@ import { TrainingCatalogPage, TrainingRunPage } from "./pages";
 export const feature: FeatureModule = {
 	shell: "player",
 	routes: [
+		{ path: "/gameboxes", element: <TrainingCatalogPage /> },
+		// 兼容旧入口；新导航使用 Default 的 Gameboxes 位置。
 		{ path: "/training", element: <TrainingCatalogPage /> },
 		{ path: "/training/runs/:runId", element: <TrainingRunPage /> },
 	],

@@ -22,6 +22,7 @@ export default {
 		challenges: "题库",
 		challengeSets: "题集",
 		training: "训练场",
+		gameboxes: "GameBoxes",
 		course: "课程",
 		instances: "我的实例",
 		top: "Top 选手",

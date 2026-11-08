@@ -2,12 +2,12 @@
 
 export default {
 	catalog: {
-		documentTitle: "AWDP Training Ground · FloatCTF",
-		title: "AWDP Training Ground",
-		description: "Pick an AWDP target to start practicing: Break → Fix → round evaluation.",
+		documentTitle: "Gameboxes · FloatCTF",
+		title: "Gameboxes",
+		description: "AWDP training: click a name to enter its run, or start one.",
 		eventsAction: "Go to events",
 		section: {
-			title: "Practice target catalog",
+			title: "GameBox catalog",
 			description:
 				"The catalog only exposes safe display fields (no exploit, source code, or credentials).",
 		},
@@ -27,9 +27,11 @@ export default {
 			clear: "Clear filter",
 		},
 		columns: {
-			gamebox: "Target",
+			gamebox: "Name",
 			category: "Category",
 			author: "Author",
+			solved: "Solved",
+			version: "Version",
 			resources: "Recommended resources",
 			state: "Training status",
 			updated: "Updated",

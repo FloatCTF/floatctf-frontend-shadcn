@@ -22,6 +22,7 @@ export default {
 		challenges: "Challenges",
 		challengeSets: "Sets",
 		training: "Training",
+		gameboxes: "GameBoxes",
 		course: "Course",
 		instances: "Instances",
 		top: "Top players",

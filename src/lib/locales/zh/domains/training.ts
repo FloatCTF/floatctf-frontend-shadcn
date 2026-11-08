@@ -2,12 +2,12 @@
 
 export default {
 	catalog: {
-		documentTitle: "AWDP 训练场 · FloatCTF",
-		title: "AWDP 训练场",
-		description: "选择一个 AWDP 靶机开始练习：Break 破题 → Fix 修复 → 回合判定。",
+		documentTitle: "GameBoxes · FloatCTF",
+		title: "GameBoxes",
+		description: "AWDP 训练场：点击名称进入训练，未开始则直接启动训练。",
 		eventsAction: "去赛事",
 		section: {
-			title: "练习靶机目录",
+			title: "GameBox 目录",
 			description: "目录只暴露安全展示字段（不含 exploit / 源码 / 凭据）。",
 		},
 		search: {
@@ -26,9 +26,11 @@ export default {
 			clear: "清空筛选",
 		},
 		columns: {
-			gamebox: "靶机",
+			gamebox: "名称",
 			category: "分类",
 			author: "作者",
+			solved: "已解出",
+			version: "版本",
 			resources: "推荐资源",
 			state: "训练状态",
 			updated: "更新时间",

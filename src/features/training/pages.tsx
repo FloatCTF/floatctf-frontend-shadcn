@@ -12,12 +12,11 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-	ArrowRight,
+	Check,
 	Dumbbell,
 	Loader2,
 	Play,
 	RefreshCw,
-	Search,
 	Square,
 	StopCircle,
 	Trophy,
@@ -32,6 +31,7 @@ import { qk } from "~/api/keys";
 import { RealtimePill, TonePill } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import { DataTable } from "~/components/app/data-table";
+import { FilterBar, type FilterKey } from "~/components/app/filter-bar";
 import {
 	KeyValueList,
 	MonoText,
@@ -51,11 +51,10 @@ import {
 } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { formatBytes, formatDateTime, formatDuration, formatInt, formatPoints } from "~/lib/format";
+import { formatDateTime, formatDuration, formatInt, formatPoints } from "~/lib/format";
 import { useCommands } from "~/app/command-palette";
-import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
+import { useDocumentTitle } from "~/lib/hooks";
 
 import {
 	RunPhaseSteps,
@@ -94,19 +93,17 @@ export function TrainingCatalogPage(): ReactNode {
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const [page, setPage] = useState(1);
-	const [pageSize, setPageSize] = useState(12);
-	const [search, setSearch] = useState("");
-	const debounced = useDebouncedValue(search, 300);
-	const filter = debounced.trim() ? `name:${debounced.trim()}` : undefined;
+	const [pageSize, setPageSize] = useState(20);
+	const [draftFilter, setDraftFilter] = useState("");
+	const [appliedFilter, setAppliedFilter] = useState("");
 	const params = useMemo(
-		() => ({ page, limit: pageSize, ...(filter ? { filter } : {}) }),
-		[page, pageSize, filter],
+		() => ({ page, limit: pageSize, ...(appliedFilter ? { filter: appliedFilter } : {}) }),
+		[page, pageSize, appliedFilter],
 	);
 
 	const query = useQuery({
 		queryKey: qk.runs.catalog(params),
 		queryFn: () => callList<GameBoxCatalogDto>(client.awdp.runs.gameboxCatalog(params)),
-		// 目录里的 active_training / solved 会随 run 生命周期变化：回到本页必须重新取。
 		staleTime: 0,
 	});
 
@@ -127,72 +124,15 @@ export function TrainingCatalogPage(): ReactNode {
 	const result = query.data;
 	const startingGameboxId = startMutation.isPending ? startMutation.variables : undefined;
 
-	const runActionLabel = (row: GameBoxCatalogDto): string =>
-		row.active_training?.phase === "ended"
-			? t("training.catalog.actions.viewRun")
-			: row.active_training?.phase === "pending"
-				? t("training.catalog.actions.enter")
-				: t("training.catalog.actions.continue");
-
-	const startButton = (row: GameBoxCatalogDto): ReactNode =>
-		row.active_training ? (
-			<Button size="sm" asChild>
-				<Link to={`/training/runs/${row.active_training.run_id}`}>
-					<Play aria-hidden="true" />
-					{runActionLabel(row)}
-				</Link>
-			</Button>
-		) : (
-			<Button
-				size="sm"
-				disabled={startMutation.isPending}
-				onClick={() => startMutation.mutate(row.id)}
-			>
-				{startingGameboxId === row.id ? (
-					<Loader2 className="animate-spin" aria-hidden="true" />
-				) : (
-					<Dumbbell aria-hidden="true" />
-				)}
-				{t("training.catalog.actions.start")}
-			</Button>
-		);
-
 	return (
 		<PageBody>
-			<PageHeader
-				title={t("training.catalog.title")}
-				description={t("training.catalog.description")}
-				actions={
-					<Button variant="outline" asChild>
-						<Link to="/events">
-							{t("training.catalog.eventsAction")}
-							<ArrowRight aria-hidden="true" />
-						</Link>
-					</Button>
-				}
-			/>
-
+			<PageHeader title={t("training.catalog.title")} description={t("training.catalog.description")} />
 			<SectionCard
 				title={t("training.catalog.section.title")}
 				description={t("training.catalog.section.description")}
+				contentClassName="px-0"
 				actions={
-					<div className="flex items-center gap-2">
-						<div className="relative w-44 sm:w-56">
-							<Search
-								className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-								aria-hidden="true"
-							/>
-							<Input
-								value={search}
-								placeholder={t("training.catalog.search.placeholder")}
-								aria-label={t("training.catalog.search.ariaLabel")}
-								className="pl-8"
-								onChange={(event) => {
-									setSearch(event.target.value);
-									setPage(1);
-								}}
-							/>
-						</div>
+					<div className="flex w-full flex-wrap items-center gap-2">
 						<Button
 							variant="ghost"
 							size="icon-sm"
@@ -202,6 +142,25 @@ export function TrainingCatalogPage(): ReactNode {
 						>
 							<RefreshCw />
 						</Button>
+						<FilterBar
+							keys={[
+								{ key: "name", label: t("training.catalog.columns.gamebox") },
+								{ key: "category", label: t("training.catalog.columns.category") },
+								{ key: "solved", label: t("training.catalog.columns.solved") },
+							] satisfies FilterKey[]}
+							value={draftFilter}
+							onChange={setDraftFilter}
+							onApply={() => {
+								setAppliedFilter(draftFilter.trim());
+								setPage(1);
+							}}
+							onClear={() => {
+								setDraftFilter("");
+								setAppliedFilter("");
+								setPage(1);
+							}}
+							placeholder={t("common.filter.placeholder")}
+						/>
 					</div>
 				}
 				footer={
@@ -215,33 +174,39 @@ export function TrainingCatalogPage(): ReactNode {
 								setPageSize(size);
 								setPage(1);
 							}}
-							// 默认每页 12 条（卡片目录三列布局），选项必须包含当前值，否则下拉显示空白。
-							pageSizeOptions={[12, 24, 48]}
 						/>
 					) : null
 				}
 			>
 				<QueryState
 					query={query}
-					skeleton={<TableSkeleton rows={6} columns={5} />}
+					skeleton={<TableSkeleton rows={6} columns={6} />}
 					errorTitle={t("training.catalog.loadError")}
 					isEmpty={(data) => data.items.length === 0}
 					empty={
 						<EmptyBlock
 							title={
-								filter
+								appliedFilter
 									? t("training.catalog.filtered.title")
 									: t("training.catalog.empty.title")
 							}
 							description={
-								filter
+								appliedFilter
 									? t("training.catalog.filtered.description")
 									: t("training.catalog.empty.description")
 							}
-							variant={filter ? "filtered" : "empty"}
+							variant={appliedFilter ? "filtered" : "empty"}
 							action={
-								filter ? (
-									<Button size="sm" variant="outline" onClick={() => setSearch("")}>
+								appliedFilter ? (
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() => {
+											setDraftFilter("");
+											setAppliedFilter("");
+											setPage(1);
+										}}
+									>
 										{t("training.catalog.filtered.clear")}
 									</Button>
 								) : undefined
@@ -258,22 +223,42 @@ export function TrainingCatalogPage(): ReactNode {
 									id: "name",
 									header: t("training.catalog.columns.gamebox"),
 									sortValue: (row) => row.name,
-									cell: (row) => (
-										<div className="min-w-0">
-											<p className="truncate text-sm font-medium">{row.name}</p>
-											<p className="line-clamp-1 text-xs text-muted-foreground">
-												{row.description || t("training.catalog.noDescription")}
-											</p>
-										</div>
-									),
+									cell: (row) =>
+										row.active_training ? (
+											<Link
+												to={`/training/runs/${row.active_training.run_id}`}
+												className="truncate text-sm font-medium hover:underline"
+											>
+												{row.name}
+											</Link>
+										) : (
+											<button
+												type="button"
+												disabled={startMutation.isPending}
+												onClick={() => startMutation.mutate(row.id)}
+												className="truncate text-left text-sm font-medium text-primary underline underline-offset-4 disabled:opacity-60"
+											>
+												{startingGameboxId === row.id ? (
+													<Loader2 className="mr-1 inline size-3 animate-spin" aria-hidden="true" />
+												) : null}
+												{row.name}
+											</button>
+										),
 								},
 								{
 									id: "category",
 									header: t("training.catalog.columns.category"),
 									sortValue: (row) => row.category,
-									cell: (row) => (
-										<span className="text-sm">{row.category || "—"}</span>
-									),
+									cell: (row) => <span className="text-sm">{row.category || "—"}</span>,
+								},
+								{
+									id: "solved",
+									header: t("training.catalog.columns.solved"),
+									sortValue: (row) => (row.solved ? 1 : 0),
+									cell: (row) =>
+										row.solved ? (
+											<Check className="size-4 text-emerald-600 dark:text-emerald-400" aria-label={t("common.yes")} />
+										) : null,
 								},
 								{
 									id: "author",
@@ -281,156 +266,55 @@ export function TrainingCatalogPage(): ReactNode {
 									hideBelow: "md",
 									sortValue: (row) => row.author ?? "",
 									cell: (row) => (
-										<span className="text-sm text-muted-foreground">
-											{row.author || "—"}
-										</span>
+										<span className="text-sm text-muted-foreground">{row.author || "—"}</span>
 									),
 								},
 								{
-									id: "resources",
-									header: t("training.catalog.columns.resources"),
-									hideBelow: "lg",
-									cell: (row) => (
-										<span className="tnum font-mono text-xs text-muted-foreground">
-											{t("training.catalog.resourcesValue", {
-												cpu: row.recommended_cpu_millis,
-												memory: formatBytes(row.recommended_memory_bytes),
-												pids: row.recommended_pids_limit,
-											})}
-										</span>
-									),
-								},
-								{
-									id: "state",
-									header: t("training.catalog.columns.state"),
-									cell: (row) => (
-										<span className="flex flex-wrap items-center gap-1">
-											{row.solved ? (
-												<TonePill tone="success">
-													{t("training.catalog.state.trained")}
-												</TonePill>
-											) : null}
-											{row.active_training ? (
-												<TonePill
-													tone={
-														row.active_training.phase === "ended"
-															? "muted"
-															: "info"
-													}
-													className="tnum"
-												>
-													{row.active_training.phase === "ended"
-														? t("training.catalog.state.ended", {
-																score: formatPoints(
-																	row.active_training.score,
-																),
-															})
-														: row.active_training.phase === "pending"
-															? t("training.catalog.state.notStarted")
-															: t("training.catalog.state.active", {
-																phase: runPhaseLabel(
-																	row.active_training.phase,
-																	t,
-																),
-																score: formatPoints(
-																	row.active_training.score,
-																),
-															})}
-												</TonePill>
-											) : null}
-											{!row.solved && !row.active_training ? (
-												<TonePill tone="muted">
-													{t("training.catalog.state.notStarted")}
-												</TonePill>
-											) : null}
-										</span>
-									),
+									id: "version",
+									header: t("training.catalog.columns.version"),
+									hideBelow: "md",
+									sortValue: (row) => row.version ?? "",
+									cell: (row) =>
+										row.version ? <MonoText>{row.version}</MonoText> : <span>—</span>,
 								},
 								{
 									id: "updated",
 									header: t("training.catalog.columns.updated"),
-									hideBelow: "md",
+									hideBelow: "lg",
 									sortValue: (row) => row.updated_at ?? "",
 									cell: (row) => (
 										<span className="tnum text-xs text-muted-foreground">
-											{row.updated_at
-												? formatDateTime(row.updated_at, { seconds: true })
-												: "—"}
+											{row.updated_at ? formatDateTime(row.updated_at, { seconds: true }) : "—"}
 										</span>
 									),
 								},
 							]}
-							rowActions={(row) => startButton(row)}
 							mobileCard={(row) => (
 								<div className="space-y-2">
 									<div className="flex items-center justify-between gap-2">
-										<span className="min-w-0 truncate text-sm font-medium">
-											{row.name}
-										</span>
-										<TonePill
-											tone={
-												row.active_training
-													? row.active_training.phase === "ended"
-														? "muted"
-														: row.active_training.phase === "pending"
-															? "warning"
-															: "info"
-													: row.solved
-														? "success"
-														: "muted"
-											}
-										>
-											{row.active_training
-												? row.active_training.phase === "ended"
-													? t("training.catalog.state.ended", {
-															score: formatPoints(
-																row.active_training.score,
-															),
-														})
-													: row.active_training.phase === "pending"
-														? t("training.catalog.state.notStarted")
-														: t("training.catalog.state.activeShort", {
-																phase: runPhaseLabel(
-																	row.active_training.phase,
-																	t,
-																),
-															})
-												: row.solved
-													? t("training.catalog.state.trained")
-													: t("training.catalog.state.notStarted")}
-										</TonePill>
-									</div>
-									<p className="line-clamp-2 text-xs text-muted-foreground">
-										{row.description || t("training.catalog.noDescription")}
-									</p>
-									<div className="flex justify-end">
 										{row.active_training ? (
-											<Button size="sm" asChild>
-												<Link
-													to={`/training/runs/${row.active_training.run_id}`}
-												>
-													<Play aria-hidden="true" />
-													{t("training.catalog.actions.continue")}
-												</Link>
-											</Button>
-										) : (
-											<Button
-												size="sm"
-												disabled={startMutation.isPending}
-												onClick={() => startMutation.mutate(row.id)}
+											<Link
+												to={`/training/runs/${row.active_training.run_id}`}
+												className="min-w-0 truncate text-sm font-medium hover:underline"
 											>
-												{startingGameboxId === row.id ? (
-													<Loader2
-														className="animate-spin"
-														aria-hidden="true"
-													/>
-												) : (
-													<Dumbbell aria-hidden="true" />
-												)}
-												{t("training.catalog.actions.start")}
-											</Button>
+												{row.name}
+											</Link>
+										) : (
+											<button
+												type="button"
+												onClick={() => startMutation.mutate(row.id)}
+												className="min-w-0 truncate text-left text-sm font-medium text-primary underline"
+											>
+												{row.name}
+											</button>
 										)}
+										{row.solved ? (
+											<Check className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label={t("common.yes")} />
+										) : null}
 									</div>
+									<p className="text-xs text-muted-foreground">
+										{row.category || "—"} · {row.author || "—"}
+									</p>
 								</div>
 							)}
 						/>
@@ -440,10 +324,6 @@ export function TrainingCatalogPage(): ReactNode {
 		</PageBody>
 	);
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Run 工作台
-// ────────────────────────────────────────────────────────────────────────────
 
 export function TrainingRunPage(): ReactNode {
 	const { t } = useTranslation();

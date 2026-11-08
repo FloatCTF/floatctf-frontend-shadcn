@@ -129,3 +129,38 @@
 - 内容区按子页切换，不是把全部内容塞进单个 arena 页。
 
 > 当前 shadcn 事件页已按这些 Tab 和总览布局调整；未加入时的 Tab 展示仍需按上图核对。
+
+## 7. 选手端 · Gameboxes（Default）
+
+入口：`/service/gameboxes`
+
+![](./gameboxes-list.png)
+
+- 表头：名称、分类、已解出、作者、版本、更新时间；
+- 名称是链接：已有 active run 时进入训练；没有 active run 时点击名称直接开始训练；
+- 工具栏：每页条数、Add Filter、过滤输入、Clear、Apply Filters；
+- 没有额外的“资源/状态”列。
+
+当前 shadcn 的训练场（`/training`）内容接近，但列和操作不同；应把入口按 Default 的
+Gameboxes 位置与列对齐，训练 run 仍保留独立页。
+
+## 8. 选手端 · Instances（Default）
+
+入口：`/service/instances`
+
+![](./instances-list.png)
+
+- 表头：内容、类型、状态、赛事、标识、用户、销毁时间、操作；
+- Challenge 实例的操作是 Destroy；GameBox 实例的操作是 Open；
+- 工具栏：每页条数、Add Filter、过滤输入、Clear、Apply Filters。
+
+## 9. 选手端 · Solves（Default）
+
+入口：`/service/solves`
+
+![](./solves-list.png)
+
+- 表头：题目、用户、更新时间；
+- 用户列带头像（无头像时显示昵称首字母）；
+- 题目链接进入题目；
+- 工具栏：每页条数、Add Filter、过滤输入、Clear、Apply Filters。

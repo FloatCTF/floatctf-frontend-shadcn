@@ -71,7 +71,7 @@ export const playerNav: NavGroup[] = [
 			{ to: "/events", labelKey: "nav.items.events", icon: CalendarDays, descriptionKey: "nav.items.eventsHint" },
 			{ to: "/challenges", labelKey: "nav.items.challenges", icon: Puzzle, descriptionKey: "nav.items.challengesHint" },
 			{ to: "/challenge-sets", labelKey: "nav.items.challengeSets", icon: Blocks },
-			{ to: "/training", labelKey: "nav.items.training", icon: Dumbbell },
+			{ to: "/gameboxes", labelKey: "nav.items.gameboxes", icon: Dumbbell },
 			{ to: "/instances", labelKey: "nav.items.instances", icon: Boxes },
 			{ to: "/solves", labelKey: "nav.items.solves", icon: Activity },
 		],
