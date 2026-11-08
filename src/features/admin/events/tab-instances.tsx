@@ -31,8 +31,16 @@ function typeTone(type: AdminInstanceRow["instance_type"]): "info" | "success" {
 	return type === "challenge" ? "info" : "success";
 }
 
-function instanceTypeLabel(type: AdminInstanceRow["instance_type"]): string {
-	return type === "challenge" ? "Challenge" : "GameBox";
+function instanceTypeLabel(type: AdminInstanceRow["instance_type"], t: (key: string) => string): string {
+	return t(type === "challenge" ? "adminEvents.instances.types.challenge" : "adminEvents.instances.types.gamebox");
+}
+
+/** 后端 status 是技术标识，展示时统一本地化。 */
+function instanceStatusLabel(status: string, t: (key: string) => string): string {
+	const known = ["running", "stopped", "starting", "pending", "error", "destroyed"];
+	return known.includes(status)
+		? t(`adminEvents.instances.statuses.${status}`)
+		: status;
 }
 
 function OwnerLabel({ row }: { row: AdminInstanceRow }): ReactNode {
@@ -74,7 +82,7 @@ export function EventInstancesTab({ eventId }: { eventId: string }): ReactNode {
 			header: t("adminEvents.instances.columns.type"),
 			cell: (row) => (
 				<TonePill tone={typeTone(row.instance_type)}>
-					{instanceTypeLabel(row.instance_type)}
+					{instanceTypeLabel(row.instance_type, t)}
 				</TonePill>
 			),
 			sortValue: (row) => row.instance_type,
@@ -84,7 +92,7 @@ export function EventInstancesTab({ eventId }: { eventId: string }): ReactNode {
 			header: t("adminEvents.instances.columns.status"),
 			cell: (row) => (
 				<TonePill tone="neutral" title={row.status}>
-					{row.status}
+					{instanceStatusLabel(row.status, t)}
 				</TonePill>
 			),
 			sortValue: (row) => row.status,
@@ -157,7 +165,7 @@ export function EventInstancesTab({ eventId }: { eventId: string }): ReactNode {
 					k: t("adminEvents.instances.mobile.type"),
 					v: (
 						<TonePill tone={typeTone(row.instance_type)}>
-							{instanceTypeLabel(row.instance_type)}
+							{instanceTypeLabel(row.instance_type, t)}
 						</TonePill>
 					),
 				},

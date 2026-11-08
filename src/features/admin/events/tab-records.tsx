@@ -65,7 +65,7 @@ export function EventLogsTab({ eventId }: { eventId: string }): ReactNode {
 			header: t("adminEvents.records.logs.columns.level"),
 			cell: (row) => (
 				<TonePill tone={levelTone(row.level)} title={row.level}>
-					{row.level}
+					{t(`adminPlatform.logs.levels.${row.level.toLowerCase()}`)}
 				</TonePill>
 			),
 			sortValue: (row) => row.level,

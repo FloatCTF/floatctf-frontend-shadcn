@@ -619,6 +619,18 @@ export default {
 		},
 	},
 	instances: {
+		types: {
+			challenge: "Challenge",
+			gamebox: "GameBox",
+		},
+		statuses: {
+			running: "Running",
+			stopped: "Stopped",
+			starting: "Starting",
+			pending: "Pending",
+			error: "Error",
+			destroyed: "Destroyed",
+		},
 		title: "Event instances",
 		description:
 			"A normalized event_instances view (Challenge and GameBox shown together). The admin list does not return flags, so no flag is displayed here.",

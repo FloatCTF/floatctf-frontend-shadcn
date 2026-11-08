@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T02:34:27.183Z",
+	"generatedAt": "2026-11-08T02:39:02.807Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -180,6 +180,14 @@
 		{
 			"method": "GET",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/data"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/instances"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/logs"
 		},
 		{
 			"method": "GET",

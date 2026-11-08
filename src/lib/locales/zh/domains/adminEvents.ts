@@ -584,6 +584,18 @@ export default {
 		},
 	},
 	instances: {
+		types: {
+			challenge: "题目实例",
+			gamebox: "GameBox",
+		},
+		statuses: {
+			running: "运行中",
+			stopped: "已停止",
+			starting: "启动中",
+			pending: "待启动",
+			error: "异常",
+			destroyed: "已销毁",
+		},
 		title: "赛事实例",
 		description:
 			"归一化的 event_instances 视图（Challenge 与 GameBox 统一呈现）。管理端列表不返回 flag，因此这里不展示任何 flag。",
