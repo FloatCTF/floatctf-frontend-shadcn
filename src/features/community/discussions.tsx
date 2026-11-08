@@ -229,8 +229,6 @@ export function DiscussionsPage(): ReactNode {
 	const [pageSize, setPageSize] = useState(20);
 	const [draftFilter, setDraftFilter] = useState("");
 	const [appliedFilter, setAppliedFilter] = useState("");
-	const [formOpen, setFormOpen] = useState(false);
-	const deleteAction = useDeleteDiscussion();
 	const columns = discussionColumns(t, me?.id);
 
 	const filter = appliedFilter.trim() || undefined;
@@ -248,18 +246,6 @@ export function DiscussionsPage(): ReactNode {
 			<PageHeader
 				title={t("community.discussions.title")}
 				description={t("community.discussions.subtitle")}
-				actions={
-					<Toolbar>
-						<Button variant="outline" asChild>
-							<Link to="/community/discussions/mine">
-								<MessagesSquare aria-hidden="true" /> {t("community.discussions.actions.mine")}
-							</Link>
-						</Button>
-						<Button onClick={() => setFormOpen(true)}>
-							<Pencil aria-hidden="true" /> {t("community.discussions.actions.create")}
-						</Button>
-					</Toolbar>
-				}
 			/>
 
 			<Tabs
@@ -321,11 +307,6 @@ export function DiscussionsPage(): ReactNode {
 								title={t("community.discussions.list.emptyTitle")}
 								description={t("community.discussions.list.emptyDescription")}
 								icon={<MessagesSquare aria-hidden="true" />}
-								action={
-									<Button size="sm" onClick={() => setFormOpen(true)}>
-										{t("community.discussions.actions.create")}
-									</Button>
-								}
 							/>
 						) : (
 							<EmptyBlock
@@ -353,33 +334,11 @@ export function DiscussionsPage(): ReactNode {
 							columns={columns}
 							onRowClick={(row) => void navigate(`/community/discussions/${row.id}`)}
 							mobileCard={(row) => discussionMobileCard(t, row, me?.id)}
-							rowActions={(row) => (
-								<div className="flex items-center gap-1">
-									<Button variant="ghost" size="sm" asChild>
-										<Link to={`/community/discussions/${row.id}`}>
-											{t("community.discussions.table.view")}
-										</Link>
-									</Button>
-									{me !== null && row.author_id === me.id ? (
-										<Button
-											variant="ghost"
-											size="icon-sm"
-											aria-label={t("community.discussions.table.delete")}
-											title={t("community.discussions.table.delete")}
-											disabled={deleteAction.isPending}
-											onClick={() => void deleteAction.requestDelete(row)}
-										>
-											<Trash2 aria-hidden="true" className="text-destructive" />
-										</Button>
-									) : null}
-								</div>
-							)}
-						/>
+							/>
 					)}
 				</QueryState>
 			</SectionCard>
 
-			<DiscussionFormSheet open={formOpen} onOpenChange={setFormOpen} />
 		</PageBody>
 	);
 }

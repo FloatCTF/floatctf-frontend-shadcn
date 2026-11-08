@@ -136,3 +136,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：公告列表按 Default 列（发布者/标题/内容/创建/更新）；武器库按 Default 列（名称/分类/描述/有附件/文件地址/更新），使用 FilterBar。
 
 - 2026-11-08：讨论区恢复 All/My Discussions Tab 与 Default 列（标题/作者/浏览/点赞/评论/创建）；题解恢复内容/作者/类型/邮箱/更新列与 FilterBar。
+
+- 2026-11-08：讨论区补齐 All/My 导航并移除列表额外操作列；Writeups 列序按 Default 调整。
