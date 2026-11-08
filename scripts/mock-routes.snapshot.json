@@ -1,6 +1,14 @@
 {
-	"generatedAt": "2026-11-08T00:24:39.159Z",
+	"generatedAt": "2026-11-08T00:34:56.935Z",
 	"routes": [
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/teams\\/([^/]+)\\/ban"
+		},
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)"
@@ -71,6 +79,26 @@
 		},
 		{
 			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/gameboxes"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/instances"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/network"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/prechecks"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/scores"
+		},
+		{
+			"method": "GET",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp"
 		},
 		{
@@ -92,6 +120,10 @@
 		{
 			"method": "GET",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/data"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/teams"
 		},
 		{
 			"method": "GET",
@@ -351,6 +383,34 @@
 		},
 		{
 			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/(deploy|start|pause|resume|finish|archive)"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/gameboxes"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/network\\/reallocate"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/precheck"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/score\\/adjust"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/teams\\/([^/]+)\\/ban"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/tokens\\/rotate"
+		},
+		{
+			"method": "POST",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/break-to-fix"
 		},
 		{
@@ -484,6 +544,10 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/users\\/reset_password"
+		},
+		{
+			"method": "PUT",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/network"
 		},
 		{
 			"method": "PUT",

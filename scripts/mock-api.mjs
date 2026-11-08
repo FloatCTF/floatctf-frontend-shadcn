@@ -547,41 +547,32 @@ const awdpAdminInstances = [
 	},
 ];
 
-const awdTeams = (eventId) => [
-	{
-		id: "team-1",
+/**
+ * 战队列表与积分榜必须同源：两者都用 `teams`（下标即 `team-${index}`），
+ * 否则管理端「按战队调分」会改到另一个队、积分榜看起来没反应。
+ */
+const awdTeams = (eventId) =>
+	teams.slice(0, 3).map(([name, score], index) => ({
+		id: `team-${index}`,
 		team: {
-			id: "team-1",
+			id: `team-${index}`,
 			event_id: eventId,
-			name: "Byte Me",
+			name,
 			description: "Mock 战队",
-			points: 1240,
+			points: score,
 			created_at: iso(now - 3 * D),
 			updated_at: iso(now - 2 * H),
-			banned: false,
+			// 第三支队伍标记为已封禁，用于验证封禁态展示。
+			banned: index === 2,
 		},
-		captain: "李明",
+		captain: index === 0 ? "李明" : `队长 ${index}`,
 		members: [
-			{ username: "2024001", nickname: "李明", role: "captain", points: 1240 },
-			{ username: "2024002", nickname: "NOP Sled", role: "member", points: 640 },
+			{ username: `202400${index + 1}`, nickname: index === 0 ? "李明" : `队员 ${index}`, role: "captain", points: score },
+			...(index === 0
+				? [{ username: "2024009", nickname: "NOP Sled", role: "member", points: Math.round(score / 2) }]
+				: []),
 		],
-	},
-	{
-		id: "team-2",
-		team: {
-			id: "team-2",
-			event_id: eventId,
-			name: "SegFault Club",
-			description: "Mock 战队",
-			points: 1020,
-			created_at: iso(now - 3 * D),
-			updated_at: iso(now - 3 * H),
-			banned: true,
-		},
-		captain: "Byte Me",
-		members: [{ username: "2024003", nickname: "Byte Me", role: "captain", points: 1020 }],
-	},
-];
+	}));
 
 // ── 管理端 AWD 运维（赛事状态机 / 网络 / 赛事靶机 / 预检）──────────────
 let awdAdminStatus = process.env.MOCK_AWD_ADMIN_STATUS ?? "verified";
@@ -809,12 +800,22 @@ const awdGameboxes = [
 		health_status: "unhealthy",
 	},
 ];
-const awdScores = [
-	{ team_id: "team-1", team_name: "Byte Me", attack_score: 620, defense_score: 620, total_score: 1240, rank: 1 },
-	{ team_id: "team-2", team_name: "NOP Sled", attack_score: 540, defense_score: 610, total_score: 1150, rank: 2 },
-	{ team_id: "team-3", team_name: "SegFault Club", attack_score: 500, defense_score: 520, total_score: 1020, rank: 3 },
-	{ team_id: "team-4", team_name: "Stack Smashers", attack_score: 420, defense_score: 380, total_score: 800, rank: 4 },
-];
+/** 由 `teams` 派生积分行：加分/扣分后**重算排名**，选手端与管理端共用同一份数据。 */
+const awdScoreRows = () =>
+	teams
+		.map(([name, base], index) => {
+			const score = base + (index === 0 ? mockAwdBonus : 0);
+			return {
+				team_id: `team-${index}`,
+				team_name: name,
+				attack_score: Math.round(score * 0.55),
+				defense_score: Math.round(score * 0.45),
+				total_score: score,
+			};
+		})
+		.sort((a, b) => b.total_score - a.total_score)
+		.map((row, index) => ({ ...row, rank: index + 1 }));
+
 const wireguardConfig = `[Interface]
 PrivateKey = MOCK-PRIVATE-KEY-DO-NOT-USE
 Address = 10.66.3.2/24
@@ -898,6 +899,29 @@ const awdpScores = [
 /** 记录活跃 SSE 连接，便于 `POST /__sse/close` 主动断开以测试重连。 */
 const sseClients = new Set();
 
+/** 向全部活跃 SSE 连接广播一条事件（用于验证前端的实时失效）。 */
+const broadcastSse = (data) => {
+	for (const client of sseClients) {
+		if (!client.writableEnded) client.write(`data: ${JSON.stringify(data)}\n\n`);
+	}
+};
+
+/** mock 里少数需要看请求体的路由（flag 校验）：其余路由忽略 body。 */
+const readJsonBody = (req) =>
+	new Promise((resolve) => {
+		let raw = "";
+		req.on("data", (chunk) => {
+			raw += chunk;
+		});
+		req.on("end", () => {
+			try {
+				resolve(JSON.parse(raw || "{}"));
+			} catch {
+				resolve({});
+			}
+		});
+	});
+
 /** SSE：保持连接并心跳；首个事件用于让前端进入 connected 状态。 */
 const sse = (res, req) => {
 	res.writeHead(200, {
@@ -929,6 +953,7 @@ const sse = (res, req) => {
 };
 
 let mockWriteup = null;
+let mockAwdBonus = 0;
 
 const routes = [
 
@@ -951,6 +976,47 @@ const routes = [
 	// 管理端 AWD 运维（状态机 / 网络 / 赛事靶机 / 预检 / 积分）
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd$/, (m, res) => ok(res, awdAdminState(m[1]))],
 	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awd$/, (m, res) => ok(res, awdAdminState(m[1]))],
+	// 管理端 AWD：生命周期（状态机）/ 网络 / 赛事靶机 / 实例 / 预检 / 积分 / 战队
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/(deploy|start|pause|resume|finish|archive)$/, (m, res) => {
+		const next = { deploy: "deployed", start: "running", pause: "paused", resume: "running", finish: "finished", archive: "archived" }[m[2]];
+		awdAdminStatus = next;
+		broadcastSse({ type: "precheck.updated", sequence: Date.now(), occurred_at: iso(now) });
+		return ok(res, null);
+	}],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/tokens\/rotate$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/precheck$/, (m, res) =>
+		ok(res, {
+			run_id: "pc-mock-new",
+			status: "succeeded",
+			error_msg: null,
+			failed_checks: [],
+			checks: [{ name: "network", ok: true, detail: "mock" }],
+			trigger: "manual",
+			event_id: m[1],
+		})],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/prechecks$/, (m, res) => ok(res, awdPrecheckRuns(m[1]))],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/scores$/, (_m, res) => ok(res, awdScoreRows())],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/network$/, (m, res) => ok(res, awdEventNetwork(m[1]))],
+	["PUT", /^\/api\/admin\/events\/([^/]+)\/awd\/network$/, (m, res) => ok(res, null)],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/network\/reallocate$/, (_m, res) => ok(res, null)],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => ok(res, awdEventGameboxes(m[1]))],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => ok(res, awdEventGameboxes(m[1])[0])],
+	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)$/, (_m, res) => ok(res, null)],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/instances$/, (_m, res) => ok(res, [])],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/teams$/, (m, res) => ok(res, awdTeams(m[1]))],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/teams\/([^/]+)\/ban$/, (_m, res) => ok(res, "team banned")],
+	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awd\/teams\/([^/]+)\/ban$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/score\/adjust$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const idx = Number(String(body.team_id ?? "").replace("team-", ""));
+			const delta = Number(body.delta ?? 0);
+			if (!Number.isInteger(idx) || idx < 0 || idx >= teams.length || !Number.isFinite(delta)) {
+				return json(res, 200, { code: 400, message: "team_id 或 delta 不合法", data: null, meta: null });
+			}
+			teams[idx][1] = Math.max(0, teams[idx][1] + delta);
+			broadcastSse({ type: "score.updated", sequence: Date.now(), occurred_at: iso(now) });
+			return ok(res, null);
+		})],
 
 
 	// 管理端 AWDP 运维（配置 / 阶段推进 / 挂载 / 实例 / 积分 / 大屏）
@@ -1207,7 +1273,7 @@ const routes = [
 			current_round: 3,
 			round_count: 8,
 			banned: false,
-			score: 1240,
+			score: 1240 + mockAwdBonus,
 			final_settlement: false,
 		})],
 	["GET", /^\/api\/events\/([^/]+)\/awd\/gameboxes$/, (_m, res) =>
@@ -1234,15 +1300,17 @@ const routes = [
 			},
 		])],
 	["GET", /^\/api\/events\/([^/]+)\/awd\/scores$/, (_m, res) =>
-		ok(res, teams.map(([name, score], index) => ({
-			team_id: `team-${index}`,
-			team_name: name,
-			attack_score: Math.round(score * 0.55),
-			defense_score: Math.round(score * 0.45),
-			total_score: score,
-			rank: index + 1,
-		})))],
-	["POST", /^\/api\/events\/([^/]+)\/awd\/submissions$/, (_m, res) => ok(res, null)],
+		ok(res, awdScoreRows())],
+	["POST", /^\/api\/events\/([^/]+)\/awd\/submissions$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const flag = String(body.flag ?? "").trim();
+			if (!flag.startsWith("FLAG{") || !flag.endsWith("}")) {
+				return json(res, 200, { code: 400, message: "flag 不正确", data: null, meta: null });
+			}
+			mockAwdBonus += 100;
+			broadcastSse({ type: "score.updated", sequence: Date.now(), occurred_at: iso(now) });
+			return ok(res, null);
+		})],
 	["POST", /^\/api\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)\/reset$/, (_m, res) => ok(res, null)],
 	["GET", /^\/api\/events\/([^/]+)\/awd\/wireguard\/config$/, (_m, res) => ok(res, { config: wireguardConfig })],
 	["GET", /^\/api\/events\/([^/]+)\/awd\/ssh-config$/, (_m, res) =>
