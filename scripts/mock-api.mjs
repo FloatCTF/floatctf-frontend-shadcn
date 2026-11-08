@@ -1262,6 +1262,10 @@ const weapons = [
 	},
 ];
 
+
+/** 训练 run 的 writeup（mock）：保存后再次读取应拿到同一份内容。 */
+let mockRunWriteup = { content: "", updated_at: null };
+
 const routes = [
 
 
@@ -1474,9 +1478,16 @@ const routes = [
 	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/evaluations$/, (_m, res) => ok(res, runEvaluations)],
 	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/scores$/, (_m, res) => ok(res, runScores)],
 	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res) =>
-		ok(res, { run_id: m[1], content: "", updated_at: null })],
-	["PUT", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res) =>
-		ok(res, { run_id: m[1], content: "## 训练复盘\n\n（mock）", updated_at: iso(now) })],
+		ok(res, { run_id: m[1], content: mockRunWriteup.content, updated_at: mockRunWriteup.updated_at })],
+	["PUT", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			// 保存内容必须持久化：之前返回固定文本，编辑后刷新就丢。
+			mockRunWriteup = {
+				content: String(body.content ?? ""),
+				updated_at: iso(now),
+			};
+			return ok(res, { run_id: m[1], ...mockRunWriteup });
+		})],
 	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, currentRunInstance())],
 	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance$/, (_m, res) => {
 		runInstanceState = "running";
@@ -1959,7 +1970,8 @@ const routes = [
 				category: item.challenge.category,
 				points: item.current_points,
 				solved_count: item.solved_count,
-				solved_percent: Math.round((item.solved_count / 42) * 1000) / 10,
+				// 后端返回的是比例（0..1），前端 formatPercent 再乘 100；不能直接给百分数。
+				solved_percent: Math.min(1, item.solved_count / 42),
 			})),
 			scoreboard_top10: scoreboard.slice(0, 10),
 			trend,
