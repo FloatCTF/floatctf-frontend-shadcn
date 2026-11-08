@@ -439,6 +439,10 @@ export default {
 			},
 		},
 		columns: {
+			id: "ID",
+			cron: "Cron 表达式",
+			executeAt: "执行时间",
+			protected: "受保护",
 			name: "任务名称",
 			key: "任务键",
 			trigger: "触发",

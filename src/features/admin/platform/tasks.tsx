@@ -302,6 +302,13 @@ export function AdminScheduledTasksPage(): ReactNode {
 
 	const columns: DataTableColumn<ScheduledTasks>[] = [
 		{
+			id: "id",
+			header: t("adminPlatform.tasks.columns.id"),
+			sortValue: (row) => row.id,
+			cell: (row) => <MonoText className="text-xs text-muted-foreground">{row.id}</MonoText>,
+			hideBelow: "lg",
+		},
+		{
 			id: "task_name",
 			header: t("adminPlatform.tasks.columns.name"),
 			sortValue: (row) => row.task_name,
@@ -317,20 +324,20 @@ export function AdminScheduledTasksPage(): ReactNode {
 		{
 			id: "task_key",
 			header: t("adminPlatform.tasks.columns.key"),
-			hideBelow: "sm",
 			sortValue: (row) => row.task_key,
 			cell: (row) => <MonoText>{row.task_key}</MonoText>,
+			hideBelow: "sm",
 		},
 		{
 			id: "trigger_type",
 			header: t("adminPlatform.tasks.columns.trigger"),
-			hideBelow: "md",
 			sortValue: (row) => row.trigger_type,
 			cell: (row) => (
 				<TonePill tone="neutral" title={row.trigger_type}>
 					{triggerLabel(row.trigger_type)}
 				</TonePill>
 			),
+			hideBelow: "md",
 		},
 		{
 			id: "status",
@@ -343,22 +350,27 @@ export function AdminScheduledTasksPage(): ReactNode {
 			),
 		},
 		{
-			id: "schedule",
-			header: t("adminPlatform.tasks.columns.schedule"),
+			id: "cron_expr",
+			header: t("adminPlatform.tasks.columns.cron"),
 			hideBelow: "lg",
 			cell: (row) =>
 				row.cron_expr ? (
 					<MonoText className="text-muted-foreground">{row.cron_expr}</MonoText>
-				) : row.execute_at ? (
-					<AbsoluteTime value={row.execute_at} seconds />
 				) : (
 					<span className="text-muted-foreground">—</span>
 				),
 		},
 		{
+			id: "execute_at",
+			header: t("adminPlatform.tasks.columns.executeAt"),
+			hideBelow: "lg",
+			sortValue: (row) => (row.execute_at ? Date.parse(row.execute_at) : 0),
+			cell: (row) =>
+				row.execute_at ? <AbsoluteTime value={row.execute_at} seconds /> : <span>—</span>,
+		},
+		{
 			id: "enabled",
 			header: t("adminPlatform.tasks.columns.enabled"),
-			hideBelow: "md",
 			cell: (row) => (
 				<BooleanPill
 					value={row.enabled}
@@ -366,22 +378,30 @@ export function AdminScheduledTasksPage(): ReactNode {
 					falseText={t("adminPlatform.common.disabled")}
 				/>
 			),
+			sortValue: (row) => (row.enabled ? 1 : 0),
+			hideBelow: "md",
+		},
+		{
+			id: "protected",
+			header: t("adminPlatform.tasks.columns.protected"),
+			cell: (row) => <BooleanPill value={row.protected} />,
+			sortValue: (row) => (row.protected ? 1 : 0),
+			hideBelow: "md",
 		},
 		{
 			id: "last_run_at",
 			header: t("adminPlatform.tasks.columns.lastRun"),
-			align: "right",
-			hideBelow: "xl",
 			sortValue: (row) => Date.parse(row.last_run_at ?? ""),
 			cell: (row) =>
 				row.last_run_at ? <AbsoluteTime value={row.last_run_at} /> : <span>—</span>,
+			hideBelow: "xl",
 		},
 		{
 			id: "updated_at",
 			header: t("adminPlatform.tasks.columns.updatedAt"),
-			align: "right",
 			sortValue: (row) => Date.parse(row.updated_at),
 			cell: (row) => <AbsoluteTime value={row.updated_at} />,
+			hideBelow: "lg",
 		},
 	];
 

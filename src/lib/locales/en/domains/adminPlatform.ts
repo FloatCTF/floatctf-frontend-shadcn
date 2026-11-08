@@ -474,6 +474,10 @@ export default {
 			},
 		},
 		columns: {
+			id: "ID",
+			cron: "Cron expression",
+			executeAt: "Execute at",
+			protected: "Protected",
 			name: "Task name",
 			key: "Task key",
 			trigger: "Trigger",
