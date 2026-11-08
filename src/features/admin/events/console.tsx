@@ -96,7 +96,8 @@ export function EventConsolePage(): ReactNode {
 				rawTab === "data" ||
 				rawTab === "instances" ||
 				rawTab === "writeups") &&
-				event.family !== "jeopardy"));
+				event.family !== "jeopardy") ||
+			(rawTab === "teams" && event.participant_mode !== "team"));
 	const tab: TabKey = familyMismatch ? "config" : rawTab;
 
 	function changeTab(next: string) {
@@ -263,7 +264,9 @@ export function EventConsolePage(): ReactNode {
 							</TabsTrigger>
 						) : null}
 						<TabsTrigger value="members">{t("adminEvents.console.tabs.members")}</TabsTrigger>
-						<TabsTrigger value="teams">{t("adminEvents.console.tabs.teams")}</TabsTrigger>
+						{event.participant_mode === "team" ? (
+							<TabsTrigger value="teams">{t("adminEvents.console.tabs.teams")}</TabsTrigger>
+						) : null}
 						<TabsTrigger value="announcements">
 							{t("adminEvents.console.tabs.announcements")}
 						</TabsTrigger>
@@ -301,9 +304,11 @@ export function EventConsolePage(): ReactNode {
 				<TabsContent value="members" className="mt-4">
 					<EventMembersTab eventId={event.id} participantMode={event.participant_mode} />
 				</TabsContent>
-				<TabsContent value="teams" className="mt-4">
-					<EventTeamsTab eventId={event.id} participantMode={event.participant_mode} />
-				</TabsContent>
+				{event.participant_mode === "team" ? (
+					<TabsContent value="teams" className="mt-4">
+						<EventTeamsTab eventId={event.id} participantMode={event.participant_mode} />
+					</TabsContent>
+				) : null}
 				<TabsContent value="announcements" className="mt-4">
 					<EventAnnouncementsTab eventId={event.id} />
 				</TabsContent>
