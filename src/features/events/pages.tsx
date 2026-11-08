@@ -477,7 +477,26 @@ export function EventWorkspacePage() {
 
 							<div className="space-y-4">
 									{gated ? (
-										<MemberGateNotice event={data.event} />
+										<Tabs defaultValue="overview">
+											<TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto">
+												<TabsTrigger value="overview" className="shrink-0">
+													{t("events.workspace.tabs.overview")}
+												</TabsTrigger>
+												{!isAwd ? (
+													<TabsTrigger value="bulletin" className="shrink-0">
+														{t("events.workspace.tabs.bulletin")}
+													</TabsTrigger>
+												) : null}
+											</TabsList>
+											<TabsContent value="overview" className="mt-4">
+												<MemberGateNotice event={data.event} />
+											</TabsContent>
+											{!isAwd ? (
+												<TabsContent value="bulletin" className="mt-4">
+													<BulletinTab eventId={resolvedEventId} />
+												</TabsContent>
+											) : null}
+										</Tabs>
 									) : (
 										<Tabs
 											value={activeTab}
