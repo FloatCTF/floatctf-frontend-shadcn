@@ -121,3 +121,7 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：题库列表列顺序改为 Default：名称 / 分类 / 已解出 / 作者 / 版本 / 更新时间。
 
 - 2026-11-08：题目详情增加 Default 的 Challenge / WriteUp 两个子页；公开题解独立成 Tab。
+
+- 2026-11-08：根据 Default 实测截图纠正题集交互：选手端恢复 FilterBar + 名称链接
+  详情页；管理端恢复名称链接 / 行操作 Edit/Delete / 右侧编辑抽屉，移除整行内容弹窗。
+  审计记录见 `docs/qa/default-interactions/README.md`。

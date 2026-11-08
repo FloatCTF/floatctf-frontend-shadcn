@@ -4,11 +4,11 @@
  * 平台列表接口没有服务端分类过滤，`QueryParams.filter` 只有一个自由文本字段）。
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Blocks, CheckCircle2, ChevronRight, Puzzle, Search } from "lucide-react";
+import { Blocks, CheckCircle2, ChevronRight, Filter, Puzzle, Search } from "lucide-react";
 
 import { call, callList } from "~/api/call";
 import { isNotFound } from "~/api/errors";
@@ -34,13 +34,13 @@ import {
 import { TonePill } from "~/components/app/badges";
 import { Button } from "~/components/ui/button";
 import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "~/components/ui/dialog";
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import {
 	Select,
@@ -479,8 +479,9 @@ export function ChallengeSetsPage() {
 	useDocumentTitle(t("jeopardy.sets.documentTitle"));
 	const client = useClient();
 	const now = useNow(60_000);
-	const [keyword, setKeyword] = useState("");
-	const [selected, setSelected] = useState<ChallengeSets | null>(null);
+	const inputRef = useRef<HTMLInputElement>(null);
+	const [draftFilter, setDraftFilter] = useState("");
+	const [appliedFilter, setAppliedFilter] = useState("");
 	const query = useQuery({
 		queryKey: qk.sets.list({}),
 		queryFn: () => call(client.service.challenges.getChallengeSets(), "题集列表"),
@@ -492,10 +493,12 @@ export function ChallengeSetsPage() {
 			header: t("jeopardy.sets.columns.name"),
 			sortValue: (row) => row.name,
 			cell: (row) => (
-				<div className="min-w-0">
-					<p className="truncate text-sm font-medium">{row.name}</p>
-					<MonoText className="text-muted-foreground">{row.id}</MonoText>
-				</div>
+				<Link
+					to={`/challenge-sets/${row.id}`}
+					className="truncate text-sm font-medium hover:underline"
+				>
+					{row.name}
+				</Link>
 			),
 		},
 		{
@@ -516,9 +519,36 @@ export function ChallengeSetsPage() {
 					{formatRelative(row.updated_at, now)}
 				</span>
 			),
-			hideBelow: "md",
 		},
 	];
+
+	function addFilter(key: "name" | "description") {
+		const token = `${key}:`;
+		setDraftFilter((current) => {
+			const trimmed = current.trim();
+			if (!trimmed) return token;
+			if (trimmed.includes(token)) return current;
+			return `${trimmed} & ${token}`;
+		});
+		requestAnimationFrame(() => inputRef.current?.focus());
+	}
+
+	function matchesFilter(row: ChallengeSets, raw: string): boolean {
+		const clauses = raw
+			.split("&")
+			.map((clause) => clause.trim())
+			.filter(Boolean);
+		if (clauses.length === 0) return true;
+		return clauses.every((clause) => {
+			const separator = clause.indexOf(":");
+			const key = (separator >= 0 ? clause.slice(0, separator) : "").trim().toLowerCase();
+			const value = (separator >= 0 ? clause.slice(separator + 1) : clause).trim().toLowerCase();
+			if (key === "name") return row.name.toLowerCase().includes(value);
+			if (key === "description")
+				return (row.description ?? "").toLowerCase().includes(value);
+			return `${row.name} ${row.description ?? ""}`.toLowerCase().includes(clause.toLowerCase());
+		});
+	}
 
 	return (
 		<PageBody>
@@ -547,167 +577,90 @@ export function ChallengeSetsPage() {
 				}
 			>
 				{(sets) => {
-					const normalized = keyword.trim().toLowerCase();
-					const filtered = normalized
-						? sets.filter((set) =>
-								`${set.name} ${set.description ?? ""}`.toLowerCase().includes(normalized),
-							)
-						: sets;
+					const filtered = appliedFilter ? sets.filter((row) => matchesFilter(row, appliedFilter)) : sets;
+					const apply = () => setAppliedFilter(draftFilter.trim());
+					const clear = () => {
+						setDraftFilter("");
+						setAppliedFilter("");
+					};
 					return (
-						<>
-							<SectionCard
-								title={t("jeopardy.sets.listTitle")}
-								description={t("jeopardy.sets.listDescription")}
-								actions={
-									<div className="relative w-full sm:w-72">
-										<Search
-											aria-hidden="true"
-											className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-										/>
-										<Input
-											value={keyword}
-											onChange={(event) => setKeyword(event.target.value)}
-											placeholder={t("jeopardy.sets.filterPlaceholder")}
-											className="pl-9"
-											aria-label={t("jeopardy.sets.filterPlaceholder")}
-										/>
-									</div>
+						<SectionCard
+							title={t("jeopardy.sets.listTitle")}
+							description={t("jeopardy.sets.listDescription")}
+							contentClassName="px-0"
+							actions={
+								<div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<Button variant="outline" size="sm">
+												<Filter aria-hidden="true" />
+												{t("jeopardy.sets.addFilter")}
+											</Button>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="start">
+											<DropdownMenuLabel>{t("jeopardy.sets.filterBy")}</DropdownMenuLabel>
+											<DropdownMenuSeparator />
+											<DropdownMenuItem onSelect={() => addFilter("name")}>
+												{t("jeopardy.sets.columns.name")}
+											</DropdownMenuItem>
+											<DropdownMenuItem onSelect={() => addFilter("description")}>
+												{t("jeopardy.sets.columns.description")}
+											</DropdownMenuItem>
+										</DropdownMenuContent>
+									</DropdownMenu>
+									<Input
+										ref={inputRef}
+										value={draftFilter}
+										onChange={(event) => setDraftFilter(event.target.value)}
+										placeholder={t("jeopardy.sets.filterPlaceholder")}
+										className="min-w-0 flex-1 sm:w-72"
+										aria-label={t("jeopardy.sets.filterPlaceholder")}
+									/>
+									<Button variant="outline" size="sm" onClick={clear}>
+										{t("common.clear")}
+									</Button>
+									<Button size="sm" onClick={apply}>
+										<Search aria-hidden="true" />
+										{t("jeopardy.sets.applyFilters")}
+									</Button>
+								</div>
+							}
+						>
+							<DataTable
+								columns={columns}
+								data={filtered}
+								getRowId={(row) => row.id}
+								empty={
+									<EmptyBlock
+										title={t("jeopardy.sets.filteredEmptyTitle")}
+										description={t("jeopardy.sets.filteredEmptyDescription")}
+										action={
+											<Button variant="outline" size="sm" onClick={clear}>
+												{t("common.clear")}
+											</Button>
+										}
+									/>
 								}
-							>
-								<DataTable
-									columns={columns}
-									data={filtered}
-									getRowId={(row) => row.id}
-									onRowClick={setSelected}
-									empty={
-										<EmptyBlock
-											title={t("jeopardy.sets.filteredEmptyTitle")}
-											description={t("jeopardy.sets.filteredEmptyDescription")}
-											action={
-												<Button variant="outline" size="sm" onClick={() => setKeyword("")}>
-													{t("common.clear")}
-												</Button>
-											}
-										/>
-									}
-									mobileCard={(row) => (
-										<div className="flex items-start justify-between gap-3">
-											<div className="min-w-0">
-												<p className="truncate text-sm font-medium">{row.name}</p>
-												<p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-													{row.description || t("jeopardy.sets.noDescription")}
-												</p>
-											</div>
-											<ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+								mobileCard={(row) => (
+									<Link
+										to={`/challenge-sets/${row.id}`}
+										className="flex items-start justify-between gap-3"
+									>
+										<div className="min-w-0">
+											<p className="truncate text-sm font-medium">{row.name}</p>
+											<p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+												{row.description || t("jeopardy.sets.noDescription")}
+											</p>
 										</div>
-									)}
-								/>
-							</SectionCard>
-							<PlayerChallengeSetDialog
-								set={selected}
-								onOpenChange={(open) => {
-									if (!open) setSelected(null);
-								}}
+										<ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+									</Link>
+								)}
 							/>
-						</>
+						</SectionCard>
 					);
 				}}
 			</QueryState>
 		</PageBody>
-	);
-}
-
-function PlayerChallengeSetDialog({
-	set,
-	onOpenChange,
-}: {
-	set: ChallengeSets | null;
-	onOpenChange: (open: boolean) => void;
-}) {
-	const { t } = useTranslation();
-	const client = useClient();
-	const setId = set?.id ?? "";
-	const query = useQuery({
-		queryKey: qk.sets.detail(setId),
-		queryFn: () => call(client.service.challenges.getChallengeSet(setId), "题集详情"),
-		enabled: setId !== "",
-	});
-
-	const columns: DataTableColumn<ChallengesListItem>[] = [
-		{
-			id: "name",
-			header: t("jeopardy.setDetail.columns.challenge"),
-			sortValue: (row) => row.name,
-			cell: (row) => (
-				<div className="min-w-0">
-					<Link
-						to={`/challenges/${row.id}`}
-						className="truncate text-sm font-medium hover:underline"
-					>
-						{row.name}
-					</Link>
-					<p className="truncate text-xs text-muted-foreground">{row.safe_name}</p>
-				</div>
-			),
-		},
-		{
-			id: "category",
-			header: t("jeopardy.setDetail.columns.category"),
-			cell: (row) => <TonePill tone="neutral">{row.category}</TonePill>,
-			sortValue: (row) => row.category,
-		},
-		{
-			id: "solved",
-			header: t("jeopardy.setDetail.columns.status"),
-			cell: (row) =>
-				row.solved ? (
-					<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
-						{t("jeopardy.common.solved")}
-					</TonePill>
-				) : (
-					<TonePill tone="muted">{t("jeopardy.common.unsolved")}</TonePill>
-				),
-			sortValue: (row) => (row.solved ? 1 : 0),
-		},
-	];
-
-	return (
-		<Dialog open={set !== null} onOpenChange={onOpenChange}>
-			<DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
-				<DialogHeader>
-					<DialogTitle>{set?.name ?? t("jeopardy.sets.title")}</DialogTitle>
-					<DialogDescription>
-						{set?.description || t("jeopardy.sets.noDescription")}
-					</DialogDescription>
-				</DialogHeader>
-				<QueryState
-					query={query}
-					skeleton={<LoadingBlock label={t("jeopardy.setDetail.loading")} />}
-					errorTitle={t("jeopardy.setDetail.loadError")}
-					isEmpty={(items) => items.length === 0}
-					empty={
-						<EmptyBlock
-							title={t("jeopardy.setDetail.emptyTitle")}
-							description={t("jeopardy.setDetail.emptyDescription")}
-						/>
-					}
-				>
-					{(items) => (
-						<div className="space-y-3">
-							<p className="text-xs text-muted-foreground">
-								{t("jeopardy.setDetail.count", { count: items.length })}
-							</p>
-							<DataTable columns={columns} data={items} getRowId={(row) => row.id} />
-						</div>
-					)}
-				</QueryState>
-				<DialogFooter>
-					<Button variant="outline" onClick={() => onOpenChange(false)}>
-						{t("common.close")}
-					</Button>
-				</DialogFooter>
-			</DialogContent>
-		</Dialog>
 	);
 }
 
