@@ -607,3 +607,16 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 测试赛事已删除。
 
 验证：`vite build` / i18n（5030 keys）/ theme 全绿。
+
+## 第 35 轮补充（补丁 gzip 魔数）
+
+补丁上传已限制 `.tar.gz / .tgz` 后缀，但把文本文件改成这些后缀仍能选中并提交，
+后端才报「请上传 patch.tar.gz」。
+
+- 训练场与赛事 AWDP 的补丁 onChange 都读取前 2 字节，要求 gzip 魔数 `1f 8b`；
+- 不匹配立即中文 toast，不发起上传；
+- 合法 `patch.tar.gz` 仍正常应用。
+
+实测：`fake.tar.gz`（文本）被拦截；真实 gzip tar 补丁仍返回「补丁已应用」。
+
+验证：`vite build` / i18n（5032 keys）/ theme 全绿。
