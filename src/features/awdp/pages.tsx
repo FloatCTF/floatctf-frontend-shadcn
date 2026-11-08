@@ -38,6 +38,7 @@ import {
 	EmptyBlock,
 	ErrorBlock,
 	LoadingBlock,
+	NotFoundBlock,
 	PermissionDeniedBlock,
 } from "~/components/app/states";
 import {
@@ -266,11 +267,23 @@ export function LabPage(): ReactNode {
 			{eventQuery.isPending ? (
 				<LoadingBlock label={t("awdp.states.loadingOverview")} />
 			) : eventQuery.isError ? (
-				<ErrorBlock
-					error={eventQuery.error}
-					title={t("awdp.states.loadOverview")}
-					onRetry={() => void eventQuery.refetch()}
-				/>
+				isNotFound(eventQuery.error) ? (
+					<NotFoundBlock
+						title={t("events.workspace.notFoundTitle")}
+						description={t("events.workspace.notFoundDescription")}
+						action={
+							<Button asChild variant="outline">
+								<Link to="/events">{t("events.workspace.backToList")}</Link>
+							</Button>
+						}
+					/>
+				) : (
+					<ErrorBlock
+						error={eventQuery.error}
+						title={t("awdp.states.loadOverview")}
+						onRetry={() => void eventQuery.refetch()}
+					/>
+				)
 			) : access ? (
 				<WorkspaceAccessBlock reason={access} eventId={eventId} practiceEntry="training" />
 			) : overviewQuery.isPending ? (

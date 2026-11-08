@@ -34,6 +34,7 @@ import {
 	EmptyBlock,
 	ErrorBlock,
 	LoadingBlock,
+	NotFoundBlock,
 	PermissionDeniedBlock,
 } from "~/components/app/states";
 import {
@@ -188,11 +189,23 @@ export function ArenaPage(): ReactNode {
 			{eventQuery.isPending ? (
 				<LoadingBlock label={t("awd.arena.loading")} />
 			) : eventQuery.isError ? (
-				<ErrorBlock
-					error={eventQuery.error}
-					title={t("awd.arena.errors.event")}
-					onRetry={() => eventQuery.refetch()}
-				/>
+				isNotFound(eventQuery.error) ? (
+					<NotFoundBlock
+						title={t("events.workspace.notFoundTitle")}
+						description={t("events.workspace.notFoundDescription")}
+						action={
+							<Button asChild variant="outline">
+								<Link to="/events">{t("events.workspace.backToList")}</Link>
+							</Button>
+						}
+					/>
+				) : (
+					<ErrorBlock
+						error={eventQuery.error}
+						title={t("awd.arena.errors.event")}
+						onRetry={() => eventQuery.refetch()}
+					/>
+				)
 			) : access ? (
 				<WorkspaceAccessBlock
 					reason={access}
