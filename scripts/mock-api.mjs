@@ -717,6 +717,8 @@ const runInstance = {
 	],
 };
 let mockRunPhase = "break";
+let runInstanceState = process.env.MOCK_RUN_STATE ?? "running";
+const currentRunInstance = () => ({ ...runInstance, runtime_state: runInstanceState });
 const trainingRun = (phase = mockRunPhase, runId = "run-1") => ({
 	run_id: runId,
 	gamebox_id: "gb-lib-1",
@@ -741,7 +743,7 @@ const trainingRun = (phase = mockRunPhase, runId = "run-1") => ({
 	my_score: 100,
 	fix_round_penalty: 10,
 	source_code_dir: "src/web-shop",
-	instances: [runInstance],
+	instances: [currentRunInstance()],
 	judge_endpoint: {
 		base_url: "http://10.42.30.2:8080",
 		flag_url: "http://10.42.30.2:8080/flag",
@@ -1078,10 +1080,23 @@ const routes = [
 		ok(res, { run_id: m[1], content: "", updated_at: null })],
 	["PUT", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res) =>
 		ok(res, { run_id: m[1], content: "## 训练复盘\n\n（mock）", updated_at: iso(now) })],
-	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, runInstance)],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/start$/, (_m, res) => ok(res, runInstance)],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
-	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => ok(res, runInstance)],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, currentRunInstance())],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance$/, (_m, res) => {
+		runInstanceState = "running";
+		return ok(res, currentRunInstance());
+	}],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/start$/, (_m, res) => {
+		runInstanceState = "running";
+		return ok(res, currentRunInstance());
+	}],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => {
+		runInstanceState = "stopped";
+		return ok(res, null);
+	}],
+	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => {
+		runInstanceState = "running";
+		return ok(res, currentRunInstance());
+	}],
 	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/break$/, (_m, res) =>
 		ok(res, { accepted: true, scored: true, already_broken: false })],
 	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/gameboxes\/([^/]+)\/patch$/, (_m, res) =>

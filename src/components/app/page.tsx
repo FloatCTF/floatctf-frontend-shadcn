@@ -252,14 +252,16 @@ export function SecretValue({ value, label }: { value: string; label?: string })
 	const name = label ?? t("common.misc.secret");
 	return (
 		<span className="inline-flex min-w-0 items-center gap-1.5">
+			{/* 隐藏时渲染固定长度掩码而不是「CSS 模糊明文」：
+			    模糊只挡肉眼，DOM / 读屏 / 复制选中仍然能拿到明文。 */}
 			<span
 				className={cn(
 					"tnum min-w-0 truncate font-mono text-xs",
-					!shown && "blur-[3px] select-none",
+					!shown && "select-none",
 				)}
 				title={shown ? value : t("common.hiddenValue", { name })}
 			>
-				{value}
+				{shown ? value : "••••••••"}
 			</span>
 			<Button
 				variant="ghost"
