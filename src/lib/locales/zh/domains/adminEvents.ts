@@ -90,7 +90,9 @@ export default {
 		},
 		loadError: "加载赛事列表失败",
 		empty: {
-			title: "没有匹配的赛事",
+			title: "还没有赛事",
+			filteredDescription: "没有标题包含「{{query}}」的赛事；清除搜索或调整筛选试试。",
+			filteredTitle: "没有匹配的赛事",
 			descriptionCompetition: "还没有正式赛事，点右上角「新建赛事」创建第一场。",
 			descriptionVirtual: "当前没有虚拟（练习）赛事。",
 		},

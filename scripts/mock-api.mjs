@@ -1614,7 +1614,7 @@ const routes = [
 
 	// 管理端
 	["GET", /^\/api\/admin\/dashboard\/summary$/, (_m, res) => ok(res, dashboardSummary)],
-	["GET", /^\/api\/admin\/events$/, (_m, res, req) => ok(res, adminEvents, req)],
+	["GET", /^\/api\/admin\/events$/, (_m, res, req) => okPage(res, adminEvents.filter((e) => mockFilterMatch(req, e)), req)],
 	["GET", /^\/api\/admin\/events\/([^/]+)$/, (m, res) => {
 		ok(res, adminEvents.find((item) => item.id === m[1]) ?? adminEvents[0]);
 	}],

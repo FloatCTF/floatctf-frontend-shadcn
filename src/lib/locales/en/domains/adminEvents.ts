@@ -96,7 +96,9 @@ export default {
 		},
 		loadError: "Failed to load events",
 		empty: {
-			title: "No matching events",
+			title: "No events yet",
+			filteredDescription: "No event title contains “{{query}}”. Clear the search or adjust the filters.",
+			filteredTitle: "No matching events",
 			descriptionCompetition:
 				"No competition events yet. Use “New event” in the top-right to create the first one.",
 			descriptionVirtual: "There are no virtual (practice) events right now.",

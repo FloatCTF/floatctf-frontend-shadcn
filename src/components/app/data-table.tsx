@@ -233,6 +233,7 @@ export function DataTable<T>({
 													aria-label={t("common.table.sortColumn", {
 														column: typeof column?.header === "string" ? column.header : header.id,
 													})}
+													title={t("common.table.sortScopeHint")}
 												>
 													{flexRender(header.column.columnDef.header, header.getContext())}
 													{sorted === "asc" ? (

@@ -81,6 +81,7 @@ export default {
 		emptyDescription: "There is nothing to show under the current conditions.",
 		emptyFilteredTitle: "No matching records",
 		emptyFilteredDescription: "Try another search term or clear the filters.",
+		sortScopeHint: "Sorting applies to this page only; cross-page ordering needs backend support.",
 		sortColumn: "Sort by {{column}}",
 		selectAll: "Select this page",
 		selectRow: "Select this row",

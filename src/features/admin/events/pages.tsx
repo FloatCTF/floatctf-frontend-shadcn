@@ -417,11 +417,19 @@ export function EventsListPage(): ReactNode {
 					errorTitle={t("adminEvents.list.loadError")}
 					empty={
 						<EmptyBlock
-							title={t("adminEvents.list.empty.title")}
+							title={
+								search.trim() === "" && family === "all"
+									? t("adminEvents.list.empty.title")
+									: t("adminEvents.list.empty.filteredTitle")
+							}
 							description={
-								scope === "virtual"
-									? t("adminEvents.list.empty.descriptionVirtual")
-									: t("adminEvents.list.empty.descriptionCompetition")
+								search.trim() === "" && family === "all"
+									? scope === "virtual"
+										? t("adminEvents.list.empty.descriptionVirtual")
+										: t("adminEvents.list.empty.descriptionCompetition")
+									: t("adminEvents.list.empty.filteredDescription", {
+											query: search.trim() || family,
+										})
 							}
 							variant={search.trim() === "" && family === "all" ? "empty" : "filtered"}
 						/>
