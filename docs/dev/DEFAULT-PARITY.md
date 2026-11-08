@@ -107,3 +107,7 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：选手端外壳/导航按 Default 分组重排；`/` 改为 Top 选手落地页（`/rank`），
   赛事、题库、题集、训练场、实例、解题流水归入 Competition；公告/讨论/题解归 Community；
   武器库独立；资料归 Account。管理端导航暂保持现状，下一步逐页对齐。
+
+- 2026-11-08：AWD 赛事工作区改为 Default 五子页：Overview / GameBoxes / Scoreboard /
+  WireGuard / SSH；复用真实 AWD 面板，不再把 trend/instances 当一级 Tab。Jeopardy/AWDP
+  的 Tab 顺序与子页内容仍在继续对齐。

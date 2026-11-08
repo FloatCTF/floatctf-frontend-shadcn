@@ -69,6 +69,10 @@ import {
 import { ChallengeWorkbench } from "~/features/jeopardy/workbench";
 import {
 	ArenaSummaryTab,
+	AwdGameboxesTab,
+	AwdScoreboardTab,
+	AwdSshTab,
+	AwdWireguardTab,
 	BulletinTab,
 	ChallengesTab,
 	InstancesTab,
@@ -487,16 +491,21 @@ export function EventWorkspacePage() {
 						data.joined && (status !== "upcoming" || liveBeforeWindow);
 					// 深链接可能带来过期/越权的 tab（?tab=arena 但本赛事是 Jeopardy）：
 					// Radix 对未知 value 不会选中任何项 → 页面变空白。统一回落到 overview。
-					const availableTabs = [
-						"overview",
-						...(caps.challenges && canAccessContent ? ["challenges"] : []),
-						...(caps.arena && canAccessContent ? ["arena"] : []),
-						...(caps.lab && canAccessContent ? ["lab"] : []),
-						...(caps.scoreboard ? ["scoreboard"] : []),
-						...(caps.trend ? ["trend"] : []),
-						...(caps.instances && canAccessContent ? ["instances"] : []),
-						"bulletin",
-					];
+					const isAwd = data.event.family === "awd";
+					const availableTabs = isAwd
+						? canAccessContent
+							? ["overview", "gameboxes", "scoreboard", "wireguard", "ssh"]
+							: ["overview"]
+						: [
+								"overview",
+								...(caps.challenges && canAccessContent ? ["challenges"] : []),
+								...(caps.arena && canAccessContent ? ["arena"] : []),
+								...(caps.lab && canAccessContent ? ["lab"] : []),
+								...(caps.scoreboard ? ["scoreboard"] : []),
+								...(caps.trend ? ["trend"] : []),
+								...(caps.instances && canAccessContent ? ["instances"] : []),
+								"bulletin",
+							];
 					const activeTab = availableTabs.includes(tab) ? tab : "overview";
 					const resolvedEventId = eventIdOf(data);
 					const gated = status !== "upcoming" && !data.joined;
@@ -547,77 +556,116 @@ export function EventWorkspacePage() {
 												<TabsTrigger value="overview" className="shrink-0">
 													{t("events.workspace.tabs.overview")}
 												</TabsTrigger>
+												{isAwd && canAccessContent ? (
+													<>
+														<TabsTrigger value="gameboxes" className="shrink-0">
+															{t("events.workspace.tabs.gameboxes")}
+														</TabsTrigger>
+														<TabsTrigger value="scoreboard" className="shrink-0">
+															{t("events.workspace.tabs.scoreboard")}
+														</TabsTrigger>
+														<TabsTrigger value="wireguard" className="shrink-0">
+															{t("events.workspace.tabs.wireguard")}
+														</TabsTrigger>
+														<TabsTrigger value="ssh" className="shrink-0">
+															{t("events.workspace.tabs.ssh")}
+														</TabsTrigger>
+													</>
+												) : null}
 												{caps.challenges && canAccessContent ? (
 													<TabsTrigger value="challenges" className="shrink-0">
 														{t("events.workspace.tabs.challenges")}
 													</TabsTrigger>
 												) : null}
-												{caps.arena && canAccessContent ? (
+												{!isAwd && caps.arena && canAccessContent ? (
 													<TabsTrigger value="arena" className="shrink-0">
 														{t("events.workspace.tabs.arena")}
 													</TabsTrigger>
 												) : null}
-												{caps.lab && canAccessContent ? (
+												{!isAwd && caps.lab && canAccessContent ? (
 													<TabsTrigger value="lab" className="shrink-0">
 														{t("events.workspace.tabs.lab")}
 													</TabsTrigger>
 												) : null}
-												{caps.scoreboard ? (
+												{!isAwd && caps.scoreboard ? (
 													<TabsTrigger value="scoreboard" className="shrink-0">
 														{t("events.workspace.tabs.scoreboard")}
 													</TabsTrigger>
 												) : null}
-												{caps.trend ? (
+												{!isAwd && caps.trend ? (
 													<TabsTrigger value="trend" className="shrink-0">
 														{t("events.workspace.tabs.trend")}
 													</TabsTrigger>
 												) : null}
-												{caps.instances && canAccessContent ? (
+												{!isAwd && caps.instances && canAccessContent ? (
 													<TabsTrigger value="instances" className="shrink-0">
 														{t("events.workspace.tabs.instances")}
 													</TabsTrigger>
 												) : null}
-												<TabsTrigger value="bulletin" className="shrink-0">
-													{t("events.workspace.tabs.bulletin")}
-												</TabsTrigger>
+												{!isAwd ? (
+													<TabsTrigger value="bulletin" className="shrink-0">
+														{t("events.workspace.tabs.bulletin")}
+													</TabsTrigger>
+												) : null}
 											</TabsList>
 
 											<TabsContent value="overview" className="mt-4">
 												<OverviewTab info={data} />
 											</TabsContent>
+											{isAwd ? (
+												<>
+													<TabsContent value="gameboxes" className="mt-4">
+														<AwdGameboxesTab eventId={resolvedEventId} />
+													</TabsContent>
+													<TabsContent value="scoreboard" className="mt-4">
+														<AwdScoreboardTab
+															eventId={resolvedEventId}
+															myTeamId={data.team_result?.team.id ?? null}
+														/>
+													</TabsContent>
+													<TabsContent value="wireguard" className="mt-4">
+														<AwdWireguardTab eventId={resolvedEventId} />
+													</TabsContent>
+													<TabsContent value="ssh" className="mt-4">
+														<AwdSshTab eventId={resolvedEventId} />
+													</TabsContent>
+												</>
+											) : null}
 											{caps.challenges && canAccessContent ? (
 												<TabsContent value="challenges" className="mt-4">
 													<ChallengesTab eventId={resolvedEventId} participantMode={data.event.participant_mode} />
 												</TabsContent>
 											) : null}
-											{caps.arena && canAccessContent ? (
+											{!isAwd && caps.arena && canAccessContent ? (
 												<TabsContent value="arena" className="mt-4">
 													<ArenaSummaryTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
-											{caps.lab && canAccessContent ? (
+											{!isAwd && caps.lab && canAccessContent ? (
 												<TabsContent value="lab" className="mt-4">
 													<LabSummaryTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
-											{caps.scoreboard ? (
+											{!isAwd && caps.scoreboard ? (
 												<TabsContent value="scoreboard" className="mt-4">
 													<ScoreboardTab info={data} />
 												</TabsContent>
 											) : null}
-											{caps.trend ? (
+											{!isAwd && caps.trend ? (
 												<TabsContent value="trend" className="mt-4">
 													<TrendTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
-											{caps.instances && canAccessContent ? (
+											{!isAwd && caps.instances && canAccessContent ? (
 												<TabsContent value="instances" className="mt-4">
 													<InstancesTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
-											<TabsContent value="bulletin" className="mt-4">
-												<BulletinTab eventId={resolvedEventId} />
-											</TabsContent>
+											{!isAwd ? (
+												<TabsContent value="bulletin" className="mt-4">
+													<BulletinTab eventId={resolvedEventId} />
+												</TabsContent>
+											) : null}
 										</Tabs>
 									)}
 								</div>

@@ -46,6 +46,12 @@ import { getLocale } from "~/lib/i18n";
 import { useNow } from "~/lib/hooks";
 
 import { EventWriteupPanel } from "./components";
+import {
+	AwdGameboxPanel,
+	AwdScoreboardPanel,
+	AwdSshPanel,
+	AwdWireGuardPanel,
+} from "~/features/awd/components";
 
 const AWD_STATUS_KEYS: Record<string, string> = {
 	draft: "events.awd.status.draft",
@@ -842,5 +848,54 @@ export function LabSummaryTab({ eventId }: { eventId: string }) {
 				)}
 			</QueryState>
 		</div>
+	);
+}
+
+
+/* ── AWD：Default 的五个子页 ─────────────────────────────────────────────── */
+
+export function AwdGameboxesTab({ eventId }: { eventId: string }) {
+	const { t } = useTranslation();
+	const client = useClient();
+	const query = useQuery({
+		queryKey: qk.awd.status(eventId),
+		queryFn: () => call<AwdPlayerStatus>(client.awd.player.status(eventId), t("awd.actionNames.status")),
+	});
+	return (
+		<QueryState
+			query={query}
+			skeleton={<LoadingBlock label={t("awd.arena.loading")} />}
+			errorTitle={t("awd.arena.errors.status")}
+		>
+			{(status) => <AwdGameboxPanel eventId={eventId} status={status} />}
+		</QueryState>
+	);
+}
+
+export function AwdScoreboardTab({
+	eventId,
+	myTeamId,
+}: {
+	eventId: string;
+	myTeamId: string | null;
+}) {
+	return <AwdScoreboardPanel eventId={eventId} myTeamId={myTeamId} />;
+}
+
+export function AwdWireguardTab({ eventId }: { eventId: string }) {
+	const { t } = useTranslation();
+	return (
+		<SectionCard title={t("awd.network.tabs.wireguard")} description={t("awd.network.description")}>
+			<AwdWireGuardPanel eventId={eventId} />
+		</SectionCard>
+	);
+}
+
+export function AwdSshTab({ eventId }: { eventId: string }) {
+	const { t } = useTranslation();
+	return (
+		<SectionCard title={t("awd.network.tabs.ssh")} description={t("awd.network.description")}>
+			<AwdSshPanel eventId={eventId} />
+		</SectionCard>
 	);
 }

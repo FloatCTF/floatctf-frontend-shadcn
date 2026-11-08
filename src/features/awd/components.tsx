@@ -563,7 +563,7 @@ export function AwdScoreboardPanel({
  * 私钥（`PrivateKey` 行）用 `<SecretValue>` 展示（默认模糊）；复制/下载给出完整 .conf，
  * 因为客户端需要它才能建立隧道。
  */
-function AwdWireGuardPanel({ eventId }: { eventId: string }): ReactNode {
+export function AwdWireGuardPanel({ eventId }: { eventId: string }): ReactNode {
 	const { t } = useTranslation();
 	const client = useClient();
 	const { copied, copy } = useCopyToClipboard();
@@ -654,7 +654,7 @@ function AwdWireGuardPanel({ eventId }: { eventId: string }): ReactNode {
 }
 
 /** 队伍 SSH 凭据：一个队伍共享密码，用户名/IP 每个实例不同。 */
-function AwdSshPanel({ eventId }: { eventId: string }): ReactNode {
+export function AwdSshPanel({ eventId }: { eventId: string }): ReactNode {
 	const { t } = useTranslation();
 	const client = useClient();
 	const query = useQuery({
