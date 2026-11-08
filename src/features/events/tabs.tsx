@@ -733,6 +733,38 @@ export function ArenaSummaryTab({
 					<TeamPanel info={info} />
 				</SectionCard>
 			) : null}
+			{info.team_result ? (
+				<SectionCard
+					title={t("events.awd.teamTitle")}
+					description={t("events.awd.teamDescription")}
+				>
+					<KeyValueList
+						columns={1}
+						items={[
+							{
+								key: t("events.awd.teamName"),
+								value: <span className="font-medium">{info.team_result.team.name}</span>,
+							},
+							{
+								key: t("events.awd.teamId"),
+								value: <MonoText>{info.team_result.team.id}</MonoText>,
+							},
+							...info.team_result.members.map((member) => ({
+								key: member.member.role,
+								value: (
+									<span>
+										{member.member_name}{" "}
+										<span className="text-xs text-muted-foreground">
+											{formatDateTime(member.member.joined_at, { seconds: true })}
+										</span>
+									</span>
+								),
+							})),
+						]}
+					/>
+				</SectionCard>
+			) : null}
+			<EventWriteupPanel info={info} />
 			<QueryState
 				query={query}
 				skeleton={<LoadingBlock label={t("events.awd.loading")} />}
@@ -769,43 +801,7 @@ export function ArenaSummaryTab({
 						</div>
 						<AwdFlagPanel eventId={eventId} status={status} />
 
-						{info.team_result ? (
-							<SectionCard
-								title={t("events.awd.teamTitle")}
-								description={t("events.awd.teamDescription")}
-							>
-								<KeyValueList
-									columns={1}
-									items={[
-										{
-											key: t("events.awd.teamName"),
-											value: (
-												<span className="font-medium">
-													{info.team_result.team.name}
-												</span>
-											),
-										},
-										{
-											key: t("events.awd.teamId"),
-											value: <MonoText>{info.team_result.team.id}</MonoText>,
-										},
-										...info.team_result.members.map((member) => ({
-											key: member.member.role,
-											value: (
-												<span>
-													{member.member_name}{" "}
-													<span className="text-xs text-muted-foreground">
-														{formatDateTime(member.member.joined_at, { seconds: true })}
-													</span>
-												</span>
-											),
-										})),
-									]}
-								/>
-							</SectionCard>
-						) : null}
 
-						<EventWriteupPanel info={info} />
 
 						<SectionCard
 							title={t("events.awd.cockpitTitle")}

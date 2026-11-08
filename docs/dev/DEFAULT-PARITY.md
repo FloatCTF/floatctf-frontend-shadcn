@@ -206,3 +206,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：选手端 AWD/AWDP 未参赛概览补 Default 的建队/入队表单，修复未开始赛事无法报名的问题。
 
 - 2026-11-08：修复 AWD 概览重复的战队报名卡，并给 AWDP 也补上报名/建队表单。
+
+- 2026-11-08：AWD 概览的战队/Writeup 移出状态查询，AWD 未配置时也能看到已建战队与提交入口。
