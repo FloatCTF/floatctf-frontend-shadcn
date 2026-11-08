@@ -170,3 +170,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：管理端 GameBox 库列改为 Default 的名称/安全名/版本构建/镜像/可见性。
 
 - 2026-11-08：管理端公告列补 ID，列顺序与 Default 一致：ID/标题/内容/发布者/创建/更新。
+
+- 2026-11-08：管理端讨论列对齐 Default：ID/标题/作者/浏览/点赞/评论/创建/更新。

@@ -25,7 +25,6 @@ import {
 	MessagesSquare,
 	MoreHorizontal,
 	RefreshCw,
-	ThumbsUp,
 	Trash2,
 } from "lucide-react";
 
@@ -172,6 +171,13 @@ export function AdminDiscussionsPage(): ReactNode {
 
 	const columns: DataTableColumn<DiscussionRow>[] = [
 		{
+			id: "id",
+			header: t("adminCommunity.discussions.columns.id"),
+			sortValue: (row) => row.id,
+			cell: (row) => <MonoText className="text-xs text-muted-foreground">{row.id}</MonoText>,
+			hideBelow: "lg",
+		},
+		{
 			id: "title",
 			header: t("adminCommunity.discussions.columns.title"),
 			sortValue: (row) => row.title,
@@ -197,59 +203,42 @@ export function AdminDiscussionsPage(): ReactNode {
 			),
 		},
 		{
-			id: "counts",
-			header: t("adminCommunity.discussions.columns.interactions"),
+			id: "view_count",
+			header: t("adminCommunity.discussions.columns.views"),
+			align: "right",
+			sortValue: (row) => row.view_count,
+			cell: (row) => <span className="tnum text-sm">{formatInt(row.view_count)}</span>,
 			hideBelow: "md",
-			cell: (row) => (
-				<div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
-					<span
-						className="tnum inline-flex items-center gap-1"
-						role="img"
-						title={t("adminCommunity.discussions.interactions.views", {
-							count: formatInt(row.view_count),
-						})}
-						aria-label={t("adminCommunity.discussions.interactions.views", {
-							count: formatInt(row.view_count),
-						})}
-					>
-						<Eye className="size-4" aria-hidden="true" />
-						{formatInt(row.view_count)}
-					</span>
-					<span
-						className="tnum inline-flex items-center gap-1"
-						role="img"
-						title={t("adminCommunity.discussions.interactions.likes", {
-							count: formatInt(row.like_count),
-						})}
-						aria-label={t("adminCommunity.discussions.interactions.likes", {
-							count: formatInt(row.like_count),
-						})}
-					>
-						<ThumbsUp className="size-4" aria-hidden="true" />
-						{formatInt(row.like_count)}
-					</span>
-					<span
-						className="tnum inline-flex items-center gap-1"
-						role="img"
-						title={t("adminCommunity.discussions.interactions.comments", {
-							count: formatInt(row.comment_count),
-						})}
-						aria-label={t("adminCommunity.discussions.interactions.comments", {
-							count: formatInt(row.comment_count),
-						})}
-					>
-						<MessageSquare className="size-4" aria-hidden="true" />
-						{formatInt(row.comment_count)}
-					</span>
-				</div>
-			),
+		},
+		{
+			id: "like_count",
+			header: t("adminCommunity.discussions.columns.likes"),
+			align: "right",
+			sortValue: (row) => row.like_count,
+			cell: (row) => <span className="tnum text-sm">{formatInt(row.like_count)}</span>,
+			hideBelow: "md",
+		},
+		{
+			id: "comment_count",
+			header: t("adminCommunity.discussions.columns.comments"),
+			align: "right",
+			sortValue: (row) => row.comment_count,
+			cell: (row) => <span className="tnum text-sm">{formatInt(row.comment_count)}</span>,
+			hideBelow: "md",
+		},
+		{
+			id: "created_at",
+			header: t("adminCommunity.discussions.columns.createdAt"),
+			sortValue: (row) => Date.parse(row.created_at),
+			cell: (row) => <AbsoluteTime value={row.created_at} />,
+			hideBelow: "lg",
 		},
 		{
 			id: "updated_at",
 			header: t("adminCommunity.discussions.columns.updatedAt"),
-			align: "right",
 			sortValue: (row) => Date.parse(row.updated_at),
 			cell: (row) => <AbsoluteTime value={row.updated_at} />,
+			hideBelow: "xl",
 		},
 	];
 

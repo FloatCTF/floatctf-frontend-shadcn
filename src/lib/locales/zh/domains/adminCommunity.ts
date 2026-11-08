@@ -108,9 +108,13 @@ export default {
 			placeholder: "搜索标题",
 		},
 		columns: {
+			id: "ID",
 			title: "标题",
 			author: "作者",
-			interactions: "互动",
+			views: "浏览",
+			likes: "点赞",
+			comments: "评论",
+			createdAt: "创建时间",
 			updatedAt: "更新时间",
 		},
 		interactions: {

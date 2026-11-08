@@ -114,9 +114,13 @@ export default {
 			placeholder: "Search titles",
 		},
 		columns: {
+			id: "ID",
 			title: "Title",
 			author: "Author",
-			interactions: "Activity",
+			views: "Views",
+			likes: "Likes",
+			comments: "Comments",
+			createdAt: "Created",
 			updatedAt: "Updated",
 		},
 		interactions: {
