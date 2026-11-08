@@ -2473,8 +2473,9 @@ const routes = [
 					key: "FRONTEND_ACTIVE",
 					value: "shadcn",
 					type: "string",
-					description: "当前激活的前端",
-					protected: false,
+					description: "当前生效的前端 ID（对应前端注册表；default 始终随平台发布）",
+					// 后端默认数据把 FRONTEND_ACTIVE 标记为 protected：可改不可删。
+					protected: true,
 					created_at: iso(now - 30 * D),
 					updated_at: iso(now - 30 * D),
 				},

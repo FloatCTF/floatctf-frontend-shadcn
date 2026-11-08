@@ -3,6 +3,7 @@
 export default {
 	common: {
 		searchPlaceholder: "搜索",
+		protectedSkip: "所选含 {{count}} 条受保护设置，删除时会自动跳过。",
 		deleteSelected: "删除所选",
 		deleteSelectedCount: "（{{count}}）",
 		countItems: "{{count}} 项",
@@ -173,6 +174,7 @@ export default {
 				"共 {{total}} 条（其中受保护 {{protectedCount}} 条）。设置接口不接受分页 / 过滤参数，搜索与分页在本页完成。",
 		},
 		searchPlaceholder: "搜索键 / 值 / 描述",
+		protectedSkip: "所选含 {{count}} 条受保护设置，删除时会自动跳过。",
 		deleteSelected: "删除所选设置",
 		empty: {
 			title: "暂无设置",

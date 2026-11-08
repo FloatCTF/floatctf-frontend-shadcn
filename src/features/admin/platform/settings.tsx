@@ -178,6 +178,10 @@ export function AdminSettingsPage(): ReactNode {
 	);
 	const visible = pageSlice(filtered, list.page, list.pageSize);
 	const protectedCount = all.filter((row) => row.protected).length;
+	const selectedRows = all.filter((row) => selected.includes(row.id));
+	const deletableSelected = selectedRows.filter((row) => !row.protected);
+	const protectedSelected = selectedRows.filter((row) => row.protected);
+
 
 	useEffect(() => {
 		setSelected([]);
@@ -294,13 +298,18 @@ export function AdminSettingsPage(): ReactNode {
 							placeholder={t("adminPlatform.settings.searchPlaceholder")}
 						/>
 						<DeleteSelectedButton
-							count={selected.length}
+							count={deletableSelected.length}
 							isPending={removeMutation.isPending}
 							label={t("adminPlatform.settings.deleteSelected")}
-							onClick={() =>
-								void removeRows(all.filter((row) => selected.includes(row.id)))
-							}
+							onClick={() => void removeRows(deletableSelected)}
 						/>
+						{protectedSelected.length > 0 ? (
+							<span className="text-xs text-muted-foreground">
+								{t("adminPlatform.settings.protectedSkip", {
+									count: protectedSelected.length,
+								})}
+							</span>
+						) : null}
 					</div>
 				}
 			>

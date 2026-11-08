@@ -3,6 +3,7 @@
 export default {
 	common: {
 		searchPlaceholder: "Search",
+		protectedSkip: "{{count}} selected setting(s) are protected and will be skipped.",
 		deleteSelected: "Delete selected",
 		deleteSelectedCount: " ({{count}})",
 		countItems: "{{count}} items",
@@ -183,6 +184,7 @@ export default {
 				"{{total}} entries ({{protectedCount}} protected). The settings API accepts no pagination / filter parameters, so search and paging happen on this page.",
 		},
 		searchPlaceholder: "Search key / value / description",
+		protectedSkip: "{{count}} selected setting(s) are protected and will be skipped.",
 		deleteSelected: "Delete selected settings",
 		empty: {
 			title: "No settings",
