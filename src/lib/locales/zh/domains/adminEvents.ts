@@ -348,6 +348,7 @@ export default {
 		title: "赛事成员",
 		descriptionTeam: "战队赛：这里是赛事的参赛账号池；成员的战队归属请在「战队」标签查看。",
 		descriptionIndividual: "个人赛：这里的成员即赛事参赛者，可在此封禁 / 移出。",
+			alreadyMemberHint: "已在赛事中的账号不可勾选。",
 		addButton: "添加成员",
 		loadError: "加载赛事成员失败",
 		toolbar: {
@@ -422,6 +423,7 @@ export default {
 			descriptionTeam:
 				"战队赛：这里只把账号加入赛事参赛池，不会自动加入任何战队（战队归属由队长 / 平台管理）。",
 			descriptionIndividual: "从平台账号中勾选参赛者；重复添加会被后端拒绝。",
+			alreadyMemberHint: "已在赛事中的账号不可勾选。",
 			emptyTitle: "没有匹配的账号",
 			emptyDescription: "换个昵称关键字试试。",
 			submit: "添加",

@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, MoreHorizontal, Plus, ShieldCheck, Trash2, UserMinus } from "lucide-react";
 
-import { call, callList } from "~/api/call";
+import { call, callList, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { BooleanPill } from "~/components/app/badges";
@@ -382,6 +382,7 @@ export function EventMembersTab({
 				<AddMembersSheet
 					eventId={eventId}
 					participantMode={participantMode}
+					existingIds={(query.data?.items ?? []).map((row) => row.user.id)}
 					onClose={() => setAddOpen(false)}
 					onDone={invalidate}
 				/>
@@ -395,11 +396,14 @@ export function EventMembersTab({
 function AddMembersSheet({
 	eventId,
 	participantMode,
+	existingIds,
 	onClose,
 	onDone,
 }: {
 	eventId: string;
 	participantMode: string;
+	/** 当前页已在本赛事中的成员：这些行不可再勾选，避免提交后被后端拒绝。 */
+	existingIds: string[];
 	onClose: () => void;
 	onDone: () => void;
 }): ReactNode {
@@ -422,8 +426,9 @@ function AddMembersSheet({
 	});
 
 	const add = useMutation({
+		// 后端该接口返回 data:null（UniResponse<null>），必须用 callVoid，不能用 call。
 		mutationFn: () =>
-			call(
+			callVoid(
 				client.admin.event_users.add({ event_id: eventId, user_id_list: selectedIds }),
 				t("adminEvents.actions.addMember"),
 			),
@@ -467,11 +472,12 @@ function AddMembersSheet({
 			}}
 			width="lg"
 			title={t("adminEvents.members.add.title")}
-			description={
+			description={[
 				participantMode === "team"
 					? t("adminEvents.members.add.descriptionTeam")
-					: t("adminEvents.members.add.descriptionIndividual")
-			}
+					: t("adminEvents.members.add.descriptionIndividual"),
+				t("adminEvents.members.add.alreadyMemberHint"),
+			].join(" ")}
 			footer={
 				<FormFooter
 					formId="add-members-form"
@@ -528,6 +534,7 @@ function AddMembersSheet({
 							columns={columns}
 							getRowId={(row) => row.id}
 							selectable
+							isRowSelectable={(row) => !existingIds.includes(row.id)}
 							selectedIds={selectedIds}
 							onSelectionChange={setSelectedIds}
 							empty={

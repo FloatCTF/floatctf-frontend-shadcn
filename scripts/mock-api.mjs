@@ -469,7 +469,7 @@ const adminEvents = events.map((event, index) => ({
 	...event,
 	// 管理端还有一些统计字段；缺省时页面按空值渲染
 	event_challenge_count: index === 0 ? challenges.length : 0,
-	event_user_count: 25,
+	event_user_count: 12,
 }));
 
 const dashboardSummary = {
@@ -1270,7 +1270,8 @@ let mockRunWriteup = { content: "", updated_at: null };
 /** 赛事成员（mock）：默认全部 mock 用户参赛；支持添加/移出/封禁。 */
 let mockEventMembers = {};
 const eventMemberIds = (eventId) => {
-	if (!mockEventMembers[eventId]) mockEventMembers[eventId] = mockUsers.map((user) => user.id);
+	// 默认只让前 12 个账号参赛，其余留给「添加成员」流程。
+	if (!mockEventMembers[eventId]) mockEventMembers[eventId] = mockUsers.slice(0, 12).map((user) => user.id);
 	return mockEventMembers[eventId];
 };
 
@@ -2012,7 +2013,7 @@ const routes = [
 	["GET", /^\/api\/admin\/events\/([^/]+)\/data$/, (_m, res) =>
 		ok(res, {
 			event: events[0],
-			user_count: mockUsers.length,
+			user_count: eventMemberIds(m[1]).length,
 			team_count: 0,
 			solved_recent_15: solves.map((solve) => ({
 				user_nickname: solve.nickname,

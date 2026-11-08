@@ -365,6 +365,7 @@ export default {
 			"Team event: this is the event's participant account pool; see the Teams tab for team membership.",
 		descriptionIndividual:
 			"Individual event: these members are the participants and can be banned or removed here.",
+		alreadyMemberHint: "Accounts already in this event cannot be selected.",
 		addButton: "Add members",
 		loadError: "Failed to load event members",
 		toolbar: {
@@ -445,6 +446,7 @@ export default {
 				"Team event: this only adds accounts to the event participant pool; it does not join any team (team membership is handled by captains / the platform).",
 			descriptionIndividual:
 				"Pick participants from platform accounts; duplicate additions are rejected by the backend.",
+			alreadyMemberHint: "Accounts already in this event cannot be selected.",
 			emptyTitle: "No matching accounts",
 			emptyDescription: "Try another nickname keyword.",
 			submit: "Add",

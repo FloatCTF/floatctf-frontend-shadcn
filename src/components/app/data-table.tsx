@@ -51,6 +51,8 @@ export interface DataTableProps<T> {
 	selectable?: boolean;
 	selectedIds?: string[];
 	onSelectionChange?: (ids: string[]) => void;
+	/** 单行是否可勾选（默认全部可选）；用于禁用「已在赛事中」这类行。 */
+	isRowSelectable?: (row: T) => boolean;
 	mobileCard?: (row: T) => ReactNode;
 	className?: string;
 	/** 表格主体为空时的展示（通常由外部 `QueryState` 处理，这里做兜底）。 */
@@ -80,6 +82,7 @@ export function DataTable<T>({
 	selectable = false,
 	selectedIds,
 	onSelectionChange,
+	isRowSelectable,
 	mobileCard,
 	className,
 	empty,
@@ -109,6 +112,7 @@ export function DataTable<T>({
 				cell: ({ row }) => (
 					<Checkbox
 						checked={row.getIsSelected()}
+						disabled={!row.getCanSelect()}
 						onCheckedChange={(value) => row.toggleSelected(value === true)}
 						aria-label={t("common.table.selectRow")}
 						onClick={(event) => event.stopPropagation()}
@@ -158,7 +162,7 @@ export function DataTable<T>({
 		getCoreRowModel: getCoreRowModel(),
 		getSortedRowModel: getSortedRowModel(),
 		getRowId: (row, index) => getRowId(row, index),
-		enableRowSelection: selectable,
+		enableRowSelection: isRowSelectable ? (row) => isRowSelectable(row.original) : selectable,
 		...(selectable && selectedIds && onSelectionChange
 			? {
 					state: { sorting, rowSelection: Object.fromEntries(selectedIds.map((id) => [id, true])) },
