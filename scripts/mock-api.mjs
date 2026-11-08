@@ -2477,6 +2477,7 @@ const routes = [
 		mockDockerNetworks.splice(index, 1);
 		return ok(res, null);
 	}],
+	["POST", /^\/api\/admin\/terminal\/session$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/admin\/database\/exec_sql$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const sql = String(body.sql ?? "").trim();

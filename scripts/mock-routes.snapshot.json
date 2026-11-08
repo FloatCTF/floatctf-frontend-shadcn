@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T02:43:37.943Z",
+	"generatedAt": "2026-11-08T02:46:11.030Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -612,6 +612,10 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/admin\\/scheduled_tasks\\/([^/]+)\\/run"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/terminal\\/session"
 		},
 		{
 			"method": "POST",
