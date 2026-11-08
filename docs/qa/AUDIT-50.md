@@ -542,3 +542,16 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 测试用户 / 角色 / 题集均已清理。
 
 验证：`vite build` / i18n（5024 keys）/ theme 全绿。
+
+## 第 30 轮补充（敏感设置编辑）
+
+设置列表已用 `SecretValue` 遮蔽 `SMTP_URI` 等敏感键，但编辑 Sheet 仍用普通 Textarea
+把完整值明文显示出来。
+
+- 编辑敏感键时改为 `type=password` 的 Input，默认隐藏；
+- 增加「显示原值 / 隐藏原值」眼睛按钮；
+- hint 明确这是敏感设置，保存会明文提交给后端；
+- 敏感键判定复用列表同一套 `SENSITIVE_KEY_PATTERN`。
+- 实测 `SMTP_URI` 编辑：默认 `type=password`，点「显示原值」切到 `text`，再点可隐藏。
+
+验证：`vite build` / i18n（5027 keys）/ theme 全绿。
