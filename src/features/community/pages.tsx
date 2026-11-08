@@ -14,7 +14,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Download, Megaphone, Swords, Trophy } from "lucide-react";
+import { Activity, Check, Download, Megaphone, Swords, Trophy } from "lucide-react";
 
 import type { SolveResult, TopUser } from "@floatctf/sdk";
 import type { Announcements, Weapons } from "@floatctf/sdk/entity";
@@ -42,10 +42,9 @@ import {
 } from "~/components/app/states";
 import { RelativeTime, UserCell } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
-import { formatInt } from "~/lib/format";
-import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
+import { formatDateTime, formatInt } from "~/lib/format";
+import { useDocumentTitle } from "~/lib/hooks";
 
-import { SearchField } from "./components";
 
 function rankTone(no: number): "warning" | "info" | "muted" {
 	if (no === 1) return "warning";
@@ -389,11 +388,9 @@ export function AnnouncementsPage(): ReactNode {
 	const client = useClient();
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
-	const [search, setSearch] = useState("");
-	const debouncedSearch = useDebouncedValue(search, 300);
-
-	const trimmed = debouncedSearch.trim();
-	const filter = trimmed === "" ? undefined : `title:${trimmed}`;
+	const [draftFilter, setDraftFilter] = useState("");
+	const [appliedFilter, setAppliedFilter] = useState("");
+	const filter = appliedFilter.trim() || undefined;
 
 	const query = useQuery({
 		queryKey: qk.announcements.list({ page, limit: pageSize, filter }),
@@ -407,24 +404,22 @@ export function AnnouncementsPage(): ReactNode {
 
 	const columns: DataTableColumn<Announcements>[] = [
 		{
+			id: "publisher",
+			header: t("community.announcements.columns.publisher"),
+			sortValue: (row) => row.publisher,
+			cell: (row) => <span className="text-sm">{row.publisher || t("common.empty")}</span>,
+		},
+		{
 			id: "title",
 			header: t("community.announcements.columns.title"),
 			sortValue: (row) => row.title,
 			cell: (row) => <span className="text-sm font-medium">{row.title}</span>,
 		},
 		{
-			id: "publisher",
-			header: t("community.announcements.columns.publisher"),
-			hideBelow: "sm",
-			sortValue: (row) => row.publisher,
-			cell: (row) => <span className="text-sm">{row.publisher || t("common.empty")}</span>,
-		},
-		{
 			id: "content",
 			header: t("community.announcements.columns.content"),
-			hideBelow: "md",
 			cell: (row) => (
-				<div className="max-w-2xl text-sm break-words whitespace-pre-wrap text-muted-foreground">
+				<div className="line-clamp-3 max-w-2xl text-sm break-words whitespace-pre-wrap text-muted-foreground">
 					{row.content && row.content.trim() !== "" ? row.content : t("common.empty")}
 				</div>
 			),
@@ -432,17 +427,14 @@ export function AnnouncementsPage(): ReactNode {
 		{
 			id: "created_at",
 			header: t("community.announcements.columns.createdAt"),
-			align: "right",
 			sortValue: (row) => row.created_at,
-			cell: (row) => <RelativeTime value={row.created_at} />,
+			cell: (row) => <span className="tnum text-xs">{formatDateTime(row.created_at)}</span>,
 		},
 		{
 			id: "updated_at",
 			header: t("community.announcements.columns.updatedAt"),
-			align: "right",
-			hideBelow: "lg",
 			sortValue: (row) => row.updated_at,
-			cell: (row) => <RelativeTime value={row.updated_at} />,
+			cell: (row) => <span className="tnum text-xs">{formatDateTime(row.updated_at)}</span>,
 		},
 	];
 
@@ -458,17 +450,24 @@ export function AnnouncementsPage(): ReactNode {
 				title={t("community.announcements.section.title")}
 				description={t("community.announcements.section.description")}
 				actions={
-					<Toolbar>
-						<RefreshingBadge active={query.isFetching && !query.isPending} />
-						<SearchField
-							value={search}
-							placeholder={t("community.announcements.search.placeholder")}
-							onChange={(value) => {
-								setSearch(value);
-								setPage(1);
-							}}
-						/>
-					</Toolbar>
+					<FilterBar
+						keys={[
+							{ key: "title", label: t("community.announcements.columns.title") },
+							{ key: "content", label: t("community.announcements.columns.content") },
+						] satisfies FilterKey[]}
+						value={draftFilter}
+						onChange={setDraftFilter}
+						onApply={() => {
+							setAppliedFilter(draftFilter.trim());
+							setPage(1);
+						}}
+						onClear={() => {
+							setDraftFilter("");
+							setAppliedFilter("");
+							setPage(1);
+						}}
+						placeholder={t("common.filter.placeholder")}
+					/>
 				}
 				contentClassName="px-0"
 				footer={
@@ -490,7 +489,7 @@ export function AnnouncementsPage(): ReactNode {
 					errorTitle={t("community.announcements.errors.load")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
-						trimmed === "" ? (
+						appliedFilter === "" ? (
 							<EmptyBlock
 								title={t("community.announcements.empty.title")}
 								description={t("community.announcements.empty.description")}
@@ -501,10 +500,13 @@ export function AnnouncementsPage(): ReactNode {
 								variant="filtered"
 								title={t("community.announcements.filtered.title")}
 								description={t("community.announcements.filtered.description", {
-									query: trimmed,
+									query: appliedFilter,
 								})}
 								action={
-									<Button size="sm" variant="outline" onClick={() => setSearch("")}>
+									<Button size="sm" variant="outline" onClick={() => {
+										setDraftFilter("");
+										setAppliedFilter("");
+									}}>
 										{t("community.announcements.filtered.clear")}
 									</Button>
 								}
@@ -546,11 +548,9 @@ export function ArsenalPage(): ReactNode {
 	const client = useClient();
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
-	const [search, setSearch] = useState("");
-	const debouncedSearch = useDebouncedValue(search, 300);
-
-	const trimmed = debouncedSearch.trim();
-	const filter = trimmed === "" ? undefined : `name:${trimmed}`;
+	const [draftFilter, setDraftFilter] = useState("");
+	const [appliedFilter, setAppliedFilter] = useState("");
+	const filter = appliedFilter.trim() || undefined;
 
 	const query = useQuery({
 		queryKey: qk.weapons.list({ page, limit: pageSize, filter }),
@@ -568,45 +568,37 @@ export function ArsenalPage(): ReactNode {
 		{
 			id: "category",
 			header: t("community.arsenal.columns.category"),
-			hideBelow: "sm",
 			sortValue: (row) => row.category,
-			cell: (row) => (
-				<TonePill tone="neutral">
-					{row.category || t("community.arsenal.uncategorized")}
-				</TonePill>
-			),
+			cell: (row) => <span className="text-sm">{row.category || "—"}</span>,
 		},
 		{
 			id: "description",
 			header: t("community.arsenal.columns.description"),
-			hideBelow: "md",
 			cell: (row) => (
 				<p className="line-clamp-3 max-w-xl text-sm break-words text-muted-foreground">
-					{row.description && row.description.trim() !== ""
-						? row.description
-						: t("common.empty")}
+					{row.description?.trim() ? row.description : "—"}
 				</p>
 			),
 		},
 		{
-			id: "file",
-			header: t("community.arsenal.columns.file"),
-			cell: (row) => <WeaponFile row={row} />,
+			id: "has_file",
+			header: t("community.arsenal.columns.hasFile"),
+			sortValue: (row) => (row.has_file ? 1 : 0),
+			cell: (row) =>
+				row.has_file ? (
+					<Check className="size-4 text-emerald-600 dark:text-emerald-400" aria-label={t("common.yes")} />
+				) : null,
 		},
 		{
-			id: "download_count",
-			header: t("community.arsenal.columns.downloadCount"),
-			align: "right",
-			hideBelow: "lg",
-			sortValue: (row) => row.download_count,
-			cell: (row) => <span className="tnum text-sm">{formatInt(row.download_count)}</span>,
+			id: "file_url",
+			header: t("community.arsenal.columns.fileUrl"),
+			cell: (row) => <WeaponFile row={row} />,
 		},
 		{
 			id: "updated_at",
 			header: t("community.arsenal.columns.updatedAt"),
-			align: "right",
 			sortValue: (row) => row.updated_at,
-			cell: (row) => <RelativeTime value={row.updated_at} />,
+			cell: (row) => <span className="tnum text-xs">{formatDateTime(row.updated_at)}</span>,
 		},
 	];
 
@@ -622,17 +614,25 @@ export function ArsenalPage(): ReactNode {
 				title={t("community.arsenal.section.title")}
 				description={t("community.arsenal.section.description")}
 				actions={
-					<Toolbar>
-						<RefreshingBadge active={query.isFetching && !query.isPending} />
-						<SearchField
-							value={search}
-							placeholder={t("community.arsenal.search.placeholder")}
-							onChange={(value) => {
-								setSearch(value);
-								setPage(1);
-							}}
-						/>
-					</Toolbar>
+					<FilterBar
+						keys={[
+							{ key: "name", label: t("community.arsenal.columns.name") },
+							{ key: "category", label: t("community.arsenal.columns.category") },
+							{ key: "has_file", label: t("community.arsenal.columns.hasFile") },
+						] satisfies FilterKey[]}
+						value={draftFilter}
+						onChange={setDraftFilter}
+						onApply={() => {
+							setAppliedFilter(draftFilter.trim());
+							setPage(1);
+						}}
+						onClear={() => {
+							setDraftFilter("");
+							setAppliedFilter("");
+							setPage(1);
+						}}
+						placeholder={t("common.filter.placeholder")}
+					/>
 				}
 				contentClassName="px-0"
 				footer={
@@ -654,7 +654,7 @@ export function ArsenalPage(): ReactNode {
 					errorTitle={t("community.arsenal.errors.load")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
-						trimmed === "" ? (
+						appliedFilter === "" ? (
 							<EmptyBlock
 								title={t("community.arsenal.empty.title")}
 								description={t("community.arsenal.empty.description")}
@@ -665,10 +665,13 @@ export function ArsenalPage(): ReactNode {
 								variant="filtered"
 								title={t("community.arsenal.filtered.title")}
 								description={t("community.arsenal.filtered.description", {
-									query: trimmed,
+									query: appliedFilter,
 								})}
 								action={
-									<Button size="sm" variant="outline" onClick={() => setSearch("")}>
+									<Button size="sm" variant="outline" onClick={() => {
+										setDraftFilter("");
+										setAppliedFilter("");
+									}}>
 										{t("community.arsenal.filtered.clear")}
 									</Button>
 								}

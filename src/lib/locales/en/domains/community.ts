@@ -157,6 +157,8 @@ export default {
 			name: "Name",
 			category: "Category",
 			description: "Description",
+			hasFile: "Has file",
+			fileUrl: "File URL",
 			file: "Attachment",
 			downloadCount: "Downloads",
 			updatedAt: "Updated",

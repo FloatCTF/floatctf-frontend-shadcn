@@ -132,3 +132,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：训练场入口改为 Default 的 Gameboxes（`/gameboxes`），列改为名称/分类/已解出/作者/版本/更新时间；名称点击启动或进入 run。
 
 - 2026-11-08：Instances 恢复 Default 列（内容/类型/状态/赛事/标识/用户/销毁时间/操作）与 FilterBar；Solves 恢复题目/用户/更新时间，去掉统计和题目下拉。
+
+- 2026-11-08：公告列表按 Default 列（发布者/标题/内容/创建/更新）；武器库按 Default 列（名称/分类/描述/有附件/文件地址/更新），使用 FilterBar。

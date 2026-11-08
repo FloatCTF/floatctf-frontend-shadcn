@@ -164,3 +164,33 @@ Gameboxes 位置与列对齐，训练 run 仍保留独立页。
 - 用户列带头像（无头像时显示昵称首字母）；
 - 题目链接进入题目；
 - 工具栏：每页条数、Add Filter、过滤输入、Clear、Apply Filters。
+
+## 10. 选手端 · Announcements（Default）
+
+入口：`/service/announcements`
+
+![](./announcements-list.png)
+
+- 表头：发布者、标题、内容、创建时间、更新时间；
+- 工具栏：每页条数、Add Filter、过滤输入、Clear、Apply Filters；
+- 没有卡片流，也没有单独的“查看公告”弹窗。
+
+## 11. 选手端 · Weapons（Default）
+
+入口：`/service/weapons`
+
+![](./weapons-list.png)
+
+- 表头：名称、分类、描述、有附件、文件地址、更新时间；
+- 有附件用勾选；
+- 文件地址是 `/public/<key>` 下载链接；
+- 工具栏：Add Filter、过滤输入、Clear、Apply Filters；没有下载次数列。
+
+## 12. 选手端 · Profile（Default）
+
+![](./profile.png)
+
+- 标题 `Profile`；两栏：左侧表单，右侧头像；
+- 默认只读，点 `Edit` 才可修改 Nickname / Email / Password；Username 永远不可改；
+- 头像区域点击选择图片，再上传；
+- 没有额外的账号元数据卡片。
