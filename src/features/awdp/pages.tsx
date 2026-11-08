@@ -96,22 +96,33 @@ export function LabPage(): ReactNode {
 
 	// 与后端一致：练习赛 / 未参赛 / 未开始都不允许进入比赛工作台。
 	// 练习 AWDP 走 `/training`（`awdp.runs`），不是事件工作区。
+	// 管理员可以提前开始 AWDP（event.start_time 可能在未来），此时 overview.started_at
+	// 是权威信号；不能只按 event 时间把已开始的比赛挡在门外。
+	const earlyOverviewQuery = useQuery({
+		queryKey: qk.awdp.overview(eventId),
+		queryFn: () => call<AwdpOverview>(client.awdp.player.overview(eventId), t("awdp.calls.overview")),
+		enabled:
+			Boolean(eventId) &&
+			eventInfo !== undefined &&
+			eventInfo.event.family === "awdp" &&
+			!isPracticeEvent(eventInfo.event) &&
+			eventInfo.joined,
+	});
+
 	let access: WorkspaceAccessReason | null = null;
 	if (eventInfo) {
 		if (eventInfo.event.family !== "awdp") access = "wrong-family";
 		else if (isPracticeEvent(eventInfo.event)) access = "practice";
 		else if (!eventInfo.joined) access = "not-joined";
-		else if (eventStatus === "upcoming") access = "not-started";
+		else if (eventStatus === "upcoming" && earlyOverviewQuery.data?.started_at == null) {
+			access = "not-started";
+		}
 	}
 	const canAccess = eventQuery.isSuccess && access === null;
 
 	const stream = useAwdpEventStream({ eventId, enabled: Boolean(eventId) && canAccess });
 
-	const overviewQuery = useQuery({
-		queryKey: qk.awdp.overview(eventId),
-		queryFn: () => call<AwdpOverview>(client.awdp.player.overview(eventId), t("awdp.calls.overview")),
-		enabled: Boolean(eventId) && canAccess,
-	});
+	const overviewQuery = earlyOverviewQuery;
 
 	const overview = overviewQuery.data;
 	const gameboxes = useMemo(() => overview?.gameboxes ?? [], [overview]);
