@@ -1456,6 +1456,41 @@ let mockSettings = [
 	},
 ];
 
+const mockEventInstanceRows = [
+	{
+		id: "inst-e1",
+		instance_type: "challenge",
+		status: "running",
+		identifier: "fctf-e1-c1",
+		event_id: "",
+		event_title: "2026 春季校内赛 · Jeopardy",
+		user_id: me.id,
+		user_name: me.nickname,
+		content_title: "签到：你好 CTF",
+		challenge_id: "c-0001",
+		runtime_generation: 1,
+		created_at: iso(now - 3 * H),
+		updated_at: iso(now - 2 * H),
+		destroy_at: iso(now + 22 * H),
+	},
+	{
+		id: "inst-e2",
+		instance_type: "challenge",
+		status: "stopped",
+		identifier: "fctf-e1-c2",
+		event_id: "",
+		event_title: "2026 春季校内赛 · Jeopardy",
+		user_id: "u-2",
+		user_name: "Byte Me",
+		content_title: "Notes 越权读取",
+		challenge_id: "c-0002",
+		runtime_generation: 2,
+		created_at: iso(now - 5 * H),
+		updated_at: iso(now - 4 * H),
+		destroy_at: null,
+	},
+		];
+
 const routes = [
 	["GET", /^\/__floatctf\/frontends\/registry\.json$/, (_m, res) => json(res, 200, mockFrontendRegistry)],
 
@@ -2084,43 +2119,11 @@ const routes = [
 				users: mockUsers.length,
 				weapons: weapons.length,
 				gameboxes: mockGameboxLibrary.length,
+				instances: mockEventInstanceRows.length,
 			},
 		})],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/instances$/, (m, res, req) => {
-		const rows = [
-			{
-				id: "inst-e1",
-				instance_type: "challenge",
-				status: "running",
-				identifier: "fctf-e1-c1",
-				event_id: m[1],
-				event_title: "2026 春季校内赛 · Jeopardy",
-				user_id: me.id,
-				user_name: me.nickname,
-				content_title: "签到：你好 CTF",
-				challenge_id: "c-0001",
-				runtime_generation: 1,
-				created_at: iso(now - 3 * H),
-				updated_at: iso(now - 2 * H),
-				destroy_at: iso(now + 22 * H),
-			},
-			{
-				id: "inst-e2",
-				instance_type: "challenge",
-				status: "stopped",
-				identifier: "fctf-e1-c2",
-				event_id: m[1],
-				event_title: "2026 春季校内赛 · Jeopardy",
-				user_id: "u-2",
-				user_name: "Byte Me",
-				content_title: "Notes 越权读取",
-				challenge_id: "c-0002",
-				runtime_generation: 2,
-				created_at: iso(now - 5 * H),
-				updated_at: iso(now - 4 * H),
-				destroy_at: null,
-			},
-		];
+		const rows = mockEventInstanceRows.map((row) => ({ ...row, event_id: m[1] }));
 		return okPage(res, rows, req);
 	}],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/logs$/, (m, res, req) => {
