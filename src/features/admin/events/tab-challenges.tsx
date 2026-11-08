@@ -416,6 +416,20 @@ function AddChallengesSheet({
 			),
 	});
 
+	// 「已在赛事」的题目必须整表判断，而不是只看当前页：
+	// 否则用户选了另一页已挂载的题目，提交后后端会以复合主键冲突拒绝。
+	const attached = useQuery({
+		queryKey: qk.admin.eventChallenges(eventId, { page: 1, limit: 1000 }),
+		queryFn: () =>
+			callList<AdminEventChallengeResult>(
+				client.admin.event_challenges.fetch(eventId)({ page: 1, limit: 1000 }),
+			),
+	});
+	const attachedIds = useMemo(
+		() => new Set((attached.data?.items ?? []).map((item) => item.challenge.id)),
+		[attached.data],
+	);
+
 	const parsedPoints = points.trim() === "" ? undefined : Number(points);
 	const pointsValid =
 		parsedPoints === undefined ||
@@ -562,6 +576,7 @@ function AddChallengesSheet({
 							selectable
 							selectedIds={selectedIds}
 							onSelectionChange={setSelectedIds}
+							isRowSelectable={(row) => !attachedIds.has(row.id)}
 							empty={
 								<EmptyBlock
 									title={t("adminEvents.challenges.add.emptyTitle")}

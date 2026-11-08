@@ -11,30 +11,39 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Pencil, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 
 import { call, callList } from "~/api/call";
 import { useAppQueryClient, useClient } from "~/api/client";
 import { qk } from "~/api/keys";
+import { TonePill } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import { Field, FormFooter, FormGrid, FormSheet } from "~/components/app/form";
 import {
+	MonoText,
 	PageBody,
 	PageHeader,
 	PaginationBar,
 	SectionCard,
 	Toolbar,
 } from "~/components/app/page";
-import { EmptyBlock, QueryState, TableSkeleton } from "~/components/app/states";
+import {
+	EmptyBlock,
+	InlineError,
+	LoadingBlock,
+	QueryState,
+	TableSkeleton,
+} from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { UserCell } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
 import { DropdownMenuItem, DropdownMenuSeparator } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { formatDateTime } from "~/lib/format";
 import { useDocumentTitle } from "~/lib/hooks";
-import type { QueryParams } from "@floatctf/sdk";
+import type { QueryParams, RoleDto, UserRolesDto } from "@floatctf/sdk";
 import type { Users } from "@floatctf/sdk/entity";
 
 import { RowMenu, SearchInput, useAdminListState } from "./shared";
@@ -96,6 +105,7 @@ export function AdminUsersPage(): ReactNode {
 	const [editing, setEditing] = useState<{ mode: "create" | "edit"; user?: Users } | null>(null);
 	const [form, setForm] = useState<UserFormState>(EMPTY_FORM);
 	const [errors, setErrors] = useState<UserFormErrors>({});
+	const [rolesTarget, setRolesTarget] = useState<Users | null>(null);
 
 	const params: QueryParams = {
 		page: list.page,
@@ -366,9 +376,16 @@ export function AdminUsersPage(): ReactNode {
 											time: formatDateTime(row.created_at),
 										})}
 									</p>
-									<div className="flex gap-2 pt-1">
+									<div className="flex flex-wrap gap-2 pt-1">
 										<Button variant="outline" size="sm" onClick={() => openEdit(row)}>
 											<Pencil aria-hidden="true" /> {t("common.edit")}
+										</Button>
+										<Button
+											variant="outline"
+											size="sm"
+											onClick={() => setRolesTarget(row)}
+										>
+											<ShieldCheck aria-hidden="true" /> {t("adminCore.users.roles.menu")}
 										</Button>
 										<Button
 											variant="destructive"
@@ -384,6 +401,9 @@ export function AdminUsersPage(): ReactNode {
 								<RowMenu label={t("adminCore.users.rowMenu", { name: row.username })}>
 									<DropdownMenuItem onSelect={() => openEdit(row)}>
 										<Pencil aria-hidden="true" /> {t("common.edit")}
+									</DropdownMenuItem>
+									<DropdownMenuItem onSelect={() => setRolesTarget(row)}>
+										<ShieldCheck aria-hidden="true" /> {t("adminCore.users.roles.menu")}
 									</DropdownMenuItem>
 									<DropdownMenuSeparator />
 									<DropdownMenuItem
@@ -504,6 +524,163 @@ export function AdminUsersPage(): ReactNode {
 					</FormGrid>
 				</form>
 			</FormSheet>
+
+			<UserRolesSheet
+				user={rolesTarget}
+				onClose={() => setRolesTarget(null)}
+			/>
 		</PageBody>
+	);
+}
+
+/**
+ * 账号 ↔ 角色授予。后端 `PUT /admin/users/:id/roles` 是**整体替换**语义；
+ * 反提权由后端逐请求判定，前端只如实展示 403。
+ */
+function UserRolesSheet({
+	user,
+	onClose,
+}: {
+	user: Users | null;
+	onClose: () => void;
+}): ReactNode {
+	const { t } = useTranslation();
+	const client = useClient();
+	const queryClient = useAppQueryClient();
+	const [selected, setSelected] = useState<Set<string>>(new Set());
+	const open = user !== null;
+	const userId = user?.id ?? "";
+
+	const rolesQuery = useQuery({
+		queryKey: qk.admin.roles(),
+		queryFn: async () => (await callList<RoleDto>(client.admin.roles.fetch())).items,
+		enabled: open,
+	});
+	const userRolesQuery = useQuery({
+		queryKey: qk.admin.userRoles(userId),
+		queryFn: () => call<UserRolesDto>(client.admin.users.getRoles(userId), t("adminCore.users.roles.request")),
+		enabled: open && userId !== "",
+	});
+
+	useEffect(() => {
+		if (!userRolesQuery.data) return;
+		setSelected(new Set(userRolesQuery.data.roles.map((role) => role.id)));
+	}, [userRolesQuery.data]);
+
+	const save = useMutation({
+		mutationFn: () =>
+			call<UserRolesDto>(
+				client.admin.users.setRoles(userId, [...selected]),
+				t("adminCore.users.roles.request"),
+			),
+		onSuccess: () => {
+			toast.success(t("adminCore.users.roles.saved"));
+			void queryClient.invalidateQueries({ queryKey: qk.admin.userRoles(userId) });
+			void queryClient.invalidateQueries({ queryKey: qk.admin.users() });
+			void queryClient.invalidateQueries({ queryKey: qk.admin.roles() });
+			onClose();
+		},
+		onError: (error) => toast.apiError(t("adminCore.users.roles.saveFailed"), error),
+	});
+
+	const roles = rolesQuery.data ?? [];
+
+	return (
+		<FormSheet
+			open={open}
+			onOpenChange={(next) => {
+				if (!next) onClose();
+			}}
+			title={t("adminCore.users.roles.title")}
+			description={
+				user
+					? t("adminCore.users.roles.description", {
+							name: user.nickname || user.username,
+						})
+					: undefined
+			}
+			width="lg"
+			footer={
+				<div className="flex w-full flex-wrap items-center justify-between gap-2">
+					<span className="text-xs text-muted-foreground">
+						{userRolesQuery.data
+							? t("adminCore.users.roles.effective", {
+									count: userRolesQuery.data.permissions.length,
+								})
+							: null}
+					</span>
+					<div className="flex items-center gap-2">
+						<Button variant="outline" onClick={onClose} disabled={save.isPending}>
+							{t("common.cancel")}
+						</Button>
+						<Button
+							onClick={() => save.mutate()}
+							disabled={save.isPending || rolesQuery.isPending || userRolesQuery.isPending}
+						>
+							{save.isPending ? t("common.saving") : t("adminCore.users.roles.save")}
+						</Button>
+					</div>
+				</div>
+			}
+		>
+			{rolesQuery.isPending || userRolesQuery.isPending ? (
+				<LoadingBlock label={t("adminCore.users.roles.loading")} />
+			) : rolesQuery.isError ? (
+				<InlineError error={rolesQuery.error} />
+			) : userRolesQuery.isError ? (
+				<InlineError error={userRolesQuery.error} />
+			) : roles.length === 0 ? (
+				<EmptyBlock
+					title={t("adminCore.users.roles.noRoles")}
+					description={t("adminCore.users.roles.description", {
+						name: user?.nickname || user?.username || "",
+					})}
+				/>
+			) : (
+				<div className="space-y-2">
+					{selected.size === 0 ? (
+						<p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+							{t("adminCore.users.roles.emptySelection")}
+						</p>
+					) : null}
+					{roles.map((role) => (
+						<label
+							key={role.id}
+							className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 hover:bg-muted/40"
+						>
+							<Checkbox
+								className="mt-0.5"
+								checked={selected.has(role.id)}
+								onCheckedChange={(value) => {
+									setSelected((current) => {
+										const next = new Set(current);
+										if (value === true) next.add(role.id);
+										else next.delete(role.id);
+										return next;
+									});
+								}}
+								aria-label={role.name}
+							/>
+							<span className="min-w-0 flex-1">
+								<span className="flex flex-wrap items-center gap-2">
+									<span className="text-sm font-medium">{role.name}</span>
+									<MonoText className="text-xs text-muted-foreground">{role.key}</MonoText>
+									{role.grants_all ? (
+										<TonePill tone="info">{t("adminCore.users.roles.grantsAll")}</TonePill>
+									) : null}
+									{role.protected ? (
+										<TonePill tone="muted">{t("adminCore.users.roles.protected")}</TonePill>
+									) : null}
+								</span>
+								<span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+									{role.description ? <span>{role.description}</span> : null}
+									<span>{t("adminCore.users.roles.holders", { count: role.user_count })}</span>
+								</span>
+							</span>
+						</label>
+					))}
+				</div>
+			)}
+		</FormSheet>
 	);
 }

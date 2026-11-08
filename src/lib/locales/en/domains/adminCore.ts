@@ -257,8 +257,7 @@ export default {
 		attachment: "Attachment {{name}}",
 		attachmentWithSize: "Attachment {{name}} · {{size}}",
 		staticFlagValue: "static flag",
-		rowMenu: "Actions for challenge {{name}}",
-		empty: {
+		rowMenu: "Actions for challenge {{name}}",		empty: {
 			title: "The challenge library is empty",
 			description: "Import a challenge package (recommended) or create an identity manually.",
 		},
@@ -551,6 +550,24 @@ export default {
 		error: "Failed to load users",
 		registeredAt: "Registered {{time}}",
 		rowMenu: "Actions for user {{name}}",
+
+		roles: {
+			menu: "Roles & permissions",
+			title: "Roles & permissions",
+			description: "Grant roles to “{{name}}”. Saving replaces the whole role set.",
+			loading: "Loading roles…",
+			loadError: "Failed to load roles",
+			noRoles: "No roles available",
+			grantsAll: "All permissions",
+			protected: "Built-in",
+			holders: "{{count}} accounts",
+			effective: "{{count}} effective permissions",
+			emptySelection: "No roles selected: this account keeps only regular user capabilities.",
+			save: "Save roles",
+			saved: "Roles updated",
+			saveFailed: "Failed to update roles",
+			request: "Update account roles",
+		},
 		empty: {
 			title: "No users yet",
 			description: "Create the first account, or let players register themselves.",

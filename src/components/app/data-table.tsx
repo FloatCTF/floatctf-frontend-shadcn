@@ -222,9 +222,6 @@ export function DataTable<T>({
 										{mobileCard(row.original)}
 									</div>
 								</div>
-								{rowActions ? (
-									<div className="mt-2 flex justify-end">{rowActions(row.original)}</div>
-								) : null}
 							</div>
 						))
 					)}

@@ -254,8 +254,7 @@ export default {
 		attachment: "附件 {{name}}",
 		attachmentWithSize: "附件 {{name}} · {{size}}",
 		staticFlagValue: "静态 flag",
-		rowMenu: "题目 {{name}} 的操作",
-		empty: {
+		rowMenu: "题目 {{name}} 的操作",		empty: {
 			title: "题库还是空的",
 			description: "导入题目包（建议）或手工创建题目身份。",
 		},
@@ -530,6 +529,24 @@ export default {
 		error: "加载用户列表失败",
 		registeredAt: "注册 {{time}}",
 		rowMenu: "用户 {{name}} 的操作",
+
+		roles: {
+			menu: "角色与权限",
+			title: "角色与权限",
+			description: "为「{{name}}」授予角色；保存时整体替换角色集合。",
+			loading: "加载角色…",
+			loadError: "加载角色失败",
+			noRoles: "还没有可授予的角色",
+			grantsAll: "全权",
+			protected: "内置",
+			holders: "{{count}} 个账号",
+			effective: "有效权限 {{count}} 项",
+			emptySelection: "未选择任何角色：该账号将只保留普通用户能力。",
+			save: "保存角色",
+			saved: "角色已更新",
+			saveFailed: "更新角色失败",
+			request: "更新账号角色",
+		},
 		empty: {
 			title: "还没有用户",
 			description: "创建第一个账号，或让选手自行注册。",

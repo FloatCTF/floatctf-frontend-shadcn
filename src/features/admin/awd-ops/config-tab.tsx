@@ -122,7 +122,10 @@ function validateForm(
 			});
 		}
 	}
-	if (form.planned_start_at !== "") {
+	// 编辑已有配置时，如果管理员没动「计划开赛」，就不要用当前时间重判历史值：
+	// 否则一个已经过去的 planned_start_at 会让整张表单（包括其它字段）永远存不了。
+	const originalPlanned = status ? toDatetimeLocalValue(status.planned_start_at) : "";
+	if (form.planned_start_at !== "" && form.planned_start_at !== originalPlanned) {
 		const iso = fromDatetimeLocalValue(form.planned_start_at);
 		if (iso === null) {
 			errors.planned_start_at = t("adminAwdOps.config.validation.plannedInvalid");
