@@ -150,6 +150,13 @@ export function AdminWeaponsPage(): ReactNode {
 
 	const columns: DataTableColumn<Weapons>[] = [
 		{
+			id: "id",
+			header: t("adminCommunity.weapons.columns.id"),
+			sortValue: (row) => row.id,
+			cell: (row) => <MonoText className="text-xs text-muted-foreground">{row.id}</MonoText>,
+			hideBelow: "lg",
+		},
+		{
 			id: "name",
 			header: t("adminCommunity.weapons.columns.name"),
 			sortValue: (row) => row.name,
@@ -162,19 +169,21 @@ export function AdminWeaponsPage(): ReactNode {
 			cell: (row) => <span className="text-sm">{row.category}</span>,
 		},
 		{
-			id: "description",
-			header: t("adminCommunity.weapons.columns.description"),
-			hideBelow: "lg",
+			id: "has_file",
+			header: t("adminCommunity.weapons.columns.hasFile"),
 			cell: (row) => (
-				<span className="text-sm text-muted-foreground">
-					{truncate(row.description ?? "", 50) ||
-						t("adminCommunity.weapons.mobile.noDescription")}
-				</span>
+				<BooleanPill
+					value={row.has_file}
+					trueText={t("adminCommunity.weapons.file.hasFile")}
+					falseText={t("adminCommunity.weapons.file.noFile")}
+				/>
 			),
+			sortValue: (row) => (row.has_file ? 1 : 0),
+			hideBelow: "sm",
 		},
 		{
-			id: "file",
-			header: t("adminCommunity.weapons.columns.file"),
+			id: "file_url",
+			header: t("adminCommunity.weapons.columns.fileUrl"),
 			cell: (row) =>
 				row.has_file && row.file_url ? (
 					<a
@@ -191,27 +200,16 @@ export function AdminWeaponsPage(): ReactNode {
 				) : row.has_file ? (
 					<TonePill tone="warning">{t("adminCommunity.weapons.file.markedNoUrl")}</TonePill>
 				) : (
-					<BooleanPill
-						value={false}
-						trueText={t("adminCommunity.weapons.file.hasFile")}
-						falseText={t("adminCommunity.weapons.file.noFile")}
-					/>
+					<span className="text-xs text-muted-foreground">—</span>
 				),
-		},
-		{
-			id: "download_count",
-			header: t("adminCommunity.weapons.columns.downloadCount"),
-			align: "right",
-			hideBelow: "sm",
-			sortValue: (row) => row.download_count,
-			cell: (row) => <MonoText>{formatInt(row.download_count)}</MonoText>,
+			hideBelow: "md",
 		},
 		{
 			id: "updated_at",
 			header: t("adminCommunity.weapons.columns.updatedAt"),
-			align: "right",
 			sortValue: (row) => Date.parse(row.updated_at),
 			cell: (row) => <AbsoluteTime value={row.updated_at} />,
+			hideBelow: "lg",
 		},
 	];
 

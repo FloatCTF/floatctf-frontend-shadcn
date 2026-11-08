@@ -208,6 +208,9 @@ export default {
 			placeholder: "搜索名称 / 分类 / 描述",
 		},
 		columns: {
+			id: "ID",
+			hasFile: "有附件",
+			fileUrl: "文件地址",
 			name: "名称",
 			category: "分类",
 			description: "描述",

@@ -219,6 +219,9 @@ export default {
 			placeholder: "Search name, category, or description",
 		},
 		columns: {
+			id: "ID",
+			hasFile: "Has file",
+			fileUrl: "File URL",
 			name: "Name",
 			category: "Category",
 			description: "Description",
