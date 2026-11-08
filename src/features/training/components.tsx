@@ -648,11 +648,18 @@ export function TrainingActionPanel({
 								id="training-patch"
 								ref={fileRef}
 								type="file"
+								accept=".tar.gz,.tgz,application/gzip"
 								className="hidden"
 								disabled={!patchGate.allowed || patchMutation.isPending}
 								onChange={(event) => {
 									const file = event.target.files?.[0];
-									if (file) patchMutation.mutate(file);
+									event.target.value = "";
+									if (!file) return;
+									if (!/\.(tar\.gz|tgz)$/i.test(file.name)) {
+										toast.error(t("training.actions.fix.patchFormat"));
+										return;
+									}
+									patchMutation.mutate(file);
 								}}
 							/>
 							<Button

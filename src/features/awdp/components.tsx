@@ -798,7 +798,7 @@ export function AwdpActionPanel({
 								id="awdp-patch"
 								ref={fileRef}
 								type="file"
-								accept=".sh,.patch,.diff,.txt,.zip"
+								accept=".tar.gz,.tgz,application/gzip"
 								className="sr-only"
 								tabIndex={-1}
 								aria-label={t("awdp.actions.patchLabel")}
@@ -806,7 +806,12 @@ export function AwdpActionPanel({
 								onChange={(event) => {
 									const file = event.target.files?.[0];
 									event.target.value = "";
-									if (file) patchMutation.mutate(file);
+									if (!file) return;
+									if (!/\.(tar\.gz|tgz)$/i.test(file.name)) {
+										toast.error(t("awdp.actions.patchFormat"));
+										return;
+									}
+									patchMutation.mutate(file);
 								}}
 							/>
 							<div className="flex flex-wrap items-center gap-2">

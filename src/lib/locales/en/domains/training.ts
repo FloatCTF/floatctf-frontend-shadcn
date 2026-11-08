@@ -360,10 +360,11 @@ export default {
 		fix: {
 			title: "Fix: patch / self-check / full check",
 			description:
-				"Upload patch.sh to fix the vulnerability, run Test Check for a self-check, and use ALL Check for the official one-click evaluation.",
-			patchLabel: "patch.sh",
-			patchHint: "The multipart field name is patch_file; do not set Content-Type manually.",
+				"Upload patch.tar.gz to fix the vulnerability, run Test Check for a self-check, and use ALL Check for the official one-click evaluation.",
+			patchLabel: "patch.tar.gz",
+			patchHint: "A gzip tar archive with patch.sh at its root; the multipart field name is patch_file, do not set Content-Type.",
 			chooseUpload: "Choose and upload",
+			patchFormat: "Upload patch.tar.gz or .tgz (a gzip tar archive containing patch.sh at its root).",
 			patchResult: "Patch result:",
 			applied: "Applied",
 			failed: "Failed to apply",

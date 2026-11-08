@@ -107,11 +107,12 @@ export default {
 		firstBreak: "First break",
 		fixTitle: "Fix: patch and self-check",
 		fixDescription:
-			"Upload patch.sh to fix the vulnerability; Test Check is a pre-evaluation self-check (not scored).",
-		patchLabel: "patch.sh",
+			"Upload patch.tar.gz to fix the vulnerability; Test Check is a pre-evaluation self-check (not scored).",
+		patchLabel: "patch.tar.gz",
 		patchHint:
-			"Uploaded as the multipart field patch_file; do not set Content-Type, the SDK adds the boundary automatically.",
-		patchAcceptHint: ".sh / .patch / .diff / .zip",
+			"A gzip tar archive with patch.sh at its root; uploaded as the multipart field patch_file. Do not set Content-Type.",
+		patchAcceptHint: ".tar.gz / .tgz",
+		patchFormat: "Upload patch.tar.gz or .tgz (a gzip tar archive containing patch.sh at its root).",
 		chooseAndUpload: "Choose and upload",
 		patchResult: "Patch result:",
 		patchApplied: "Applied",
