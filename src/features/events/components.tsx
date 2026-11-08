@@ -553,8 +553,11 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 						}
 						// 后缀 / MIME 都可能伪造；读文件头挡掉必然被后端拒绝的伪 PDF。
 						if (picked) {
-							const head = await picked.slice(0, 1024).text();
-							if (!head.includes("%PDF-")) {
+							// 后端只读取前 5 字节并要求精确等于 %PDF-；这里完全按同一契约校验，
+							// 不能放过“文件中间某处出现 %PDF-”的伪 PDF。
+							const head = new Uint8Array(await picked.slice(0, 5).arrayBuffer());
+							const magic = String.fromCharCode(...head);
+							if (magic !== "%PDF-") {
 								toast.error(t("events.writeup.invalidPdf"));
 								setFile(null);
 								return;
