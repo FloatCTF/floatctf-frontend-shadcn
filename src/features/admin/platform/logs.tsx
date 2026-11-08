@@ -155,7 +155,11 @@ export function AdminLogsPage(): ReactNode {
 			id: "level",
 			header: t("adminPlatform.logs.columns.level"),
 			sortValue: (row) => row.level,
-			cell: (row) => <TonePill tone={levelTone(row.level)}>{row.level}</TonePill>,
+			cell: (row) => (
+				<TonePill tone={levelTone(row.level)}>
+					{t(`adminPlatform.logs.levels.${row.level.toLowerCase()}`)}
+				</TonePill>
+			),
 		},
 		{
 			id: "category",
@@ -250,7 +254,7 @@ export function AdminLogsPage(): ReactNode {
 								</SelectItem>
 								{LEVELS.map((item) => (
 									<SelectItem key={item} value={item}>
-										{item}
+										{t(`adminPlatform.logs.levels.${item.toLowerCase()}`)}
 									</SelectItem>
 								))}
 							</SelectContent>

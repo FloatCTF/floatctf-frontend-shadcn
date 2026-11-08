@@ -947,29 +947,38 @@ const broadcastSse = (data) => {
 
 /** mock 里少数需要看请求体的路由（flag 校验）：其余路由忽略 body。 */
 
-/** 解析后端 `filter` 查询参数（`key:value`，空格续接，`&`/`|` 分隔）；mock 只实现 AND 包含匹配。 */
-const parseFilter = (req) => {
+/** 一组 OR 组、每组 AND 条件：`title:a | content:b` = (title 含 a) 或 (content 含 b)。 */
+const mockFilterGroups = (req) => {
 	const url = new URL(req.url ?? "", "http://mock.local");
-	const raw = url.searchParams.get("filter") ?? "";
-	const tokens = raw.split(/\s+/).filter(Boolean);
-	const filters = {};
-	let index = 0;
-	while (index < tokens.length) {
-		const token = tokens[index];
-		if (token === "&" || token === "|") {
-			index += 1;
-			continue;
-		}
-		const [key, ...rest] = token.split(":");
-		let value = rest.join(":");
-		index += 1;
-		while (index < tokens.length && tokens[index] !== "&" && tokens[index] !== "|") {
-			value += ` ${tokens[index]}`;
-			index += 1;
-		}
-		if (key && value) filters[key] = value;
-	}
-	return filters;
+	const raw = (url.searchParams.get("filter") ?? "").trim();
+	if (!raw) return null;
+	return raw
+		.split("|")
+		.map((group) =>
+			group
+				.split("&")
+				.map((token) => token.trim())
+				.filter(Boolean)
+				.map((token) => {
+					const [key, ...rest] = token.split(":");
+					return { key: key.trim(), value: rest.join(":").trim() };
+				})
+				.filter((item) => item.key && item.value),
+		)
+		.filter((group) => group.length > 0);
+};
+
+/** 行是否命中筛选；字段名可通过 alias 重映射（如 `name` → `task_name`）。 */
+const mockFilterMatch = (req, row, alias = {}) => {
+	const groups = mockFilterGroups(req);
+	if (!groups) return true;
+	return groups.some((group) =>
+		group.every(({ key, value }) => {
+			const field = alias[key] ?? key;
+			const actual = row?.[field];
+			return actual !== undefined && actual !== null && matchesContains(actual, value);
+		}),
+	);
 };
 
 /** 不区分大小写的包含匹配（mock 的通用过滤）。 */
@@ -1328,16 +1337,8 @@ const routes = [
 	["GET", /^\/api\/solves\/top15users$/, (_m, res) => ok(res, topUsers)],
 	["GET", /^\/api\/writeups$/, (_m, res, req) => ok(res, unifiedWriteups, req)],
 	["GET", /^\/api\/writeups\/([^/]+)$/, (_m, res) => ok(res, unifiedWriteupDetail)],
-	["GET", /^\/api\/discussions$/, (_m, res, req) => {
-		const f = parseFilter(req);
-		const list = discussions.filter(
-			(d) =>
-				(!f.title || matchesContains(d.title, f.title)) &&
-				(!f.author_id || d.author_id === f.author_id) &&
-				(!f.author_nickname || matchesContains(d.author_nickname, f.author_nickname)),
-		);
-		return ok(res, list, req);
-	}],
+	["GET", /^\/api\/discussions$/, (_m, res, req) =>
+		ok(res, discussions.filter((d) => mockFilterMatch(req, d)), req)],
 	["POST", /^\/api\/discussions$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const title = String(body.title ?? "").trim();
@@ -1558,13 +1559,11 @@ const routes = [
 	["GET", /^\/api\/admin\/events\/([^/]+)$/, (m, res) => {
 		ok(res, adminEvents.find((item) => item.id === m[1]) ?? adminEvents[0]);
 	}],
-	["GET", /^\/api\/admin\/scheduled_tasks$/, (_m, res, req) =>
-		ok(
-			res,
-			[
+	["GET", /^\/api\/admin\/scheduled_tasks$/, (_m, res, req) => {
+		const rows = [
 				{
 					id: "t-1",
-					group_id: "maintenance",
+					group_id: "system",
 					task_name: "清理过期实例",
 					description: "回收超过 24 小时的题目实例。",
 					task_key: "cleanup-stale-instances",
@@ -1579,8 +1578,24 @@ const routes = [
 					max_attempts: 3,
 				},
 				{
+					id: "t-3",
+					group_id: "system",
+					task_name: "启动时检查 helper 连接",
+					description: "API 启动后确认 helper-docker / helper-control socket 可用。",
+					task_key: "helper-healthcheck",
+					trigger_type: "startup",
+					status: "pending",
+					enabled: true,
+					protected: false,
+					cron_expr: null,
+					created_at: iso(now - 90 * D),
+					updated_at: iso(now - 3 * 60000),
+					attempt_count: 0,
+					max_attempts: 3,
+				},
+				{
 					id: "t-2",
-					group_id: "maintenance",
+					group_id: "service",
 					task_name: "平台课程同步",
 					description: "从课程服务同步选课名单（示例任务）。",
 					task_key: "course-sync",
@@ -1595,9 +1610,10 @@ const routes = [
 					max_attempts: 3,
 					last_error: "network timeout（示例）",
 				},
-			],
-			req,
-		)],
+		];
+		// 后端的 `kind` 过滤对应任务分组（service / system / event），不是 trigger_type。
+		return ok(res, rows.filter((row) => mockFilterMatch(req, row, { kind: "group_id", name: "task_name" })), req);
+	}],
 	["POST", /^\/api\/admin\/scheduled_tasks\/([^/]+)\/run$/, (_m, res, req) =>
 		ok(
 			res,
@@ -1641,25 +1657,23 @@ const routes = [
 			scoreboard_top10: scoreboard.slice(0, 10),
 			trend,
 		})],
-	["GET", /^\/api\/admin\/challenges$/, (_m, res, req) => ok(res, challenges, req)],
+	["GET", /^\/api\/admin\/challenges$/, (_m, res, req) => ok(res, challenges.filter((c) => mockFilterMatch(req, c)), req)],
 	["GET", /^\/api\/admin\/challenge_sets$/, (_m, res, req) => ok(res, [], req)],
-	["GET", /^\/api\/admin\/users$/, (_m, res, req) =>
-		ok(
-			res,
-			[
-				{ ...me, permissions: undefined, grants_all: undefined },
-				{
-					id: "u-2",
-					username: "2024007",
-					nickname: "Byte Me",
-					email: "byte@example.edu",
-					avatar: null,
-					created_at: iso(now - 30 * D),
-					updated_at: iso(now - 30 * D),
-				},
-			],
-			req,
-		)],
+	["GET", /^\/api\/admin\/users$/, (_m, res, req) => {
+		const rows = [
+			{ ...me, permissions: undefined, grants_all: undefined },
+			{
+				id: "u-2",
+				username: "2024007",
+				nickname: "Byte Me",
+				email: "byte@example.edu",
+				avatar: null,
+				created_at: iso(now - 30 * D),
+				updated_at: iso(now - 30 * D),
+			},
+		];
+		return ok(res, rows.filter((row) => mockFilterMatch(req, row)), req);
+	}],
 	["GET", /^\/api\/admin\/users\/([^/]+)\/roles$/, (m, res) =>
 		ok(res, { user_id: m[1], username: me.username, roles: [], permissions: [] })],
 	["GET", /^\/api\/admin\/permissions$/, (_m, res) =>
@@ -1682,10 +1696,30 @@ const routes = [
 				user_count: 1,
 			},
 		])],
-	["GET", /^\/api\/admin\/logs$/, (_m, res, req) =>
-		ok(
-			res,
-			[
+	["GET", /^\/api\/admin\/logs$/, (_m, res, req) => {
+		const rows = [
+				{
+					id: "log-2",
+					ip_address: "10.0.0.9",
+					category: "event",
+					action: "awd.deploy",
+					level: "warn",
+					message: "GameBox 部署重试一次后成功",
+					details: "retry=1",
+					created_at: iso(now - 26 * 60000),
+					actor_user_id: me.id,
+				},
+				{
+					id: "log-3",
+					ip_address: "10.0.0.9",
+					category: "platform",
+					action: "helper.control",
+					level: "error",
+					message: "helper-control 连接超时（示例）",
+					details: "timeout=2s",
+					created_at: iso(now - 8 * 60000),
+					actor_user_id: me.id,
+				},
 				{
 					id: "log-1",
 					ip_address: "10.0.0.8",
@@ -1697,9 +1731,9 @@ const routes = [
 					created_at: iso(now - 12 * 60000),
 					actor_user_id: me.id,
 				},
-			],
-			req,
-		)],
+		];
+		return ok(res, rows.filter((row) => mockFilterMatch(req, row)), req);
+	}],
 	["GET", /^\/api\/admin\/settings$/, (_m, res, req) =>
 		ok(
 			res,
@@ -1722,8 +1756,8 @@ const routes = [
 	["GET", /^\/api\/admin\/docker\/containers$/, (_m, res, req) => ok(res, [], req)],
 	["GET", /^\/api\/admin\/docker\/images$/, (_m, res, req) => ok(res, [], req)],
 	["GET", /^\/api\/admin\/docker\/networks$/, (_m, res, req) => ok(res, [], req)],
-	["GET", /^\/api\/admin\/announcements$/, (_m, res, req) => ok(res, announcements, req)],
-	["GET", /^\/api\/admin\/discussions$/, (_m, res, req) => ok(res, discussions, req)],
+	["GET", /^\/api\/admin\/announcements$/, (_m, res, req) => ok(res, announcements.filter((a) => mockFilterMatch(req, a)), req)],
+	["GET", /^\/api\/admin\/discussions$/, (_m, res, req) => ok(res, discussions.filter((d) => mockFilterMatch(req, d)), req)],
 	["GET", /^\/api\/admin\/weapons$/, (_m, res, req) => ok(res, [], req)],
 ];
 

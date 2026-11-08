@@ -102,6 +102,12 @@ export default {
 		},
 	},
 	logs: {
+		levels: {
+			info: "信息",
+			warn: "警告",
+			error: "错误",
+			debug: "调试",
+		},
 		documentTitle: "操作日志 · FloatCTF 控制台",
 		title: "操作日志",
 		description: "平台审计日志（只读）。级别为精确匹配，其余字段按后端映射做包含 / 精确匹配。",

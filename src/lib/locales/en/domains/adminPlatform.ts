@@ -109,6 +109,12 @@ export default {
 		},
 	},
 	logs: {
+		levels: {
+			info: "Info",
+			warn: "Warning",
+			error: "Error",
+			debug: "Debug",
+		},
 		documentTitle: "Operation logs · FloatCTF Console",
 		title: "Operation logs",
 		description:
