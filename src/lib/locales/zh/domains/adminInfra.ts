@@ -322,8 +322,7 @@ export default {
 	version: {
 		documentTitle: "平台版本 · FloatCTF 控制台",
 		title: "平台版本",
-		description:
-			"后端 API 版本与前端运行时契约版本。契约版本用于判断可插拔前端是否兼容。",
+		description: "前端制品版本与后端 API 版本。",
 		stats: {
 			api: "平台 API",
 			apiHint: "GET /api/admin/system/version",

@@ -55,10 +55,6 @@ export function AdminVersionPage(): ReactNode {
 					columns={1}
 					items={[
 						{
-							key: "Version",
-							value: <MonoText>{t("adminInfra.version.rows.version")}</MonoText>,
-						},
-						{
 							key: "floatctf-web",
 							value: <MonoText>{__APP_VERSION__}</MonoText>,
 						},
