@@ -260,6 +260,8 @@ export default {
 		deployBlocked:
 			"The current status is “{{status}}”, so deploying is not allowed; only pre-runtime configuration states can deploy",
 		deployBlock: {
+			draft: "Not yet in configuring (draft): save the configuration first, then deploy",
+			deployed: "Already deployed: change the configuration back to configuring before redeploying",
 			deploying: "A deployment is in progress (deploying); wait for it to finish",
 			prechecking: "A precheck is in progress (prechecking); wait for it to finish",
 			verified:
@@ -278,6 +280,8 @@ export default {
 		precheckBlocked:
 			"The current status is “{{status}}”, so prechecking is not allowed; only pre-runtime configuration states can precheck",
 		precheckBlock: {
+			draft: "Not yet in configuring (draft): save the configuration first, then precheck",
+			deployFailed: "Deployment failed (deploy_failed): change and save the configuration to return to configuring, then precheck",
 			deploying: "A deployment is in progress: wait for it to finish",
 			running: "The competition has started: only pre-runtime configuration states can precheck",
 			paused: "The competition is paused: only pre-runtime configuration states can precheck",

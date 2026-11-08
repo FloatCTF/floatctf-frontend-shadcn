@@ -232,6 +232,8 @@ export default {
 		notEnabledShort: "尚未开通 AWD",
 		deployBlocked: "当前状态为「{{status}}」，不可部署；仅运行前的配置态可部署",
 		deployBlock: {
+			draft: "尚未进入配置态（draft）：请先保存配置，状态回到配置中后再部署",
+			deployed: "已部署（deployed）：修改配置回到配置中后才可重新部署",
 			deploying: "部署正在进行中（deploying），请等待本次部署结束",
 			prechecking: "预检进行中（prechecking），请等待预检结束",
 			verified: "已通过预检：运行时已就绪，无需重新部署；修改配置后可再次部署",
@@ -246,6 +248,8 @@ export default {
 		},
 		precheckBlocked: "当前状态为「{{status}}」，不可预检；仅运行前的配置态可预检",
 		precheckBlock: {
+			draft: "尚未进入配置态（draft）：请先保存配置，状态回到配置中后再预检",
+			deployFailed: "部署失败（deploy_failed）：请先修改配置保存回到配置中，再预检",
 			deploying: "部署进行中：请等待部署结束",
 			running: "比赛已开始：仅运行前的配置态可预检",
 			paused: "比赛已暂停：仅运行前的配置态可预检",

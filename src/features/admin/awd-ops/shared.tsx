@@ -349,34 +349,29 @@ export interface AwdGateInput {
 	finalSettlement: boolean;
 }
 
-/** 后端 `AwdEventStatus::is_configurable()` 的字面值集合。 */
-const CONFIGURABLE_STATUSES: string[] = [
-	AwdEventStatus.Draft,
+/** 可（重新）部署的状态：只有 Configuring 能合法转移到 Deploying。 */
+// 后端 is_configurable() 比状态机宽：Draft / Deployed / DeployFailed / VerificationFailed
+// 直接转 Deploying 都会被 "Invalid transition" 拒绝。前端必须按真实状态机收紧，
+// 否则按钮看起来可用，点下去才失败。
+const DEPLOYABLE_STATUSES: string[] = [AwdEventStatus.Configuring];
+
+/** 可预检的状态：与 precheck_service 的真实转移一致（Draft/DeployFailed 不能直接转 Prechecking）。 */
+const PRECHECKABLE_STATUSES: string[] = [
 	AwdEventStatus.Configuring,
 	AwdEventStatus.Deployed,
 	AwdEventStatus.Prechecking,
 	AwdEventStatus.Verified,
 	AwdEventStatus.StartBlocked,
-	AwdEventStatus.DeployFailed,
 	AwdEventStatus.VerificationFailed,
-];
-
-/** 可（重新）部署的状态：处于运行前的配置态，允许修复后重试。 */
-// 后端虽然把 DeployFailed / VerificationFailed 归入 is_configurable()，但状态机的
-// 合法转移只有 DeployFailed -> Configuring、VerificationFailed -> Prechecking/Configuring；
-// 直接 Deploying 会被 "Invalid transition" 拒绝。因此这里不再把它们标成可部署，
-// 而是提示先保存配置/重新预检回到配置态。
-const DEPLOYABLE_STATUSES: string[] = [
-	AwdEventStatus.Draft,
-	AwdEventStatus.Configuring,
-	AwdEventStatus.Deployed,
 ];
 
 const TERMINAL_STATUSES: string[] = [AwdEventStatus.Finished, AwdEventStatus.Archived];
 
 /** 不可部署时的**逐状态**原因（比一句笼统的「当前状态不支持」更有用）。 */
 const DEPLOY_BLOCK_KEYS: Record<string, string> = {
+	[AwdEventStatus.Draft]: "adminAwdOps.gates.deployBlock.draft",
 	[AwdEventStatus.Deploying]: "adminAwdOps.gates.deployBlock.deploying",
+	[AwdEventStatus.Deployed]: "adminAwdOps.gates.deployBlock.deployed",
 	[AwdEventStatus.Prechecking]: "adminAwdOps.gates.deployBlock.prechecking",
 	[AwdEventStatus.Verified]: "adminAwdOps.gates.deployBlock.verified",
 	[AwdEventStatus.StartBlocked]: "adminAwdOps.gates.deployBlock.startBlocked",
@@ -391,7 +386,9 @@ const DEPLOY_BLOCK_KEYS: Record<string, string> = {
 
 /** 不可预检时的逐状态原因。 */
 const PRECHECK_BLOCK_KEYS: Record<string, string> = {
+	[AwdEventStatus.Draft]: "adminAwdOps.gates.precheckBlock.draft",
 	[AwdEventStatus.Deploying]: "adminAwdOps.gates.precheckBlock.deploying",
+	[AwdEventStatus.DeployFailed]: "adminAwdOps.gates.precheckBlock.deployFailed",
 	[AwdEventStatus.Running]: "adminAwdOps.gates.precheckBlock.running",
 	[AwdEventStatus.Paused]: "adminAwdOps.gates.precheckBlock.paused",
 	[AwdEventStatus.NetworkError]: "adminAwdOps.gates.precheckBlock.networkError",
@@ -439,7 +436,7 @@ export function buildAwdGates(input: AwdGateInput, t: TFunction): Record<AwdActi
 
 	const precheck: AwdActionGate = unknown
 		? { enabled: false, reason: t("adminAwdOps.gates.notEnabled") }
-		: !CONFIGURABLE_STATUSES.includes(status)
+		: !PRECHECKABLE_STATUSES.includes(status)
 			? { enabled: false, reason: precheckReason(status, t) }
 			: !networkAllocated
 				? { enabled: false, reason: networkReason }
