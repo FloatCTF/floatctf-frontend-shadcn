@@ -846,7 +846,7 @@ const awdStatus = (eventId) => ({
 	phase: "attack",
 	current_round: 3,
 	round_count: 8,
-	banned: false,
+	banned: process.env.MOCK_TEAM_BANNED === "1",
 	score: 1240,
 	final_settlement: false,
 });
@@ -1119,7 +1119,7 @@ const mockTeamFor = (event) => ({
 		points: 1240,
 		created_at: iso(now - 3 * D),
 		updated_at: iso(now - 2 * H),
-		banned: false,
+		banned: process.env.MOCK_TEAM_BANNED === "1",
 	},
 	members: [
 		{
@@ -1731,7 +1731,7 @@ const routes = [
 			phase: "attack",
 			current_round: 3,
 			round_count: 8,
-			banned: false,
+			banned: process.env.MOCK_TEAM_BANNED === "1",
 			score: 1240 + mockAwdBonus,
 			final_settlement: false,
 		})],
