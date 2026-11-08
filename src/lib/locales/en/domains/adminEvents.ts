@@ -136,7 +136,7 @@ export default {
 		tabs: {
 			config: "Configuration",
 			challenges: "Challenges",
-			members: "Members",
+			members: "Users",
 			teams: "Teams",
 			announcements: "Announcements",
 			instances: "Instances",

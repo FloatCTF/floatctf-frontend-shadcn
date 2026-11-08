@@ -99,7 +99,11 @@ export function EventConsolePage(): ReactNode {
 				event.family !== "jeopardy") ||
 			(rawTab === "data" && (event.family !== "jeopardy" || !isOfficial)) ||
 			(rawTab === "teams" && event.participant_mode !== "team"));
-	const tab: TabKey = familyMismatch ? "config" : rawTab;
+	const fallbackTab: TabKey = event?.family === "jeopardy" ? "challenges" : "config";
+	const tab: TabKey =
+		familyMismatch || (event?.family === "jeopardy" && rawTab === "config")
+			? fallbackTab
+			: rawTab;
 
 	function changeTab(next: string) {
 		const nextParams = new URLSearchParams(searchParams);
@@ -258,39 +262,42 @@ export function EventConsolePage(): ReactNode {
 						className="w-max min-w-full justify-start"
 						aria-label={t("adminEvents.console.tabsLabel")}
 					>
-						<TabsTrigger value="config">{t("adminEvents.console.tabs.config")}</TabsTrigger>
 						{event.family === "jeopardy" ? (
-							<TabsTrigger value="challenges">
-								{t("adminEvents.console.tabs.challenges")}
-							</TabsTrigger>
-						) : null}
-						<TabsTrigger value="members">{t("adminEvents.console.tabs.members")}</TabsTrigger>
-						{event.participant_mode === "team" ? (
-							<TabsTrigger value="teams">{t("adminEvents.console.tabs.teams")}</TabsTrigger>
-						) : null}
-						<TabsTrigger value="announcements">
-							{t("adminEvents.console.tabs.announcements")}
-						</TabsTrigger>
-						{event.family === "jeopardy" ? (
-							<TabsTrigger value="instances">
-								{t("adminEvents.console.tabs.instances")}
-							</TabsTrigger>
-						) : null}
-						<TabsTrigger value="logs">{t("adminEvents.console.tabs.logs")}</TabsTrigger>
-						{event.family === "jeopardy" ? (
-							<TabsTrigger value="writeups">
-								{t("adminEvents.console.tabs.writeups")}
-							</TabsTrigger>
-						) : null}
-						{event.family === "jeopardy" && isOfficial ? (
-							<TabsTrigger value="data">{t("adminEvents.console.tabs.data")}</TabsTrigger>
-						) : null}
-						{event.family === "awd" ? (
-							<TabsTrigger value="awd">{t("adminEvents.console.tabs.awd")}</TabsTrigger>
-						) : null}
-						{event.family === "awdp" ? (
-							<TabsTrigger value="awdp">{t("adminEvents.console.tabs.awdp")}</TabsTrigger>
-						) : null}
+							<>
+								<TabsTrigger value="challenges">{t("adminEvents.console.tabs.challenges")}</TabsTrigger>
+								<TabsTrigger value="members">{t("adminEvents.console.tabs.members")}</TabsTrigger>
+								{event.participant_mode === "team" ? (
+									<TabsTrigger value="teams">{t("adminEvents.console.tabs.teams")}</TabsTrigger>
+								) : null}
+								<TabsTrigger value="announcements">
+									{t("adminEvents.console.tabs.announcements")}
+								</TabsTrigger>
+								<TabsTrigger value="writeups">{t("adminEvents.console.tabs.writeups")}</TabsTrigger>
+								<TabsTrigger value="logs">{t("adminEvents.console.tabs.logs")}</TabsTrigger>
+								{isOfficial ? (
+									<TabsTrigger value="data">{t("adminEvents.console.tabs.data")}</TabsTrigger>
+								) : null}
+								<TabsTrigger value="instances">{t("adminEvents.console.tabs.instances")}</TabsTrigger>
+							</>
+						) : (
+							<>
+								<TabsTrigger value="config">{t("adminEvents.console.tabs.config")}</TabsTrigger>
+								<TabsTrigger value="members">{t("adminEvents.console.tabs.members")}</TabsTrigger>
+								{event.participant_mode === "team" ? (
+									<TabsTrigger value="teams">{t("adminEvents.console.tabs.teams")}</TabsTrigger>
+								) : null}
+								<TabsTrigger value="announcements">
+									{t("adminEvents.console.tabs.announcements")}
+								</TabsTrigger>
+								<TabsTrigger value="logs">{t("adminEvents.console.tabs.logs")}</TabsTrigger>
+								{event.family === "awd" ? (
+									<TabsTrigger value="awd">{t("adminEvents.console.tabs.awd")}</TabsTrigger>
+								) : null}
+								{event.family === "awdp" ? (
+									<TabsTrigger value="awdp">{t("adminEvents.console.tabs.awdp")}</TabsTrigger>
+								) : null}
+							</>
+						)}
 					</TabsList>
 				</div>
 
