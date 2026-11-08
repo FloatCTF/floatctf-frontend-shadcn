@@ -73,6 +73,7 @@ export default {
 		generation: "Rebuild generation {{count}}",
 		resets: "Manual resets {{count}}",
 		notStartedHint: "Not started: no instance exists and no endpoints are exposed.",
+		endpointsOffline: "Instance stopped: the endpoints below are unavailable until you start it again.",
 		endpointsEmpty: "No service endpoints are exposed while the instance is not running.",
 		endpointLabel: "Service address",
 		containerPort: "Container port {{port}}",

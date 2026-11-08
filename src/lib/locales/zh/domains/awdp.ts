@@ -71,6 +71,7 @@ export default {
 		generation: "重建代数 {{count}}",
 		resets: "手动 Reset {{count}} 次",
 		notStartedHint: "尚未启动：实例不存在，端点也不会暴露。",
+		endpointsOffline: "实例已停止：下列端点暂时不可用，启动后恢复。",
 		endpointsEmpty: "实例未运行时不暴露服务端点。",
 		endpointLabel: "服务地址",
 		containerPort: "容器端口 {{port}}",

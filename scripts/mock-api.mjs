@@ -902,6 +902,7 @@ PersistentKeepalive = 25`;
 
 // ── AWDP 选手端 ─────────────────────────────────────────────────────────
 const awdpGameboxId = "egb-awdp-1";
+let awdpInstanceState = "running";
 const awdpInstance = {
 	instance_id: "inst-awdp-1",
 	runtime_state: "running",
@@ -912,6 +913,9 @@ const awdpInstance = {
 		{ protocol: "tcp", container_port: 22, public_host: "10.42.20.11", public_port: 22022 },
 	],
 };
+/** 每次读取都从可变状态生成，停止/启动/重置后页面能立即反映。 */
+const currentAwdpInstance = () => ({ ...awdpInstance, runtime_state: awdpInstanceState });
+
 const awdpOverview = (eventId) => ({
 	event_id: eventId,
 	phase: process.env.MOCK_AWDP_PHASE ?? "break",
@@ -939,7 +943,7 @@ const awdpOverview = (eventId) => ({
 			hidden: false,
 			exposed: [["http", 8080]],
 			broken: true,
-			instance: awdpInstance,
+			instance: currentAwdpInstance(),
 			source_code_dir: "src/web-shop",
 		},
 	],
@@ -1350,9 +1354,21 @@ const routes = [
 			],
 		});
 	}],
-	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, awdpInstance)],
-	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, awdpInstance)],
-	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => ok(res, awdpInstance)],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, currentAwdpInstance())],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => {
+		awdpInstanceState = "running";
+		return ok(res, currentAwdpInstance());
+	}],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => {
+		awdpInstanceState = "stopped";
+		return ok(res, null);
+	}],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => {
+		awdpInstance.reset_count += 1;
+		awdpInstance.runtime_generation += 1;
+		awdpInstanceState = "running";
+		return ok(res, currentAwdpInstance());
+	}],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/break$/, (_m, res) =>
 		ok(res, { accepted: true, scored: true, already_broken: false })],
@@ -1400,9 +1416,7 @@ const routes = [
 			{ name: "Byte Me", points: [{ name: "Byte Me", score: 200, time: iso(now - 30 * 60000) }, { name: "Byte Me", score: 300, time: iso(now - 10 * 60000) }] },
 			{ name: "NOP Sled", points: [{ name: "NOP Sled", score: 200, time: iso(now - 30 * 60000) }, { name: "NOP Sled", score: 200, time: iso(now - 10 * 60000) }] },
 		])],
-	["GET", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, awdpInstance)],
-	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance$/, (_m, res) => ok(res, awdpInstance)],
-	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/reset$/, (_m, res) => ok(res, awdpInstance)],
+
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/break$/, (_m, res) =>
 		ok(res, { accepted: true, scored: true, already_broken: false })],

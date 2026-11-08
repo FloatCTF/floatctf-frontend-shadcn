@@ -361,6 +361,12 @@ export function AwdpInstancePanel({
 					</div>
 					{!control.allowed ? <GateNotice reason={control.reason} /> : null}
 
+					{instance && !running ? (
+						<p className="text-xs text-muted-foreground">
+							{t("awdp.instance.endpointsOffline")}
+						</p>
+					) : null}
+
 					{instance && instance.endpoints.length > 0 ? (
 						<ul className="space-y-1.5">
 							{instance.endpoints.map((endpoint) => {
