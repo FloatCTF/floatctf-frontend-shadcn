@@ -418,7 +418,9 @@ export function TeamPanel({ info }: { info: EventInfo }) {
 					>
 						<LogOut aria-hidden="true" /> {t("events.team.quitAction")}
 					</Button>
-				) : null}
+				) : (
+					<p className="text-xs text-muted-foreground">{t("events.team.lockedNote")}</p>
+				)}
 			</div>
 
 			<KeyValueList

@@ -1091,6 +1091,31 @@ let mockRoles = [
 	},
 ];
 
+
+/** 战队详情（mock）：仅 team 模式的赛事返回，用于验证战队面板与成员角色。 */
+const mockTeamFor = (event) => ({
+	team: {
+		id: "team-6",
+		event_id: event.id,
+		name: "Byte Me",
+		description: "Mock 战队",
+		points: 1240,
+		created_at: iso(now - 3 * D),
+		updated_at: iso(now - 2 * H),
+		banned: false,
+	},
+	members: [
+		{
+			member_name: me.nickname,
+			member: { event_id: event.id, team_id: "team-6", user_id: me.id, role: "captain", joined_at: iso(now - 3 * D) },
+		},
+		{
+			member_name: "NOP Sled",
+			member: { event_id: event.id, team_id: "team-6", user_id: "u-2", role: "member", joined_at: iso(now - 2 * D) },
+		},
+	],
+});
+
 const routes = [
 
 
@@ -1353,15 +1378,25 @@ const routes = [
 	["GET", /^\/api\/events$/, (_m, res, req) =>
 		ok(
 			res,
-			events.map((event) => ({ id: event.id, event, joined: event.id.endsWith("0001") || event.id.endsWith("0002") })),
+			events.map((event) => {
+				const joined = event.id.endsWith("0001") || event.id.endsWith("0002");
+				return {
+					id: event.id,
+					event,
+					joined,
+					...(joined && event.participant_mode === "team" ? { team_result: mockTeamFor(event) } : {}),
+				};
+			}),
 			req,
 		)],
 	["GET", /^\/api\/events\/([^/]+)$/, (m, res) => {
 		const event = events.find((item) => item.id === m[1]) ?? events[0];
+		const joined = event.id.endsWith("0001") || event.id.endsWith("0002");
 		ok(res, {
 			id: event.id,
 			event,
-			joined: event.id.endsWith("0001") || event.id.endsWith("0002"),
+			joined,
+			...(joined && event.participant_mode === "team" ? { team_result: mockTeamFor(event) } : {}),
 		});
 	}],
 	["GET", /^\/api\/events\/([^/]+)\/challenges$/, (_m, res, req) => ok(res, eventChallenges, req)],

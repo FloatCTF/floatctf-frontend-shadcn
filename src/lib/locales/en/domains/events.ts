@@ -102,6 +102,7 @@ export default {
 		joinAction: "Join team",
 		joinSuccess: "Joined the team",
 		joinFailed: "Failed to join the team",
+		lockedNote: "Teams cannot be left or changed after the event starts; contact an organizer if you need help.",
 		quitAction: "Leave team",
 		quitSuccess: "Left the team",
 		quitFailed: "Failed to leave the team",

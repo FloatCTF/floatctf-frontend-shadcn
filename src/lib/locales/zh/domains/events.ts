@@ -101,6 +101,7 @@ export default {
 		joinAction: "加入战队",
 		joinSuccess: "已加入战队",
 		joinFailed: "加入战队失败",
+		lockedNote: "赛事开始后无法退出或更换战队；如需调整请联系赛事管理员。",
 		quitAction: "退出战队",
 		quitSuccess: "已退出战队",
 		quitFailed: "退出战队失败",
