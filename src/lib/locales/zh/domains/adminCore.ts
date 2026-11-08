@@ -369,6 +369,8 @@ export default {
 			hidden: "隐藏题目",
 			hiddenHint: "隐藏后选手端不可见，管理员始终可见。",
 			hiddenAria: "隐藏题目",
+			showStaticFlag: "显示静态 Flag",
+			hideStaticFlag: "隐藏静态 Flag",
 			staticFlag: "静态 Flag（明文）",
 			staticFlagHint:
 				"仅 flag_type=static 时生效；留空表示清空。此处填写的内容会以明文提交到后端。",

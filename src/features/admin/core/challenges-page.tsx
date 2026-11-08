@@ -20,6 +20,8 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
 import {
+	Eye,
+	EyeOff,
 	FileUp,
 	Hammer,
 	Lock,
@@ -156,6 +158,7 @@ export function AdminChallengesPage(): ReactNode {
 	);
 	const [form, setForm] = useState<ChallengeFormState>(EMPTY_FORM);
 	const [errors, setErrors] = useState<ChallengeFormErrors>({});
+	const [showStaticFlag, setShowStaticFlag] = useState(false);
 
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [file, setFile] = useState<File | null>(null);
@@ -356,6 +359,7 @@ export function AdminChallengesPage(): ReactNode {
 	function openCreate(): void {
 		setForm(EMPTY_FORM);
 		setErrors({});
+		setShowStaticFlag(false);
 		setEditing({ mode: "create" });
 	}
 
@@ -374,6 +378,7 @@ export function AdminChallengesPage(): ReactNode {
 			pidsLimit: row.recommended_pids_limit ? String(row.recommended_pids_limit) : "",
 		});
 		setErrors({});
+		setShowStaticFlag(false);
 		setEditing({ mode: "edit", row });
 	}
 
@@ -1054,15 +1059,41 @@ export function AdminChallengesPage(): ReactNode {
 								error={errors.staticFlagValue}
 								hint={t("adminCore.challenges.sheet.staticFlagHint")}
 							>
-								<Input
-									id="challenge-static-flag"
-									autoComplete="off"
-									className="font-mono text-xs"
-									value={form.staticFlagValue}
-									onChange={(event) =>
-										setForm({ ...form, staticFlagValue: event.target.value })
-									}
-								/>
+								<div className="flex gap-2">
+									<Input
+										id="challenge-static-flag"
+										type={showStaticFlag ? "text" : "password"}
+										autoComplete="off"
+										spellCheck={false}
+										className="font-mono text-xs"
+										value={form.staticFlagValue}
+										onChange={(event) =>
+											setForm({ ...form, staticFlagValue: event.target.value })
+										}
+									/>
+									<Button
+										type="button"
+										variant="outline"
+										size="icon"
+										aria-label={
+											showStaticFlag
+												? t("adminCore.challenges.sheet.hideStaticFlag")
+												: t("adminCore.challenges.sheet.showStaticFlag")
+										}
+										title={
+											showStaticFlag
+												? t("adminCore.challenges.sheet.hideStaticFlag")
+												: t("adminCore.challenges.sheet.showStaticFlag")
+										}
+										onClick={() => setShowStaticFlag((value) => !value)}
+									>
+										{showStaticFlag ? (
+											<EyeOff aria-hidden="true" />
+										) : (
+											<Eye aria-hidden="true" />
+										)}
+									</Button>
+								</div>
 							</Field>
 							<FormGrid columns={2}>
 								<Field

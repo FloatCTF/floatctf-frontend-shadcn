@@ -382,6 +382,8 @@ export default {
 			hidden: "Hide challenge",
 			hiddenHint: "Hidden challenges are invisible to players; admins still see them.",
 			hiddenAria: "Hide challenge",
+			showStaticFlag: "Reveal static flag",
+			hideStaticFlag: "Hide static flag",
 			staticFlag: "Static flag (plaintext)",
 			staticFlagHint:
 				"Only applies when flag_type=static; leave empty to clear. The value entered here is submitted to the backend in plaintext.",
