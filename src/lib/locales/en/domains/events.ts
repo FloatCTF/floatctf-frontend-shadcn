@@ -132,6 +132,7 @@ export default {
 		submitted: "Write-up submitted",
 		notSubmitted: "No write-up (PDF) submitted yet.",
 		notPdf: "Choose a PDF file (the server only accepts files that pass PDF magic-byte validation).",
+		invalidPdf: "The file header is not a PDF; choose a valid PDF file.",
 		choose: "Choose PDF",
 		fileLabel: "Choose write-up PDF",
 		submit: "Submit write-up",

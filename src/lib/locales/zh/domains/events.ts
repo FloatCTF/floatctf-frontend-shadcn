@@ -130,6 +130,7 @@ export default {
 		submitted: "已提交 writeup",
 		notSubmitted: "还没有提交 writeup（PDF）。",
 		notPdf: "请选择 PDF 文件（后端只接受 PDF 魔数校验通过的文件）。",
+		invalidPdf: "文件头不是 PDF，请选择有效的 PDF 文件。",
 		choose: "选择 PDF",
 		fileLabel: "选择 writeup PDF",
 		submit: "提交 writeup",

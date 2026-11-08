@@ -538,8 +538,9 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 					accept="application/pdf"
 					aria-label={t("events.writeup.fileLabel")}
 					className="sr-only"
-					onChange={(event) => {
+					onChange={async (event) => {
 						const picked = event.target.files?.[0] ?? null;
+						event.target.value = "";
 						// `accept` 只是选择器过滤，用户可切到「所有文件」：这里先挡一次非 PDF。
 						if (
 							picked &&
@@ -548,12 +549,18 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 						) {
 							toast.warning(t("events.writeup.notPdf"));
 							setFile(null);
-							event.target.value = "";
 							return;
 						}
+						// 后缀 / MIME 都可能伪造；读文件头挡掉必然被后端拒绝的伪 PDF。
+						if (picked) {
+							const head = await picked.slice(0, 1024).text();
+							if (!head.includes("%PDF-")) {
+								toast.error(t("events.writeup.invalidPdf"));
+								setFile(null);
+								return;
+							}
+						}
 						setFile(picked);
-						// 清空 input.value 才能再次选择同一个文件（失败后重试的常见路径）。
-						event.target.value = "";
 					}}
 				/>
 				<Button
