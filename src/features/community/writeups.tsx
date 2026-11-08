@@ -20,6 +20,7 @@ import { ArrowLeft, BookOpen, ExternalLink, Mail } from "lucide-react";
 import type { UnifiedWriteupDetail, UnifiedWriteupResult } from "@floatctf/sdk";
 
 import { call, callList } from "~/api/call";
+import { isNotFound } from "~/api/errors";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { TonePill } from "~/components/app/badges";
@@ -35,6 +36,7 @@ import {
 import {
 	EmptyBlock,
 	LoadingBlock,
+	NotFoundBlock,
 	QueryState,
 	RefreshingBadge,
 	TableSkeleton,
@@ -281,6 +283,22 @@ export function WriteupDetailPage(): ReactNode {
 			: t("community.writeups.detail.documentTitleFallback"),
 	);
 
+	if (query.isError && isNotFound(query.error)) {
+		return (
+			<PageBody>
+				<NotFoundBlock
+					title={t("community.writeups.detail.notFoundTitle")}
+					description={t("community.writeups.detail.notFoundDescription")}
+					action={
+						<Button asChild variant="outline">
+							<Link to="/writeups">{t("community.writeups.detail.back")}</Link>
+						</Button>
+					}
+				/>
+			</PageBody>
+		);
+	}
+
 	return (
 		<PageBody>
 			<PageHeader
@@ -332,7 +350,7 @@ export function WriteupDetailPage(): ReactNode {
 								</Button>
 							) : (
 								<Button variant="outline" asChild>
-									<Link to={`/training/runs/${writeup.id}`}>
+									<Link to={`/training/runs/${writeup.content_id}`}>
 										<ExternalLink aria-hidden="true" /> {t("community.writeups.detail.openRun")}
 									</Link>
 								</Button>

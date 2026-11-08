@@ -360,6 +360,8 @@ export default {
 			load: "加载题解失败",
 		},
 		detail: {
+			notFoundTitle: "题解不存在",
+			notFoundDescription: "该题解可能已被删除，或链接已失效。",
 			documentTitle: "{{title}} 题解 · FloatCTF",
 			documentTitleFallback: "题解详情 · FloatCTF",
 			titleFallback: "题解详情",

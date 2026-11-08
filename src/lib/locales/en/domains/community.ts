@@ -374,6 +374,8 @@ export default {
 			load: "Failed to load writeups",
 		},
 		detail: {
+			notFoundTitle: "Writeup not found",
+			notFoundDescription: "This writeup may have been deleted, or the link is invalid.",
 			documentTitle: "{{title}} writeup · FloatCTF",
 			documentTitleFallback: "Writeup details · FloatCTF",
 			titleFallback: "Writeup details",
