@@ -833,12 +833,14 @@ const runEvaluations = [
 		finished_at: iso(now - 2 * 60000),
 	},
 ];
-const runScores = {
-	total: 100,
-	history: [
-		{ id: "se-1", score_type: "break", gamebox_id: "gb-lib-1", fix_round_id: null, delta: 100, created_at: iso(now - 4 * 60000) },
-	],
-};
+/** 分数必须与 run 阶段一致：Break 刚开始没有计分记录，Fix 后才有。 */
+const runScoresFor = (phase) => ({
+	total: phase === "fix" || phase === "ended" ? 100 : 0,
+	history:
+		phase === "fix" || phase === "ended"
+			? [{ id: "se-1", score_type: "break", gamebox_id: "gb-lib-1", fix_round_id: null, delta: 100, created_at: iso(now - 4 * 60000) }]
+			: [],
+});
 
 // ── AWD 选手端 ──────────────────────────────────────────────────────────
 const awdStatus = (eventId) => ({
@@ -1736,7 +1738,7 @@ const routes = [
 	}],
 	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/rounds$/, (_m, res) => ok(res, runRounds)],
 	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/evaluations$/, (_m, res) => ok(res, runEvaluations)],
-	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/scores$/, (_m, res) => ok(res, runScores)],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/scores$/, (_m, res) => ok(res, runScoresFor(mockRunPhase))],
 	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res) =>
 		ok(res, { run_id: m[1], content: mockRunWriteup.content, updated_at: mockRunWriteup.updated_at })],
 	["PUT", /^\/api\/service\/awdp\/runs\/([^/]+)\/writeup$/, (m, res, req) =>
@@ -1946,7 +1948,7 @@ const routes = [
 	// 社区
 	["GET", /^\/api\/announcements$/, (_m, res, req) =>
 		okPage(res, announcements.filter((a) => mockFilterMatch(req, a)), req)],
-	["GET", /^\/api\/solves$/, (_m, res, req) => ok(res, solves, req)],
+	["GET", /^\/api\/solves$/, (_m, res, req) => okPage(res, solves.filter((row) => mockFilterMatch(req, row)), req)],
 	["GET", /^\/api\/solves\/top15users$/, (_m, res) => ok(res, topUsers)],
 	["GET", /^\/api\/writeups$/, (_m, res, req) => ok(res, unifiedWriteups, req)],
 	["GET", /^\/api\/writeups\/([^/]+)$/, (_m, res) => ok(res, unifiedWriteupDetail)],
