@@ -306,3 +306,18 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 移除重复的 submissions 路由，只保留一条并复用 `mockAwdBonus`，避免两份实现分叉。
 
 验证：`vite build` / i18n / theme / mock-check 全绿。
+
+## 第 16 轮补充（AWDP Break 提交）
+
+已完成：
+
+- **AWDP Break 提交不再接受任意 flag**：mock 的 `/events/:id/awdp/gameboxes/:id/break`
+  原先只要调用就返回 `{accepted:true, scored:true}`。现在精确比对 mock 正确 flag：
+  错误返回 `accepted:false`（UI「flag 未被接受」），正确才进入计分/已攻破分支。
+- **已攻破状态自洽**：fixture 中 E6 web-shop 已是「已被攻破」；初始把该 gamebox 放入
+  broken 集合，重复提交返回 `already_broken:true, scored:false`，不再从 200 分莫名加到 400。
+- 删除重复的 break 路由，只保留一条；正确首次提交才 +200 并广播 SSE。
+- 实测：错误 flag → 「flag 未被接受」；正确但已攻破 → 「该靶机此前已被攻破，本次提交不计分」，
+  分数保持 200。
+
+验证：`vite build` / i18n / theme / mock-check 全绿。
