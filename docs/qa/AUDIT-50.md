@@ -716,3 +716,16 @@ INT2 → i16、INT4 → i32、INT8 → i64 分别解码。前端已如实展示�
 - `/events/does-not-exist` → 赛事不存在。
 
 验证：`vite build` / i18n（5037 keys）/ theme 全绿。
+
+## 第 43 轮补充（非法路由复查）
+
+复查选手端与管理端非法 ID 深链接，当前均落到 not-found，不再显示技术错误 + 重试：
+
+- `/admin/events/does-not-exist`、`/awd`、`/awdp` → 赛事不存在；
+- `/events/does-not-exist`、`/events/does-not-exist/challenges/foo` → 赛事不存在；
+- `/arena/does-not-exist`、`/lab/does-not-exist` → 赛事不存在；
+- `/training/runs/does-not-exist` → 训练 run 不存在；
+- `/writeups/does-not-exist`、`/community/discussions/does-not-exist` → 对应资源不存在。
+- `/admin/community/discussions/does-not-exist` 没有详情路由，落到全局 404，属预期。
+
+SQL 控制台的 int2/int4 后端映射 bug 仍待后端修复；前端保持如实展示。
