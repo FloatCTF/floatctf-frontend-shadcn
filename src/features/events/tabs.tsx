@@ -45,7 +45,7 @@ import { formatDateTime, formatPoints, formatRelative, formatScore } from "~/lib
 import { getLocale } from "~/lib/i18n";
 import { useNow } from "~/lib/hooks";
 
-import { EventWriteupPanel, TeamPanel } from "./components";
+import { EventWriteupPanel, JoinLeaveControl, TeamPanel } from "./components";
 import {
 	AwdFlagPanel,
 	AwdGameboxPanel,
@@ -849,10 +849,22 @@ export function LabSummaryTab({
 			</SectionCard>
 			{!info.joined ? (
 				<SectionCard
-					title={t("events.workspace.teamCardTitle")}
-					description={t("events.workspace.teamCardDescription")}
+					title={
+						info.event.participant_mode === "team"
+							? t("events.workspace.teamCardTitle")
+							: t("events.workspace.participationCardTitle")
+					}
+					description={
+						info.event.participant_mode === "team"
+							? t("events.workspace.teamCardDescription")
+							: t("events.workspace.participationOpen")
+					}
 				>
-					<TeamPanel info={info} />
+					{info.event.participant_mode === "team" ? (
+						<TeamPanel info={info} />
+					) : (
+						<JoinLeaveControl info={info} />
+					)}
 				</SectionCard>
 			) : null}
 			<QueryState
