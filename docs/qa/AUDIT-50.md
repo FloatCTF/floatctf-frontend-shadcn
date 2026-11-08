@@ -267,3 +267,17 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 复测：`d-2` 正常显示正文/点赞/评论；无效 ID 只有 not-found 块。
 
 验证：`vite build` / i18n / theme / mock-check 全绿。
+
+## 第 13 轮补充（题解详情链接与无效题解）
+
+已完成：
+
+- **「打开训练 Run」用错 ID**：GameBox 题解详情把 `writeup.id`（w-2）当成 run id，
+  跳到 `/training/runs/w-2`（上一轮已让未知 run 返回 404）。现在改用
+  `writeup.content_id`（run-1），实测正确进入训练工作台。
+- **无效题解显示 not-found**：`/writeups/does-not-exist` 原先显示「加载题解失败 + 重试」；
+  现在显示「题解不存在 + 返回题解列表」。
+- 补中英文 `community.writeups.detail.notFound*` 文案。
+- 复测：w-2 正文/作者/打开 Run 正常；无效 ID 只有 not-found 块。
+
+验证：`vite build` / i18n / theme / mock-check 全绿。
