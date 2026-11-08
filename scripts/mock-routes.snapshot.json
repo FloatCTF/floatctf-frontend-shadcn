@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T02:39:02.807Z",
+	"generatedAt": "2026-11-08T02:43:37.943Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -12,6 +12,18 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/challenge_sets\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/docker\\/containers\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/docker\\/images\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/docker\\/networks\\/([^/]+)"
 		},
 		{
 			"method": "DELETE",
@@ -520,6 +532,18 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/admin\\/challenge_sets\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/database\\/exec_sql"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/docker\\/containers\\/([^/]+)\\/stop"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/docker\\/networks"
 		},
 		{
 			"method": "POST",

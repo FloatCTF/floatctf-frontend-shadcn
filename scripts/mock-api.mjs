@@ -1383,6 +1383,22 @@ let mockNetworkConfig = {
 	wireguard_port_capacity: 81,
 };
 
+
+/** Docker（mock）：容器/镜像/网络，供基础设施页展示与操作验证。 */
+const mockDockerContainers = [
+	{ id: "c1a2b3d4e5f6", name: "floatctf-web-shop-1", image: "floatctf/gamebox-web-shop:1.0.0", status: "running", ports: "127.0.0.1:18080->8080/tcp", created: iso(now - 3 * H) },
+	{ id: "a9b8c7d6e5f4", name: "floatctf-pwn-1", image: "floatctf/gamebox-pwn:1.2.0", status: "exited", ports: "", created: iso(now - 8 * H) },
+	{ id: "f1e2d3c4b5a6", name: "floatctf-mysql-1", image: "mysql:8.4", status: "running", ports: "127.0.0.1:3306->3306/tcp", created: iso(now - 3 * D) },
+];
+const mockDockerImages = [
+	{ id: "sha256:web-shop", repo_tags: ["floatctf/gamebox-web-shop:1.0.0"], size: 268435456, created: iso(now - 5 * D) },
+	{ id: "sha256:pwn", repo_tags: ["floatctf/gamebox-pwn:1.2.0"], size: 189267968, created: iso(now - 9 * D) },
+];
+const mockDockerNetworks = [
+	{ id: "net-fctf-1", name: "fctf-platform-control", driver: "bridge", scope: "local", subnet: "10.42.8.0/24", gateway: "10.42.8.1" },
+	{ id: "net-fctf-2", name: "fctf-awd-2", driver: "bridge", scope: "local", subnet: "10.42.16.0/24", gateway: "10.42.16.1" },
+];
+
 const routes = [
 
 
@@ -2424,9 +2440,58 @@ const routes = [
 		)],
 	["GET", /^\/api\/admin\/system\/version$/, (_m, res) => ok(res, "1.0.6")],
 	["GET", /^\/api\/admin\/system\/monitor$/, (_m, res) => ok(res, null)],
-	["GET", /^\/api\/admin\/docker\/containers$/, (_m, res, req) => ok(res, [], req)],
-	["GET", /^\/api\/admin\/docker\/images$/, (_m, res, req) => ok(res, [], req)],
-	["GET", /^\/api\/admin\/docker\/networks$/, (_m, res, req) => ok(res, [], req)],
+	["POST", /^\/api\/admin\/docker\/containers\/([^/]+)\/stop$/, (m, res) => {
+		const box = mockDockerContainers.find((row) => row.id === m[1]);
+		if (!box) return json(res, 404, { code: 404, message: "容器不存在", data: null, meta: null });
+		box.status = "exited";
+		return ok(res, null);
+	}],
+	["DELETE", /^\/api\/admin\/docker\/containers\/([^/]+)$/, (m, res) => {
+		const index = mockDockerContainers.findIndex((row) => row.id === m[1]);
+		if (index < 0) return json(res, 404, { code: 404, message: "容器不存在", data: null, meta: null });
+		mockDockerContainers.splice(index, 1);
+		return ok(res, null);
+	}],
+	["DELETE", /^\/api\/admin\/docker\/images\/([^/]+)$/, (m, res) => {
+		const index = mockDockerImages.findIndex((row) => row.id === m[1]);
+		if (index < 0) return json(res, 404, { code: 404, message: "镜像不存在", data: null, meta: null });
+		mockDockerImages.splice(index, 1);
+		return ok(res, null);
+	}],
+	["POST", /^\/api\/admin\/docker\/networks$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const net = {
+				id: `net-${Date.now()}`,
+				name: String(body.name ?? "fctf-new"),
+				driver: String(body.driver ?? "bridge"),
+				scope: "local",
+				subnet: body.subnet ?? "",
+				gateway: body.gateway ?? "",
+			};
+			mockDockerNetworks.push(net);
+			return ok(res, net);
+		})],
+	["DELETE", /^\/api\/admin\/docker\/networks\/([^/]+)$/, (m, res) => {
+		const index = mockDockerNetworks.findIndex((row) => row.id === m[1]);
+		if (index < 0) return json(res, 404, { code: 404, message: "网络不存在", data: null, meta: null });
+		mockDockerNetworks.splice(index, 1);
+		return ok(res, null);
+	}],
+	["POST", /^\/api\/admin\/database\/exec_sql$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const sql = String(body.sql ?? "").trim();
+			const isSelect = /^select\b/i.test(sql);
+			return ok(res, {
+				sql_type: isSelect ? "select" : "write",
+				rows: isSelect ? [{ result: 1, note: "mock 结果" }] : [],
+				count: isSelect ? 1 : 0,
+				rows_affected: isSelect ? 0 : 1,
+				elapsed_ms: 3,
+			});
+		})],
+	["GET", /^\/api\/admin\/docker\/containers$/, (_m, res, req) => okPage(res, mockDockerContainers, req)],
+	["GET", /^\/api\/admin\/docker\/images$/, (_m, res, req) => okPage(res, mockDockerImages, req)],
+	["GET", /^\/api\/admin\/docker\/networks$/, (_m, res, req) => okPage(res, mockDockerNetworks, req)],
 	["GET", /^\/api\/admin\/announcements$/, (_m, res, req) => okPage(res, announcements.filter((a) => mockFilterMatch(req, a)), req)],
 	["GET", /^\/api\/admin\/discussions$/, (_m, res, req) => okPage(res, discussions.filter((d) => mockFilterMatch(req, d)), req)],
 	["POST", /^\/api\/admin\/weapons$/, (_m, res, req) =>
