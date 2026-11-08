@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T02:56:18.209Z",
+	"generatedAt": "2026-11-08T03:01:32.162Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -80,6 +80,10 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/events\\/([^/]+)\\/team\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/instances\\/([^/]+)"
 		},
 		{
 			"method": "GET",
@@ -703,6 +707,10 @@
 		},
 		{
 			"method": "POST",
+			"pattern": "\\/api\\/instances\\/launch"
+		},
+		{
+			"method": "POST",
 			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/end"
 		},
 		{
@@ -764,6 +772,10 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/session"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/submit\\/flag"
 		},
 		{
 			"method": "POST",

@@ -1491,6 +1491,10 @@ const mockEventInstanceRows = [
 	},
 		];
 
+
+/** 选手题目实例（mock）：启动/销毁与 flag 提交都作用在这份状态上。 */
+let mockChallengeInstances = {};
+
 const routes = [
 	["GET", /^\/__floatctf\/frontends\/registry\.json$/, (_m, res) => json(res, 200, mockFrontendRegistry)],
 
@@ -1887,7 +1891,52 @@ const routes = [
 	["GET", /^\/api\/challenges\/([^/]+)$/, (m, res) => {
 		ok(res, challenges.find((item) => item.id === m[1]) ?? challenges[0]);
 	}],
-	["GET", /^\/api\/challenges\/([^/]+)\/instance$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/instances\/launch$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const challengeId = String(body.challenge_id ?? "");
+			const instance = {
+				id: `inst-${Date.now()}`,
+				status: "running",
+				flag: "flag{mock_instance_flag}",
+				content: null,
+				challenge_id: challengeId,
+				event_id: "",
+				user_id: me.id,
+				identifier: `fctf-${challengeId}`,
+				created_at: iso(now),
+				updated_at: iso(now),
+				destroy_at: iso(now + 2 * H),
+			};
+			mockChallengeInstances[challengeId] = instance;
+			return ok(res, instance);
+		})],
+	["GET", /^\/api\/challenges\/([^/]+)\/instance$/, (m, res) =>
+		ok(res, mockChallengeInstances[m[1]] ?? null)],
+	["DELETE", /^\/api\/instances\/([^/]+)$/, (m, res) => {
+		for (const [key, instance] of Object.entries(mockChallengeInstances)) {
+			if (instance.id === m[1]) delete mockChallengeInstances[key];
+		}
+		return ok(res, null);
+	}],
+	["POST", /^\/api\/submit\/flag$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const correct = String(body.flag ?? "").trim() === "flag{mock_instance_flag}";
+			// 后端语义：flag 正确后平台自动回收该题实例。
+			if (correct) {
+				// 提交接口可能只带 instance_id（不带 challenge_id），两种键都支持。
+				for (const [key, instance] of Object.entries(mockChallengeInstances)) {
+					if (instance.id === body.instance_id || instance.challenge_id === body.challenge_id) {
+						delete mockChallengeInstances[key];
+					}
+				}
+			}
+			return ok(res, {
+				correct,
+				message: correct ? "flag 正确" : "flag 错误",
+				score: correct ? 100 : 0,
+				challenge_id: body.challenge_id ?? null,
+			});
+		})],
 	["GET", /^\/api\/challenges\/([^/]+)\/writeups$/, (_m, res, req) => ok(res, challengeWriteups, req)],
 	["GET", /^\/api\/challenges\/([^/]+)\/my_writeup$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/challenges\/([^/]+)\/submit$/, (_m, res) => ok(res, { correct: true, points: 500 })],
