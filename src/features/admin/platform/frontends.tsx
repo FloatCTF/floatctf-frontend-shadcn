@@ -19,8 +19,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ExternalLink, Info, RefreshCw, RotateCw, ShieldAlert } from "lucide-react";
-import { Link } from "react-router";
+import { RefreshCw } from "lucide-react";
 import type { TFunction } from "i18next";
 
 import {
@@ -38,28 +37,10 @@ import type { SettingsDto } from "@floatctf/sdk";
 import { call, callList } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
-import { BooleanPill, TonePill } from "~/components/app/badges";
-import { useConfirm } from "~/components/app/confirm";
-import { DataTable, type DataTableColumn } from "~/components/app/data-table";
-import {
-	CopyText,
-	KeyValueList,
-	MonoText,
-	PageBody,
-	PageHeader,
-	SectionCard,
-	StatCard,
-	Toolbar,
-} from "~/components/app/page";
-import {
-	EmptyBlock,
-	ErrorBlock,
-	InlineError,
-	LoadingBlock,
-	RefreshingBadge,
-} from "~/components/app/states";
+import { TonePill } from "~/components/app/badges";
+import { PageBody, PageHeader, SectionCard } from "~/components/app/page";
+import { InlineError, LoadingBlock } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
-import { AbsoluteTime } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
 import {
 	Select,
@@ -68,21 +49,11 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "~/components/ui/select";
-import {
-	Sheet,
-	SheetContent,
-	SheetDescription,
-	SheetHeader,
-	SheetTitle,
-} from "~/components/ui/sheet";
 import { useDocumentTitle } from "~/lib/hooks";
 
-import { textOf } from "./components";
 
 const FRONTEND_ACTIVE_KEY = "FRONTEND_ACTIVE";
 
-/** 切换生效前端是平台级高危操作：要求输入确认词。 */
-const SWITCH_PHRASE = "SWITCH";
 
 interface RegistryError {
 	message: string;
@@ -130,13 +101,10 @@ export function AdminFrontendsPage(): ReactNode {
 	useDocumentTitle(t("adminPlatform.frontends.documentTitle"));
 	const client = useClient();
 	const queryClient = useQueryClient();
-	const confirm = useConfirm();
 	const [state, setState] = useState<RegistryState>({ status: "loading" });
 	const [selected, setSelected] = useState<string | null>(null);
 	const [switched, setSwitched] = useState<string | null>(null);
-	const [detailId, setDetailId] = useState<string | null>(null);
 
-	// ── 本地注册表（同源静态文件 + 运行时权威校验器）—— 逃生舱，见文件头声明 ──
 	const loadRegistry = useCallback(async () => {
 		setState({ status: "loading" });
 		try {
@@ -153,27 +121,16 @@ export function AdminFrontendsPage(): ReactNode {
 							status: response.status,
 							statusText: response.statusText,
 						}),
-						details: [
-							t("adminPlatform.frontends.errors.address", {
-								url: DEFAULT_REGISTRY_URL,
-							}),
-							response.status === 404
-								? t("adminPlatform.frontends.errors.http404")
-								: t("adminPlatform.frontends.errors.httpOther"),
-						],
+						details: [t("adminPlatform.frontends.errors.address", { url: DEFAULT_REGISTRY_URL })],
 					},
 				});
 				return;
 			}
-			const text = await response.text();
-			const parsed = parseRegistry(text);
+			const parsed = parseRegistry(await response.text());
 			if (!parsed.ok) {
 				setState({
 					status: "error",
-					error: {
-						message: t("adminPlatform.frontends.errors.invalid"),
-						details: parsed.errors,
-					},
+					error: { message: t("adminPlatform.frontends.errors.invalid"), details: parsed.errors },
 				});
 				return;
 			}
@@ -185,12 +142,7 @@ export function AdminFrontendsPage(): ReactNode {
 					message: t("adminPlatform.frontends.errors.fetch", {
 						message: error instanceof Error ? error.message : String(error),
 					}),
-					details: [
-						t("adminPlatform.frontends.errors.address", {
-							url: DEFAULT_REGISTRY_URL,
-						}),
-						t("adminPlatform.frontends.errors.sameOrigin"),
-					],
+					details: [t("adminPlatform.frontends.errors.sameOrigin")],
 				},
 			});
 		}
@@ -200,12 +152,10 @@ export function AdminFrontendsPage(): ReactNode {
 		void loadRegistry();
 	}, [loadRegistry]);
 
-	// ── 当前生效前端（平台设置 FRONTEND_ACTIVE，可编辑不可删除）──
 	const activeQuery = useQuery({
 		queryKey: qk.admin.settings({}),
 		queryFn: () => callList<SettingsDto>(client.admin.settings.fetch()),
 	});
-
 	const activeRow = useMemo(
 		() => (activeQuery.data?.items ?? []).find((row) => row.key === FRONTEND_ACTIVE_KEY) ?? null,
 		[activeQuery.data],
@@ -237,731 +187,142 @@ export function AdminFrontendsPage(): ReactNode {
 	});
 
 	const registry = state.status === "ok" ? state.registry : null;
-
-	const rows = useMemo(() => {
-		if (!registry) return [] as FloatCTFRegistryFrontend[];
-		return Object.values(registry.frontends).sort((a, b) => a.id.localeCompare(b.id));
-	}, [registry]);
-
 	const options = useMemo(() => {
-		return rows.map((entry) => {
-			const version = currentVersionOf(entry);
-			const compat: CompatInfo = version
-				? checkCompatibility(version, t)
-				: {
-						compatible: false,
-						reasons: [
-							t("adminPlatform.frontends.compat.versionMissingInVersions", {
-								version: entry.currentVersion,
-							}),
-						],
-					};
-			return { entry, version, compat };
-		});
-	}, [rows, t]);
+		if (!registry) return [];
+		return Object.keys(registry.frontends)
+			.sort()
+			.map((id) => {
+				const entry = registry.frontends[id];
+				const version = currentVersionOf(entry);
+				const compat = version
+					? checkCompatibility(version, t)
+					: { compatible: false, reasons: [t("adminPlatform.frontends.compat.versionMissing")] };
+				return { id, entry, version, compat };
+			});
+	}, [registry, t]);
 
-	const selectedOption = options.find((option) => option.entry.id === selected) ?? null;
+	const selectedOption = options.find((option) => option.id === selected) ?? null;
 	const dirty = selected !== null && selected !== currentValue;
-	const detailEntry = rows.find((entry) => entry.id === detailId) ?? null;
-
-	async function submitSwitch() {
-		if (!selected || !selectedOption) return;
-		if (!selectedOption.compat.compatible) {
-			toast.warning(
-				t("adminPlatform.frontends.switch.toastIncompatible"),
-				selectedOption.compat.reasons.join(t("adminPlatform.common.reasonSeparator")),
-			);
-			return;
-		}
-		const ok = await confirm({
-			title: t("adminPlatform.frontends.switch.confirmTitle", { id: selected }),
-			description: t("adminPlatform.frontends.switch.confirmDescription"),
-			consequences: [
-				t("adminPlatform.frontends.switch.consequence1", { id: selected }),
-				t("adminPlatform.frontends.switch.consequence2"),
-				t("adminPlatform.frontends.switch.consequence3"),
-			],
-			tone: "danger",
-			confirmText: t("adminPlatform.frontends.switch.confirmText"),
-			confirmPhrase: SWITCH_PHRASE,
-		});
-		if (!ok) return;
-		patchMutation.mutate(selected);
-	}
-
-	const columns: DataTableColumn<FloatCTFRegistryFrontend>[] = [
-		{
-			id: "id",
-			header: t("adminPlatform.frontends.columns.id"),
-			sortValue: (row) => row.id,
-			cell: (row) => (
-				<span className="inline-flex items-center gap-1.5">
-					<MonoText className="font-medium">{row.id}</MonoText>
-					{row.protected ? (
-						<TonePill tone="info">{t("adminPlatform.frontends.pills.builtin")}</TonePill>
-					) : null}
-					{row.id === currentValue ? (
-						<TonePill tone="success">{t("adminPlatform.frontends.pills.active")}</TonePill>
-					) : null}
-				</span>
-			),
-		},
-		{
-			id: "name",
-			header: t("adminPlatform.frontends.columns.name"),
-			cell: (row) => <span>{currentVersionOf(row)?.name ?? "—"}</span>,
-		},
-		{
-			id: "version",
-			header: t("adminPlatform.frontends.columns.version"),
-			cell: (row) => <MonoText>{row.currentVersion}</MonoText>,
-		},
-		{
-			id: "compat",
-			header: t("adminPlatform.frontends.columns.compat"),
-			cell: (row) => {
-				const version = currentVersionOf(row);
-				if (!version) {
-					return (
-						<TonePill tone="danger">
-							{t("adminPlatform.frontends.compat.versionMissing")}
-						</TonePill>
-					);
-				}
-				const compat = checkCompatibility(version, t);
-				return compat.compatible ? (
-					<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
-						{t("adminPlatform.frontends.compat.compatible")}
-					</TonePill>
-				) : (
-					<TonePill
-						tone="warning"
-						title={compat.reasons.join(t("adminPlatform.common.reasonSeparator"))}
-					>
-						{t("adminPlatform.frontends.compat.incompatible")}
-					</TonePill>
-				);
-			},
-		},
-		{
-			id: "runtime",
-			header: t("adminPlatform.frontends.columns.runtime"),
-			hideBelow: "md",
-			cell: (row) => {
-				const version = currentVersionOf(row);
-				return (
-					<MonoText className="text-muted-foreground">
-						{version?.compatibility.frontendRuntime ?? "—"} /{" "}
-						{version?.compatibility.apiContract ?? "—"}
-					</MonoText>
-				);
-			},
-		},
-		{
-			id: "entry",
-			header: t("adminPlatform.frontends.columns.entry"),
-			hideBelow: "lg",
-			cell: (row) => (
-				<MonoText className="text-muted-foreground">
-					{currentVersionOf(row)?.entry ?? "—"}
-				</MonoText>
-			),
-		},
-		{
-			id: "installedAt",
-			header: t("adminPlatform.frontends.columns.installedAt"),
-			align: "right",
-			hideBelow: "sm",
-			sortValue: (row) => Date.parse(currentVersionOf(row)?.installedAt ?? ""),
-			cell: (row) => {
-				const version = currentVersionOf(row);
-				return version ? <AbsoluteTime value={version.installedAt} /> : <span>—</span>;
-			},
-		},
-	];
+	const loading = state.status === "loading" || activeQuery.isPending;
 
 	return (
 		<PageBody>
 			<PageHeader
 				title={t("adminPlatform.frontends.title")}
 				description={t("adminPlatform.frontends.description")}
-				badge={<TonePill tone="muted">{t("adminPlatform.frontends.badge")}</TonePill>}
 				actions={
-					<Toolbar>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => void loadRegistry()}
-							disabled={state.status === "loading"}
-						>
-							<RefreshCw aria-hidden="true" />
-							{t("adminPlatform.frontends.actions.reload")}
-						</Button>
-						<Button variant="outline" size="sm" asChild>
-							<Link to="/admin/platform/settings">
-								<ExternalLink aria-hidden="true" />
-								{t("adminPlatform.frontends.actions.settingsPage")}
-							</Link>
-						</Button>
-					</Toolbar>
+					<Button variant="outline" size="sm" onClick={() => void loadRegistry()} disabled={loading}>
+						<RefreshCw aria-hidden="true" />
+						{t("adminPlatform.frontends.actions.reload")}
+					</Button>
 				}
 			/>
-
-			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-				<StatCard
-					label={t("adminPlatform.frontends.stats.installed")}
-					value={registry ? rows.length : "…"}
-					hint={
-						registry ? (
-							<span>
-								{t("adminPlatform.frontends.stats.updatedAt")}{" "}
-								<AbsoluteTime value={registry.updatedAt} />
-							</span>
-						) : (
-							t("adminPlatform.frontends.stats.waitingRegistry")
-						)
-					}
-					icon={<Info className="size-4" aria-hidden="true" />}
-				/>
-				<StatCard
-					label={t("adminPlatform.frontends.stats.runtimeContract")}
-					value={FRONTEND_RUNTIME_VERSION}
-					hint={
-						<span className="inline-flex flex-wrap items-center gap-1">
-							<MonoText>FRONTEND_RUNTIME_VERSION</MonoText>·{" "}
-							{t("adminPlatform.frontends.stats.compileTimeConstant")}
-						</span>
-					}
-				/>
-				<StatCard
-					label={t("adminPlatform.frontends.stats.apiContract")}
-					value={API_CONTRACT_VERSION}
-					hint={
-						<span className="inline-flex flex-wrap items-center gap-1">
-							<MonoText>API_CONTRACT_VERSION</MonoText>·{" "}
-							{t("adminPlatform.frontends.stats.compileTimeConstant")}
-						</span>
-					}
-				/>
-				<StatCard
-					label={t("adminPlatform.frontends.stats.active")}
-					value={<span className="font-mono">{currentValue || "—"}</span>}
-					hint={
-						activeRow ? (
-							<span className="inline-flex flex-wrap items-center gap-1">
-								<MonoText>FRONTEND_ACTIVE</MonoText>·{" "}
-								{t("adminPlatform.frontends.stats.activeUpdatedAt")}{" "}
-								<AbsoluteTime value={activeRow.updated_at} />
-							</span>
-						) : (
-							t("adminPlatform.frontends.stats.activeMissing")
-						)
-					}
-					tone={activeRow ? "success" : "warning"}
-				/>
-			</div>
 
 			<SectionCard
 				title={t("adminPlatform.frontends.registry.title")}
 				description={t("adminPlatform.frontends.registry.description")}
-				actions={<RefreshingBadge active={state.status === "loading"} />}
 			>
-				{state.status === "loading" ? (
+				{state.status === "error" ? (
+					<div className="space-y-2">
+						<InlineError error={state.error.message} />
+						{state.error.details.map((detail) => (
+							<p key={detail} className="text-xs text-muted-foreground">
+								{detail}
+							</p>
+						))}
+					</div>
+				) : loading ? (
 					<LoadingBlock label={t("adminPlatform.frontends.registry.loading")} />
-				) : state.status === "error" ? (
-					<ErrorBlock
-						error={new Error(state.error.message)}
-						title={t("adminPlatform.frontends.registry.errorTitle")}
-						onRetry={() => void loadRegistry()}
-					/>
 				) : (
-					<div className="space-y-4">
-						<KeyValueList
-							columns={3}
-							items={[
-								{
-									key: t("adminPlatform.frontends.registry.address"),
-									value: (
-										<CopyText
-											value={DEFAULT_REGISTRY_URL}
-											label={t("adminPlatform.frontends.registry.address")}
-										/>
-									),
-								},
-								{
-									key: t("adminPlatform.frontends.registry.schemaVersion"),
-									value: (
-										<MonoText>{String(state.registry.schemaVersion)}</MonoText>
-									),
-									hint: "FRONTEND_REGISTRY_SCHEMA_VERSION",
-								},
-								{
-									key: t("adminPlatform.frontends.registry.updatedAt"),
-									value: (
-										<AbsoluteTime value={state.registry.updatedAt} seconds />
-									),
-								},
-							]}
-						/>
-						{rows.length === 0 ? (
-							<EmptyBlock
-								title={t("adminPlatform.frontends.registry.emptyTitle")}
-								description={t("adminPlatform.frontends.registry.emptyDescription")}
-							/>
-						) : (
-							<DataTable
-								data={rows}
-								getRowId={(row) => row.id}
-								columns={columns}
-								rowActions={(row) => (
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() => setDetailId(row.id)}
-									>
-										{t("adminPlatform.frontends.detail.title")}
-									</Button>
-								)}
-								mobileCard={(row) => {
-									const version = currentVersionOf(row);
-									const compat = version ? checkCompatibility(version, t) : null;
-									return (
-										<div className="space-y-2">
-											<div className="flex items-center justify-between gap-2">
-												<MonoText className="font-medium">{row.id}</MonoText>
-												{compat ? (
-													<TonePill
-														tone={
-															compat.compatible ? "success" : "warning"
-														}
-													>
-														{compat.compatible
-															? t(
-																	"adminPlatform.frontends.compat.contractCompatible",
-																)
-															: t(
-																	"adminPlatform.frontends.compat.contractIncompatible",
-																)}
-													</TonePill>
-												) : null}
-											</div>
-											<p className="text-sm">
-												{version?.name ?? "—"} · v{row.currentVersion}
-											</p>
-											{compat && !compat.compatible ? (
-												<p className="text-xs text-destructive">
-													{compat.reasons.join(
-														t("adminPlatform.common.reasonSeparator"),
-													)}
-												</p>
-											) : null}
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={() => setDetailId(row.id)}
-											>
-												{t("adminPlatform.frontends.detail.title")}
-											</Button>
-										</div>
-									);
+					<div className="max-w-2xl space-y-4">
+						<div className="space-y-2">
+							<label htmlFor="frontend-active" className="text-sm font-medium">
+								{t("adminPlatform.frontends.selector.label", { key: FRONTEND_ACTIVE_KEY })}
+							</label>
+							<Select
+								value={selected ?? ""}
+								disabled={!activeRow || patchMutation.isPending}
+								onValueChange={setSelected}
+							>
+								<SelectTrigger id="frontend-active" className="w-full">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{options.map((option) => (
+										<SelectItem
+											key={option.id}
+											value={option.id}
+											disabled={!option.compat.compatible}
+										>
+											{option.id} · {option.version?.name ?? "—"} · v
+											{option.entry.currentVersion}
+											{option.entry.protected ? `（${t("adminPlatform.frontends.pills.builtin")}）` : ""}
+											{option.compat.compatible
+												? ""
+												: `（${t("adminPlatform.frontends.compat.incompatible")}）`}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+
+						{selectedOption ? (
+							<div className="flex flex-wrap items-center gap-2 text-sm">
+								<TonePill tone={selectedOption.entry.protected ? "info" : "muted"}>
+									{selectedOption.entry.protected
+										? t("adminPlatform.frontends.pills.builtin")
+										: t("adminPlatform.frontends.pills.thirdParty")}
+								</TonePill>
+								<TonePill tone={selectedOption.compat.compatible ? "success" : "warning"}>
+									{selectedOption.compat.compatible
+										? t("adminPlatform.frontends.compat.compatible")
+										: t("adminPlatform.frontends.compat.incompatible")}
+								</TonePill>
+								<span className="text-muted-foreground">
+									{t("adminPlatform.frontends.selector.meta", {
+										version: selectedOption.entry.currentVersion,
+										entry: selectedOption.version?.entry ?? "—",
+									})}
+								</span>
+								{selectedOption.compat.reasons.length > 0 ? (
+									<span className="text-xs text-amber-600 dark:text-amber-400">
+										{selectedOption.compat.reasons.join(t("adminPlatform.common.reasonSeparator"))}
+									</span>
+								) : null}
+							</div>
+						) : null}
+
+						<div className="flex flex-wrap items-center gap-2">
+							<Button
+								disabled={!dirty || !activeRow || patchMutation.isPending}
+								onClick={() => {
+									if (selected) patchMutation.mutate(selected);
 								}}
-							/>
-						)}
+							>
+								{patchMutation.isPending
+									? t("adminPlatform.frontends.switch.saving")
+									: t("adminPlatform.frontends.switch.save")}
+							</Button>
+							<Button
+								variant="outline"
+								disabled={!switched}
+								onClick={() => window.location.reload()}
+							>
+								{t("adminPlatform.frontends.switch.reload")}
+							</Button>
+							{switched && !dirty ? (
+								<span className="text-xs text-muted-foreground">
+									{t("adminPlatform.frontends.switch.savedHint", { id: switched })}
+								</span>
+							) : null}
+						</div>
+
+						<p className="text-xs text-muted-foreground">
+							{t("adminPlatform.frontends.selector.breakGlass")}
+						</p>
 					</div>
 				)}
 			</SectionCard>
-
-			{state.status === "error" ? (
-				<SectionCard
-					title={t("adminPlatform.frontends.registry.errorDetailsTitle")}
-					description={t("adminPlatform.frontends.registry.errorDetailsDescription")}
-				>
-					<ul className="list-disc space-y-1 pl-5 text-sm">
-						{state.error.details.map((detail) => (
-							<li key={detail} className="text-muted-foreground break-all">
-								{detail}
-							</li>
-						))}
-					</ul>
-				</SectionCard>
-			) : null}
-
-			<SectionCard
-				title={t("adminPlatform.frontends.switch.title")}
-				description={t("adminPlatform.frontends.switch.description")}
-			>
-				<div className="space-y-4">
-					{activeQuery.isPending ? (
-						<LoadingBlock
-							label={t("adminPlatform.frontends.switch.loadingSettings")}
-						/>
-					) : activeQuery.isError ? (
-						<ErrorBlock
-							error={activeQuery.error}
-							title={t("adminPlatform.frontends.switch.settingsLoadFailed")}
-							onRetry={() => void activeQuery.refetch()}
-						/>
-					) : !activeRow ? (
-						<div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
-							<ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-							<div className="space-y-1">
-								<p className="flex flex-wrap items-center gap-1.5">
-									<MonoText>{FRONTEND_ACTIVE_KEY}</MonoText>
-									<span>{t("adminPlatform.frontends.switch.noActiveDescription")}</span>
-								</p>
-								<Link
-									to="/admin/platform/settings"
-									className="underline underline-offset-4"
-								>
-									{t("adminPlatform.frontends.switch.goSettings")}
-								</Link>
-							</div>
-						</div>
-					) : (
-						<>
-							<div className="grid gap-4 lg:grid-cols-2">
-								<div className="space-y-1.5">
-									<p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-										{t("adminPlatform.frontends.switch.currentLabel")}
-										<MonoText>{FRONTEND_ACTIVE_KEY}</MonoText>
-									</p>
-									<Select
-										value={selected ?? ""}
-										onValueChange={setSelected}
-										disabled={registry === null || patchMutation.isPending}
-									>
-										<SelectTrigger
-											className="w-full"
-											aria-label={t("adminPlatform.frontends.switch.selectAria")}
-										>
-											<SelectValue
-												placeholder={t(
-													"adminPlatform.frontends.switch.placeholder",
-												)}
-											/>
-										</SelectTrigger>
-										<SelectContent>
-											{options.map((option) => {
-												const suffix = `${
-													option.entry.protected
-														? t(
-																"adminPlatform.frontends.switch.optionBuiltinSuffix",
-															)
-														: ""
-												}${
-													option.compat.compatible
-														? ""
-														: t(
-																"adminPlatform.frontends.switch.optionDisabledSuffix",
-															)
-												}`;
-												return (
-													<SelectItem
-														key={option.entry.id}
-														value={option.entry.id}
-														disabled={!option.compat.compatible}
-													>
-														{t(
-															"adminPlatform.frontends.switch.option",
-															{
-																id: option.entry.id,
-																name:
-																	option.version?.name ??
-																	t(
-																		"adminPlatform.frontends.switch.optionNameFallback",
-																	),
-																version: option.entry.currentVersion,
-															},
-														)}
-														{suffix}
-													</SelectItem>
-												);
-											})}
-										</SelectContent>
-									</Select>
-								</div>
-								<div className="space-y-1.5">
-									<p className="text-xs text-muted-foreground">
-										{t("adminPlatform.frontends.switch.selectedTitle")}
-									</p>
-									{selectedOption ? (
-										<div className="space-y-1 text-sm">
-											<div className="flex flex-wrap items-center gap-2">
-												<BooleanPill
-													value={selectedOption.compat.compatible}
-													trueText={t(
-														"adminPlatform.frontends.compat.contractCompatible",
-													)}
-													falseText={t(
-														"adminPlatform.frontends.compat.contractIncompatible",
-													)}
-													trueTone="success"
-													falseTone="warning"
-												/>
-												<BooleanPill
-													value={selectedOption.entry.protected}
-													trueText={t(
-														"adminPlatform.frontends.pills.builtin",
-													)}
-													falseText={t(
-														"adminPlatform.frontends.pills.thirdParty",
-													)}
-												/>
-											</div>
-											<p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-												<span>
-													{t(
-														"adminPlatform.frontends.switch.versionLabel",
-														{
-															version:
-																selectedOption.entry
-																	.currentVersion,
-														},
-													)}
-												</span>
-												·{" "}
-												<span>
-													{t(
-														"adminPlatform.frontends.switch.entryLabel",
-													)}
-												</span>
-												<MonoText>
-													{selectedOption.version?.entry ?? "—"}
-												</MonoText>
-											</p>
-											{selectedOption.compat.reasons.length > 0 ? (
-												<InlineError
-													error={selectedOption.compat.reasons.join(
-														t(
-															"adminPlatform.common.reasonSeparator",
-														),
-													)}
-												/>
-											) : null}
-										</div>
-									) : (
-										<p className="text-sm text-muted-foreground">
-											{t("adminPlatform.frontends.switch.selectHint")}
-										</p>
-									)}
-								</div>
-							</div>
-
-							<div className="flex flex-wrap items-center gap-2">
-								<Button
-									onClick={() => void submitSwitch()}
-									disabled={!dirty || patchMutation.isPending || !activeRow}
-								>
-									{patchMutation.isPending
-										? t("adminPlatform.frontends.switch.saving")
-										: t("adminPlatform.frontends.switch.save")}
-								</Button>
-								<Button
-									variant="outline"
-									onClick={() => window.location.reload()}
-									disabled={switched === null}
-								>
-									<RotateCw aria-hidden="true" />
-									{t("adminPlatform.frontends.switch.reload")}
-								</Button>
-								{switched && !dirty ? (
-									<p className="text-xs text-muted-foreground">
-										{t("adminPlatform.frontends.switch.savedHint", {
-											id: switched,
-										})}
-									</p>
-								) : null}
-								{activeQuery.isFetching ? (
-									<RefreshingBadge
-										active={activeQuery.isFetching && !activeQuery.isPending}
-									/>
-								) : null}
-							</div>
-
-							<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-								<span>{t("adminPlatform.frontends.switch.breakGlass")}</span>
-								<MonoText>?frontend=default</MonoText>
-							</div>
-						</>
-					)}
-				</div>
-			</SectionCard>
-
-			<Sheet open={detailEntry !== null} onOpenChange={(open) => !open && setDetailId(null)}>
-				<SheetContent className="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-2xl">
-					<SheetHeader>
-						<SheetTitle>
-							{detailEntry
-								? t("adminPlatform.frontends.detail.namedTitle", {
-										id: detailEntry.id,
-									})
-								: t("adminPlatform.frontends.detail.title")}
-						</SheetTitle>
-						<SheetDescription>
-							{t("adminPlatform.frontends.detail.description")}
-						</SheetDescription>
-					</SheetHeader>
-					{detailEntry ? (
-						<div className="space-y-3 px-4 pb-6">
-							<KeyValueList
-								columns={2}
-								items={[
-									{
-										key: t("adminPlatform.frontends.detail.id"),
-										value: <MonoText>{detailEntry.id}</MonoText>,
-									},
-									{
-										key: t("adminPlatform.frontends.detail.currentVersion"),
-										value: (
-											<MonoText>{detailEntry.currentVersion}</MonoText>
-										),
-									},
-									{
-										key: t("adminPlatform.frontends.detail.protected"),
-										value: (
-											<BooleanPill
-												value={detailEntry.protected}
-												trueText={t(
-													"adminPlatform.frontends.pills.builtinNoRemove",
-												)}
-												falseText={t(
-													"adminPlatform.frontends.pills.thirdParty",
-												)}
-											/>
-										),
-									},
-									{
-										key: t("adminPlatform.frontends.detail.versionCount"),
-										value: (
-											<MonoText>
-												{Object.keys(detailEntry.versions).length}
-											</MonoText>
-										),
-									},
-								]}
-							/>
-							<div className="space-y-2">
-								{Object.entries(detailEntry.versions).map(
-									([versionKey, version]) => {
-										const compat = checkCompatibility(version, t);
-										return (
-											<div
-												key={versionKey}
-												className="space-y-1 rounded-lg border px-3 py-2"
-											>
-												<div className="flex flex-wrap items-center gap-2">
-													<MonoText className="font-medium">
-														v{versionKey}
-													</MonoText>
-													<span className="text-sm">
-														{version.name}
-													</span>
-													{versionKey ===
-													detailEntry.currentVersion ? (
-														<TonePill tone="success">
-															{t(
-																"adminPlatform.frontends.pills.currentVersion",
-															)}
-														</TonePill>
-													) : null}
-													<TonePill
-														tone={
-															compat.compatible
-																? "success"
-																: "warning"
-														}
-													>
-														{compat.compatible
-															? t(
-																	"adminPlatform.frontends.compat.contractCompatible",
-																)
-															: t(
-																	"adminPlatform.frontends.compat.contractIncompatible",
-																)}
-													</TonePill>
-												</div>
-												<p className="text-xs text-muted-foreground">
-													{t(
-														"adminPlatform.frontends.detail.runtimeApi",
-														{
-															runtime:
-																version.compatibility
-																	.frontendRuntime,
-															api: version.compatibility
-																.apiContract,
-														},
-													)}
-													{version.compatibility.sdk
-														? ` · sdk ${version.compatibility.sdk}`
-														: ""}
-												</p>
-												<p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-													<span>
-														{t(
-															"adminPlatform.frontends.detail.entry",
-														)}
-													</span>
-													<MonoText>{version.entry}</MonoText>
-													·{" "}
-													<span>
-														{t(
-															"adminPlatform.frontends.detail.styles",
-														)}
-													</span>
-													<MonoText>
-														{version.styles.join(", ") ||
-															t(
-																"adminPlatform.frontends.detail.emptyStyles",
-															)}
-													</MonoText>
-												</p>
-												<p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-													<span>
-														{t(
-															"adminPlatform.frontends.detail.installedAt",
-														)}
-													</span>
-													<AbsoluteTime
-														value={version.installedAt}
-														seconds
-													/>
-													{version.author ? (
-														<span>
-															·{" "}
-															{t(
-																"adminPlatform.frontends.detail.author",
-																{
-																	author: textOf(
-																		version.author,
-																	),
-																},
-															)}
-														</span>
-													) : null}
-												</p>
-												{version.description ? (
-													<p className="text-xs text-muted-foreground">
-														{version.description}
-													</p>
-												) : null}
-												{compat.reasons.length > 0 ? (
-													<InlineError
-														error={compat.reasons.join(
-															t(
-																"adminPlatform.common.reasonSeparator",
-															),
-														)}
-													/>
-												) : null}
-											</div>
-										);
-									},
-								)}
-							</div>
-						</div>
-					) : null}
-				</SheetContent>
-			</Sheet>
 		</PageBody>
 	);
 }

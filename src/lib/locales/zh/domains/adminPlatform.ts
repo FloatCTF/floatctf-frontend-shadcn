@@ -310,6 +310,11 @@ export default {
 			activeMissing: "平台设置里没有 FRONTEND_ACTIVE",
 			activeUpdatedAt: "更新于",
 		},
+		selector: {
+			label: "当前生效的前端（{{key}}）",
+			meta: "版本 {{version}} · 入口 {{entry}}",
+			breakGlass: "破窗恢复：任意页面加 ?frontend=default 可临时用内置前端打开。",
+		},
 		registry: {
 			title: "注册表（本地静态文件）",
 			description: "只列出宿主已安装的前端；安装 / 升级 / 回滚由运维在宿主执行 frontend.sh。",

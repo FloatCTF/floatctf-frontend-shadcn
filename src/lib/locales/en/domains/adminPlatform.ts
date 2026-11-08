@@ -333,6 +333,11 @@ export default {
 			activeMissing: "FRONTEND_ACTIVE is missing from platform settings",
 			activeUpdatedAt: "updated",
 		},
+		selector: {
+			label: "Active frontend ({{key}})",
+			meta: "Version {{version}} · entry {{entry}}",
+			breakGlass: "Break-glass: add ?frontend=default to any page to load the built-in frontend.",
+		},
 		registry: {
 			title: "Registry (local static file)",
 			description:

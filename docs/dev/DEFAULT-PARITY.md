@@ -162,3 +162,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：管理端设置列改为 Default 的 ID/键/值/解析值/描述/类型/更新时间。
 
 - 2026-11-08：管理端计划任务列改为 Default 的 ID/名称/键/触发/状态/Cron/执行/启用/受保护/上次/更新。
+
+- 2026-11-08：管理端前端选择页按 Default 简化为「当前生效前端」下拉 + 保存/刷新，移除统计表与详情抽屉。
