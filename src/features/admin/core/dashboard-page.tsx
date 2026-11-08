@@ -38,7 +38,6 @@ import { qk } from "~/api/keys";
 import { BooleanPill, TonePill } from "~/components/app/badges";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import {
-	CopyText,
 	MonoText,
 	PageBody,
 	PageHeader,
@@ -177,16 +176,9 @@ export function AdminDashboardPage(): ReactNode {
 		refetchIntervalInBackground: false,
 	});
 
-	const version = useQuery({
-		queryKey: qk.admin.version(),
-		queryFn: () =>
-			call<string>(client.admin.system.version(), t("adminCore.actions.platformVersion")),
-	});
-
 	function refreshAll(): void {
 		void queryClient.invalidateQueries({ queryKey: qk.admin.dashboard() });
 		void queryClient.invalidateQueries({ queryKey: qk.admin.system() });
-		void queryClient.invalidateQueries({ queryKey: qk.admin.version() });
 	}
 
 	return (
@@ -260,8 +252,6 @@ export function AdminDashboardPage(): ReactNode {
 							/>
 						</div>
 
-						<AttentionSection summary={data} monitor={monitor.data} />
-
 						<SectionCard
 							title={t("adminCore.dashboard.events.title")}
 							description={t("adminCore.dashboard.events.description")}
@@ -289,6 +279,8 @@ export function AdminDashboardPage(): ReactNode {
 								/>
 							)}
 						</SectionCard>
+
+						<AttentionSection summary={data} monitor={monitor.data} />
 
 						<div className="grid gap-5 lg:grid-cols-2">
 							<SectionCard
@@ -332,26 +324,7 @@ export function AdminDashboardPage(): ReactNode {
 
 			<SystemMonitorSection monitor={monitor} />
 
-			<SectionCard
-				title={t("adminCore.dashboard.version.title")}
-				description={t("adminCore.dashboard.version.description")}
-			>
-				<QueryState
-					query={version}
-					skeleton={<LoadingBlock label={t("adminCore.dashboard.version.loading")} />}
-				>
-					{(value) =>
-						value ? (
-							<div className="flex items-center gap-2">
-								<MonoText className="text-sm">{value}</MonoText>
-								<CopyText value={value} label={t("adminCore.dashboard.version.copyLabel")} />
-							</div>
-						) : (
-							<EmptyBlock title={t("adminCore.dashboard.version.empty")} />
-						)
-					}
-				</QueryState>
-			</SectionCard>
+
 		</PageBody>
 	);
 }
