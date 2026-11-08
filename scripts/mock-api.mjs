@@ -1399,7 +1399,50 @@ const mockDockerNetworks = [
 	{ id: "net-fctf-2", name: "fctf-awd-2", driver: "bridge", scope: "local", subnet: "10.42.16.0/24", gateway: "10.42.16.1" },
 ];
 
+/** 前端注册表（mock）：真实环境由 Caddy 暴露静态 registry.json。 */
+const mockFrontendRegistry = {
+	schemaVersion: 1,
+	updatedAt: iso(now - 2 * D),
+	frontends: {
+		shadcn: {
+			id: "shadcn",
+			currentVersion: "0.1.0",
+			protected: false,
+			versions: {
+				"0.1.0": {
+					version: "0.1.0",
+					name: "shadcn 控制台",
+					description: "中性控制台风格前端。",
+					author: "FloatCTF",
+					compatibility: { frontendRuntime: "1", apiContract: "2" },
+					entry: "frontends/shadcn/0.1.0/frontend.js",
+					styles: ["frontends/shadcn/0.1.0/frontend.css"],
+					installedAt: iso(now - 10 * D),
+				},
+			},
+		},
+		default: {
+			id: "default",
+			currentVersion: "1.0.0",
+			protected: true,
+			versions: {
+				"1.0.0": {
+					version: "1.0.0",
+					name: "Default Primer 前端",
+					description: "平台官方前端。",
+					author: "FloatCTF",
+					compatibility: { frontendRuntime: "1", apiContract: "2" },
+					entry: "frontends/default/1.0.0/frontend.js",
+					styles: [],
+					installedAt: iso(now - 60 * D),
+				},
+			},
+		},
+	},
+};
+
 const routes = [
+	["GET", /^\/__floatctf\/frontends\/registry\.json$/, (_m, res) => json(res, 200, mockFrontendRegistry)],
 
 
 
