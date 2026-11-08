@@ -249,6 +249,9 @@ export default {
 			protectedHint: "受保护键不可删除；关闭保护后即可删除，请谨慎操作。",
 			resolvedLabel: "当前解析值：",
 			resolvedCopyLabel: "解析值",
+			revealSecret: "显示原值",
+			hideSecret: "隐藏原值",
+			secretHint: "敏感设置：值默认隐藏，点击眼睛显示；保存时会明文提交给后端。",
 			requiredHint: "键与值为必填项",
 		},
 		form: {

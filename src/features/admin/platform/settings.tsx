@@ -16,6 +16,8 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ExternalLink,
+	Eye,
+	EyeOff,
 	Lock,
 	MoreHorizontal,
 	Pencil,
@@ -506,10 +508,12 @@ function SettingFormSheet({
 		protected: false,
 	});
 	const [errors, setErrors] = useState<{ key?: string; value?: string }>({});
+	const [showSecret, setShowSecret] = useState(false);
 
 	useEffect(() => {
 		if (!open) return;
 		setErrors({});
+		setShowSecret(false);
 		setForm({
 			key: row?.key ?? "",
 			value: row?.value ?? "",
@@ -715,16 +719,54 @@ function SettingFormSheet({
 					hint={
 						form.key === FRONTEND_ACTIVE_KEY
 							? t("adminPlatform.settings.field.valueHintFrontend")
-							: t("adminPlatform.settings.field.valueHint")
+							: isSensitiveKey(form.key)
+								? t("adminPlatform.settings.field.secretHint")
+								: t("adminPlatform.settings.field.valueHint")
 					}
 				>
-					<Textarea
-						id="setting-value"
-						className="font-mono text-sm"
-						style={{ minHeight: 90 }}
-						value={form.value}
-						onChange={(event) => setForm({ ...form, value: event.target.value })}
-					/>
+					{isSensitiveKey(form.key) ? (
+						<div className="flex gap-2">
+							<Input
+								id="setting-value"
+								type={showSecret ? "text" : "password"}
+								className="font-mono text-sm"
+								autoComplete="off"
+								spellCheck={false}
+								value={form.value}
+								onChange={(event) => setForm({ ...form, value: event.target.value })}
+							/>
+							<Button
+								type="button"
+								variant="outline"
+								size="icon"
+								aria-label={
+									showSecret
+										? t("adminPlatform.settings.field.hideSecret")
+										: t("adminPlatform.settings.field.revealSecret")
+								}
+								title={
+									showSecret
+										? t("adminPlatform.settings.field.hideSecret")
+										: t("adminPlatform.settings.field.revealSecret")
+								}
+								onClick={() => setShowSecret((value) => !value)}
+							>
+								{showSecret ? (
+									<EyeOff aria-hidden="true" />
+								) : (
+									<Eye aria-hidden="true" />
+								)}
+							</Button>
+						</div>
+					) : (
+						<Textarea
+							id="setting-value"
+							className="font-mono text-sm"
+							style={{ minHeight: 90 }}
+							value={form.value}
+							onChange={(event) => setForm({ ...form, value: event.target.value })}
+						/>
+					)}
 				</Field>
 				<Field
 					label={t("adminPlatform.settings.field.descriptionLabel")}

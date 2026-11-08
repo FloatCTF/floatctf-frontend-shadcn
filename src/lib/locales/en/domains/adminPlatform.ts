@@ -269,6 +269,9 @@ export default {
 				"Protected keys cannot be deleted; turning protection off makes deletion possible, so be careful.",
 			resolvedLabel: "Current resolved value:",
 			resolvedCopyLabel: "Resolved value",
+			revealSecret: "Reveal value",
+			hideSecret: "Hide value",
+			secretHint: "Sensitive setting: the value is hidden by default; click the eye to reveal it. Saving submits it as plain text to the backend.",
 			requiredHint: "Key and value are required",
 		},
 		form: {
