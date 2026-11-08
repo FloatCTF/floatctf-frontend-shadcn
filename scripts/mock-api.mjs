@@ -1970,7 +1970,13 @@ const routes = [
 		runInstanceState = "stopped";
 		return ok(res, trainingRun(mockRunPhase, "run-1"));
 	}],
-	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)$/, (m, res) => ok(res, trainingRun(mockRunPhase, m[1]))],
+	["GET", /^\/api\/service\/awdp\/runs\/([^/]+)$/, (m, res) => {
+		// 只允许 mock 真正创建过的 run，避免任意 ID 都被伪造成一份可操作的训练。
+		if (!["run-1", "run-2", "run-done"].includes(m[1])) {
+			return json(res, 404, { code: 404, message: "训练 Run 不存在", data: null, meta: null });
+		}
+		return ok(res, trainingRun(mockRunPhase, m[1]));
+	}],
 	["POST", /^\/api\/service\/awdp\/runs\/([^/]+)\/start$/, (m, res) => {
 		mockRunPhase = "break";
 		runInstanceState = "running";
