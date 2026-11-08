@@ -76,6 +76,8 @@ export default {
 		count: "共 {{count}} 道题",
 		emptyTitle: "题集里还没有题目",
 		emptyDescription: "管理员向题集添加题目后会出现在这里。",
+		notFoundTitle: "题集不存在",
+		notFoundDescription: "该题集可能已被删除，或链接已失效。",
 		backToSets: "返回题集",
 		columns: {
 			challenge: "题目",

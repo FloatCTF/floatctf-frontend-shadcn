@@ -77,6 +77,8 @@ export default {
 		count: "{{count}} challenges",
 		emptyTitle: "This set has no challenges",
 		emptyDescription: "Challenges appear here after an administrator adds them to the set.",
+		notFoundTitle: "Challenge set not found",
+		notFoundDescription: "This set may have been deleted, or the link is invalid.",
 		backToSets: "Back to sets",
 		columns: {
 			challenge: "Challenge",

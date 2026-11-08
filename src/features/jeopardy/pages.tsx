@@ -42,6 +42,7 @@ import {
 	SelectValue,
 } from "~/components/ui/select";
 import type { ChallengesListItem } from "@floatctf/sdk";
+import type { ChallengeSets } from "@floatctf/sdk/entity";
 import { formatRelative } from "~/lib/format";
 import { useDebouncedValue, useDocumentTitle, useNow } from "~/lib/hooks";
 import { ChallengeWorkbench, ChallengeWriteups } from "./workbench";
@@ -528,6 +529,28 @@ export function ChallengeSetDetailPage() {
 		queryFn: () => call(client.service.challenges.getChallengeSet(setId), "题集详情"),
 		enabled: setId !== "",
 	});
+	// 后端 getChallengeSet 对不存在的 id 返回空数组（与「空题集」无法区分），
+	// 用题集列表确认存在性；列表页使用同一 key，通常直接命中缓存。
+	const setsQuery = useQuery({
+		queryKey: qk.sets.list({}),
+		queryFn: () => call<ChallengeSets[]>(client.service.challenges.getChallengeSets(), "题集列表"),
+	});
+
+	if (setsQuery.isSuccess && !setsQuery.data.some((item) => item.id === setId)) {
+		return (
+			<PageBody>
+				<NotFoundBlock
+					title={t("jeopardy.setDetail.notFoundTitle")}
+					description={t("jeopardy.setDetail.notFoundDescription")}
+					action={
+						<Button asChild variant="outline">
+							<Link to="/challenge-sets">{t("jeopardy.setDetail.backToSets")}</Link>
+						</Button>
+					}
+				/>
+			</PageBody>
+		);
+	}
 
 	const columns: DataTableColumn<ChallengesListItem>[] = [
 		{
