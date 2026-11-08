@@ -67,6 +67,17 @@ export default {
 		emptyDescription: "Challenge sets appear here after an administrator creates one.",
 		updatedAt: "Updated {{time}}",
 		open: "Open",
+		listTitle: "Challenge sets",
+		listDescription: "Challenges grouped by topic; click a row to view its challenges.",
+		filterPlaceholder: "Filter by name or description",
+		filteredEmptyTitle: "No matching challenge sets",
+		filteredEmptyDescription: "Try clearing the filter.",
+		noDescription: "(No description)",
+		columns: {
+			name: "Name",
+			description: "Description",
+			updatedAt: "Updated",
+		},
 	},
 	setDetail: {
 		documentTitle: "Challenge set · FloatCTF",

@@ -66,6 +66,17 @@ export default {
 		emptyDescription: "管理员创建题集后会出现在这里。",
 		updatedAt: "更新于 {{time}}",
 		open: "打开",
+		listTitle: "题集列表",
+		listDescription: "按主题组织的题目集合；点击任意一行查看题目。",
+		filterPlaceholder: "筛选名称或描述",
+		filteredEmptyTitle: "没有匹配的题集",
+		filteredEmptyDescription: "试试清除筛选条件。",
+		noDescription: "（无描述）",
+		columns: {
+			name: "名称",
+			description: "描述",
+			updatedAt: "更新时间",
+		},
 	},
 	setDetail: {
 		documentTitle: "题集内容 · FloatCTF",

@@ -10,7 +10,6 @@
 
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRight, Blocks, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 
@@ -31,15 +30,23 @@ import {
 import { EmptyBlock, QueryState, TableSkeleton } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "~/components/ui/dialog";
 import { DropdownMenuItem, DropdownMenuSeparator } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { formatDateTime } from "~/lib/format";
 import { useDocumentTitle } from "~/lib/hooks";
-import type { QueryParams } from "@floatctf/sdk";
+import type { ChallengesListItem, QueryParams } from "@floatctf/sdk";
 import type { ChallengeSets } from "@floatctf/sdk/entity";
 
-import { RowMenu, SearchInput, useAdminListState } from "./shared";
+import { BuildStatusPill, RowMenu, SearchInput, useAdminListState } from "./shared";
 
 const SEARCH_KEYS = ["name", "description"];
 
@@ -52,13 +59,13 @@ export function AdminChallengeSetsPage(): ReactNode {
 	const { t } = useTranslation();
 	useDocumentTitle(t("adminCore.challengeSets.documentTitle"));
 	const client = useClient();
-	const navigate = useNavigate();
 	const queryClient = useAppQueryClient();
 	const confirm = useConfirm();
 	const list = useAdminListState(SEARCH_KEYS);
 
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
 	const [editing, setEditing] = useState<{ mode: "create" | "edit"; row?: ChallengeSets } | null>(null);
+	const [selectedSet, setSelectedSet] = useState<ChallengeSets | null>(null);
 	const [form, setForm] = useState<SetFormState>({ name: "", description: "" });
 	const [nameError, setNameError] = useState<string | undefined>(undefined);
 
@@ -114,7 +121,7 @@ export function AdminChallengeSetsPage(): ReactNode {
 						}),
 					);
 					const created = items[0];
-					if (created) void navigate(`/admin/challenge-sets/${created.id}`);
+					if (created) setSelectedSet(created);
 				} catch {
 					// 回查失败不覆盖已成功的创建；用户仍可在列表点开题集。
 				}
@@ -337,7 +344,7 @@ export function AdminChallengeSetsPage(): ReactNode {
 							selectable
 							selectedIds={selectedIds}
 							onSelectionChange={setSelectedIds}
-							onRowClick={(row) => void navigate(`/admin/challenge-sets/${row.id}`)}
+							onRowClick={(row) => setSelectedSet(row)}
 							mobileCard={(row) => (
 								<div className="space-y-1.5">
 									<p className="text-sm font-medium">{row.name}</p>
@@ -348,7 +355,7 @@ export function AdminChallengeSetsPage(): ReactNode {
 										<Button
 											variant="outline"
 											size="sm"
-											onClick={() => void navigate(`/admin/challenge-sets/${row.id}`)}
+											onClick={() => setSelectedSet(row)}
 										>
 											<Blocks aria-hidden="true" />{" "}
 											{t("adminCore.challengeSets.manageChallenges")}
@@ -370,9 +377,7 @@ export function AdminChallengeSetsPage(): ReactNode {
 								<RowMenu
 									label={t("adminCore.challengeSets.rowMenu", { name: row.name })}
 								>
-									<DropdownMenuItem
-										onSelect={() => void navigate(`/admin/challenge-sets/${row.id}`)}
-									>
+									<DropdownMenuItem onSelect={() => setSelectedSet(row)}>
 										<Blocks aria-hidden="true" />{" "}
 										{t("adminCore.challengeSets.manageChallenges")}
 									</DropdownMenuItem>
@@ -392,6 +397,13 @@ export function AdminChallengeSetsPage(): ReactNode {
 					)}
 				</QueryState>
 			</SectionCard>
+
+			<AdminChallengeSetDialog
+				set={selectedSet}
+				onOpenChange={(open) => {
+					if (!open) setSelectedSet(null);
+				}}
+			/>
 
 			<FormSheet
 				open={editing !== null}
@@ -465,5 +477,293 @@ export function AdminChallengeSetsPage(): ReactNode {
 				</form>
 			</FormSheet>
 		</PageBody>
+	);
+}
+
+
+function AdminChallengeSetDialog({
+	set,
+	onOpenChange,
+}: {
+	set: ChallengeSets | null;
+	onOpenChange: (open: boolean) => void;
+}) {
+	const { t } = useTranslation();
+	const client = useClient();
+	const queryClient = useAppQueryClient();
+	const confirm = useConfirm();
+	const setId = set?.id ?? "";
+	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	const [pickerOpen, setPickerOpen] = useState(false);
+	const [picked, setPicked] = useState<string[]>([]);
+	const picker = useAdminListState(["name", "safe_name", "category"]);
+
+	const items = useQuery({
+		queryKey: [...qk.admin.challengeSet(setId), "dialog"],
+		queryFn: () =>
+			callList<ChallengesListItem>(
+				client.admin.challenges.getChallengeSet(setId)({ page: 1, limit: 200 }),
+			),
+		enabled: setId !== "",
+	});
+	const pickerParams: QueryParams = {
+		page: picker.page,
+		limit: picker.pageSize,
+		...(picker.filter ? { filter: picker.filter } : {}),
+	};
+	const pickerQuery = useQuery({
+		queryKey: qk.admin.challenges(pickerParams),
+		queryFn: () => callList<ChallengesListItem>(client.admin.challenges.fetch(pickerParams)),
+		enabled: pickerOpen,
+	});
+
+	function invalidate(): void {
+		void queryClient.invalidateQueries({ queryKey: qk.admin.challengeSet(setId) });
+		void queryClient.invalidateQueries({ queryKey: qk.admin.challengeSets() });
+	}
+
+	const add = useMutation({
+		mutationFn: (ids: string[]) =>
+			callVoid(
+				client.admin.challenges.addChallengeToSet({ set_id: setId, challenge_id_list: ids }),
+				t("adminCore.actions.addChallengesToSet"),
+			),
+		onSuccess: (_data, ids) => {
+			toast.success(t("adminCore.challengeSetDetail.toasts.added", { count: ids.length }));
+			invalidate();
+			setPicked([]);
+			setPickerOpen(false);
+		},
+		onError: (error) => toast.apiError(t("adminCore.challengeSetDetail.toasts.addFailed"), error),
+	});
+	const remove = useMutation({
+		mutationFn: (ids: string[]) =>
+			call<number>(
+				client.admin.challenges.removeChallengeFromSet(setId)(ids),
+				t("adminCore.actions.removeChallengesFromSet"),
+			),
+		onSuccess: (count) => {
+			toast.success(t("adminCore.challengeSetDetail.toasts.removed", { count }));
+			invalidate();
+			setSelectedIds([]);
+		},
+		onError: (error) => toast.apiError(t("adminCore.challengeSetDetail.toasts.removeFailed"), error),
+	});
+
+	async function confirmRemove(ids: string[]): Promise<void> {
+		const ok = await confirm({
+			title: t("adminCore.challengeSetDetail.confirm.removeSelectedTitle", { count: ids.length }),
+			description: t("adminCore.challengeSetDetail.confirm.removeDescription"),
+			consequences: [
+				t("adminCore.challengeSetDetail.confirm.removeSelectedConsequence1", { count: ids.length }),
+				t("adminCore.challengeSetDetail.confirm.removeSelectedConsequence2"),
+			],
+			tone: "danger",
+			confirmText: t("adminCore.challengeSetDetail.confirm.remove"),
+			confirmPhrase: "delete",
+		});
+		if (ok) remove.mutate(ids);
+	}
+
+	const columns: DataTableColumn<ChallengesListItem>[] = [
+		{
+			id: "name",
+			header: t("adminCore.challengeSetDetail.columns.challenge"),
+			cell: (row) => (
+				<div className="min-w-0">
+					<p className="truncate text-sm font-medium">{row.name}</p>
+					<MonoText className="text-muted-foreground">{row.safe_name}</MonoText>
+				</div>
+			),
+			sortValue: (row) => row.name,
+		},
+		{
+			id: "category",
+			header: t("adminCore.challengeSetDetail.columns.category"),
+			cell: (row) => <span className="text-sm">{row.category}</span>,
+			sortValue: (row) => row.category,
+			hideBelow: "sm",
+		},
+		{
+			id: "build",
+			header: t("adminCore.challengeSetDetail.columns.versionBuild"),
+			cell: (row) => (
+				<div className="flex flex-wrap items-center gap-1">
+					<MonoText>{row.version ?? "—"}</MonoText>
+					<BuildStatusPill status={row.build_status} />
+				</div>
+			),
+			hideBelow: "md",
+		},
+	];
+
+	return (
+		<>
+			<Dialog open={set !== null} onOpenChange={onOpenChange}>
+				<DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-4xl">
+					<DialogHeader>
+						<DialogTitle>{set?.name ?? t("adminCore.challengeSetDetail.titleFallback")}</DialogTitle>
+						<DialogDescription>
+							{set?.description || t("adminCore.challengeSetDetail.descriptionFallback")}
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-4">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<p className="text-xs text-muted-foreground">
+								{set?.id ? <MonoText>{set.id}</MonoText> : null}
+							</p>
+							<div className="flex flex-wrap items-center gap-2">
+								{selectedIds.length > 0 ? (
+									<Button
+										variant="destructive"
+										size="sm"
+										onClick={() => void confirmRemove(selectedIds)}
+										disabled={remove.isPending}
+									>
+										{t("adminCore.challengeSetDetail.removeSelected", { count: selectedIds.length })}
+									</Button>
+								) : null}
+								<Button
+									size="sm"
+									onClick={() => {
+										setPicked([]);
+										setPickerOpen(true);
+									}}
+								>
+									<Plus aria-hidden="true" /> {t("adminCore.challengeSetDetail.add")}
+								</Button>
+							</div>
+						</div>
+						<QueryState
+							query={items}
+							skeleton={<TableSkeleton rows={5} columns={3} />}
+							errorTitle={t("adminCore.challengeSetDetail.itemsError")}
+							isEmpty={(result) => result.items.length === 0}
+							empty={
+								<EmptyBlock
+									title={t("adminCore.challengeSetDetail.empty.title")}
+									description={t("adminCore.challengeSetDetail.empty.description")}
+								/>
+							}
+						>
+							{(result) => (
+								<DataTable
+									data={result.items}
+									getRowId={(row) => row.id}
+									columns={columns}
+									selectable
+									selectedIds={selectedIds}
+									onSelectionChange={setSelectedIds}
+									rowActions={(row) => (
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => void confirmRemove([row.id])}
+											disabled={remove.isPending}
+										>
+											{t("adminCore.challengeSetDetail.remove")}
+										</Button>
+									)}
+								/>
+							)}
+						</QueryState>
+					</div>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => onOpenChange(false)}>
+							{t("common.close")}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<FormSheet
+				open={pickerOpen}
+				onOpenChange={(open) => {
+					if (!open) {
+						setPickerOpen(false);
+						setPicked([]);
+					}
+				}}
+				title={t("adminCore.challengeSetDetail.picker.title")}
+				description={t("adminCore.challengeSetDetail.picker.description")}
+				width="xl"
+				footer={
+					<div className="flex w-full flex-wrap items-center justify-between gap-2">
+						<span className="text-xs text-muted-foreground">
+							{t("adminCore.challengeSetDetail.picker.selected", { count: picked.length })}
+						</span>
+						<div className="flex items-center gap-2">
+							<Button variant="outline" onClick={() => setPickerOpen(false)}>
+								{t("common.cancel")}
+							</Button>
+							<Button
+								onClick={() => {
+									if (picked.length === 0) {
+										toast.warning(t("adminCore.challengeSetDetail.toasts.selectForAdd"));
+										return;
+									}
+									add.mutate(picked);
+								}}
+								disabled={add.isPending || picked.length === 0}
+							>
+								<Plus aria-hidden="true" />
+								{t("adminCore.challengeSetDetail.picker.addSelected", { count: picked.length })}
+							</Button>
+						</div>
+					</div>
+				}
+			>
+				<SearchInput
+					value={picker.search}
+					onChange={picker.setSearch}
+					placeholder={t("adminCore.challengeSetDetail.picker.searchPlaceholder")}
+				/>
+				<QueryState
+					query={pickerQuery}
+					skeleton={<TableSkeleton rows={5} columns={3} />}
+					errorTitle={t("adminCore.challengeSetDetail.picker.error")}
+					isEmpty={(result) => result.items.length === 0}
+					empty={
+						<EmptyBlock
+							variant="filtered"
+							title={t("adminCore.challengeSetDetail.picker.empty.title")}
+							description={t("adminCore.challengeSetDetail.picker.empty.description")}
+						/>
+					}
+				>
+					{(result) => (
+						<DataTable
+							data={result.items}
+							getRowId={(row) => row.id}
+							selectable
+							isRowSelectable={(row) =>
+								!(items.data?.items ?? []).some((item) => item.id === row.id)
+							}
+							selectedIds={picked}
+							onSelectionChange={setPicked}
+							columns={[
+								{
+									id: "name",
+									header: t("adminCore.challengeSetDetail.columns.challenge"),
+									cell: (row) => (
+										<div className="min-w-0">
+											<p className="truncate text-sm font-medium">{row.name}</p>
+											<MonoText className="text-muted-foreground">{row.safe_name}</MonoText>
+										</div>
+									),
+									sortValue: (row) => row.name,
+								},
+								{
+									id: "category",
+									header: t("adminCore.challengeSetDetail.columns.category"),
+									cell: (row) => <span className="text-sm">{row.category}</span>,
+									sortValue: (row) => row.category,
+								},
+							]}
+						/>
+					)}
+				</QueryState>
+			</FormSheet>
+		</>
 	);
 }
