@@ -139,6 +139,7 @@ export default {
 			gameboxes: "GameBoxes",
 			network: "Network",
 			operations: "Operations",
+			scoreboard: "Scoreboard",
 			instance: "Instance",
 			challenges: "Challenges",
 			members: "Users",

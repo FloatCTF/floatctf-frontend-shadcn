@@ -132,6 +132,7 @@ export default {
 			gameboxes: "靶机箱",
 			network: "网络",
 			operations: "运维操作",
+			scoreboard: "积分榜",
 			instance: "实例",
 			challenges: "题目",
 			members: "用户",
