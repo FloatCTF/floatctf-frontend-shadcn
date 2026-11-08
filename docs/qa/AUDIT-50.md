@@ -173,3 +173,19 @@ node scripts/mock-check.mjs
 AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 
 验证：`vite build` / i18n / theme / mock-check 全绿；mock 路由 235 条。
+
+## 第 6 轮补充（题目编辑持久化 / 级联删除 / AWD 数据标签）
+
+已完成：
+
+- **题目编辑真正持久化**：编辑表单提交的 `static_flag_value`、`container_port`、
+  `recommended_cpu_millis/memory_bytes/pids_limit` 此前被 mock 丢弃；现在保存后重开
+  仍为修改值（实测 flag 与 CPU 150 保持）。
+- **题目删除级联**：删除题库题目时同步清理 `eventChallenges` 与题集关联；实测删除
+  「逆向：魔改校验」后，选手端赛事题目列表 6→5，不再残留已删除题。
+- **AWD/AWDP 不再显示 Jeopardy 专属标签**：赛事控制台对非 Jeopardy 隐藏「题目」「数据大屏」，
+  避免出现「挂题数 0 / 累计解出 0」但积分榜有分的矛盾；深链接 `?tab=data` 回退到「配置」，
+  AWD/AWDP 使用各自运维页的数据大屏。
+- 复测：题库编辑、题目删除级联、AWD/AWDP 控制台标签、移动端无横向溢出、社区删除无 404。
+
+验证：`vite build` / i18n / theme / mock-check 全绿；10 条重点路由 sweep 0 console error。
