@@ -174,3 +174,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：管理端讨论列对齐 Default：ID/标题/作者/浏览/点赞/评论/创建/更新。
 
 - 2026-11-08：管理端武器列对齐 Default：ID/名称/分类/有附件/文件地址/更新时间。
+
+- 2026-11-08：管理端 Docker 容器列顺序按 Default 调整为容器 ID/名称/镜像/状态/端口/创建时间。

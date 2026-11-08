@@ -314,18 +314,18 @@ function ContainersTab(): ReactNode {
 
 	const columns: DataTableColumn<FloatDockerContainer>[] = [
 		{
-			id: "name",
-			header: t("adminInfra.docker.columns.name"),
-			sortValue: (row) => row.name,
-			cell: (row) => <span className="font-mono font-medium">{row.name || empty}</span>,
-		},
-		{
 			id: "id",
 			header: t("adminInfra.docker.columns.containerId"),
 			hideBelow: "md",
 			cell: (row) => (
 				<CopyText value={row.id} label={t("adminInfra.docker.columns.containerId")} />
 			),
+		},
+		{
+			id: "name",
+			header: t("adminInfra.docker.columns.name"),
+			sortValue: (row) => row.name,
+			cell: (row) => <span className="font-mono font-medium">{row.name || empty}</span>,
 		},
 		{
 			id: "image",
