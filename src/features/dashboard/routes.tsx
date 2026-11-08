@@ -4,5 +4,5 @@ import { DashboardPage } from "./pages";
 
 export const feature: FeatureModule = {
 	shell: "player",
-	routes: [{ path: "/", element: <DashboardPage /> }],
+	routes: [{ path: "/dashboard", element: <DashboardPage /> }],
 };

@@ -5,6 +5,10 @@
 export default {
 	groups: {
 		play: "Play",
+		overview: "Overview",
+		competition: "Competition",
+		arsenal: "Arsenal",
+		account: "Account",
 		community: "Community",
 		me: "Me",
 		control: "Control",
@@ -20,6 +24,7 @@ export default {
 		training: "Training",
 		course: "Course",
 		instances: "Instances",
+		top: "Top players",
 		rank: "Leaderboard",
 		solves: "Solves",
 		announcements: "Announcements",

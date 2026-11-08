@@ -17,7 +17,6 @@ import {
 	Dumbbell,
 	Gauge,
 	GraduationCap,
-	Home,
 	Info,
 	ListChecks,
 	Megaphone,
@@ -59,35 +58,38 @@ export interface NavGroup {
 
 export const playerNav: NavGroup[] = [
 	{
-		labelKey: "nav.groups.play",
+		labelKey: "nav.groups.overview",
 		items: [
-			{ to: "/", labelKey: "nav.items.overview", icon: Home, end: true, descriptionKey: "nav.items.overviewHint" },
+			// Default 的选手端落地页是 Top Users；保留 /rank 页面，把 / 重定向到这里。
+			{ to: "/rank", labelKey: "nav.items.top", icon: Trophy },
+			{ to: "/training/", labelKey: "nav.items.course", icon: GraduationCap, reloadDocument: true },
+		],
+	},
+	{
+		labelKey: "nav.groups.competition",
+		items: [
 			{ to: "/events", labelKey: "nav.items.events", icon: CalendarDays, descriptionKey: "nav.items.eventsHint" },
 			{ to: "/challenges", labelKey: "nav.items.challenges", icon: Puzzle, descriptionKey: "nav.items.challengesHint" },
 			{ to: "/challenge-sets", labelKey: "nav.items.challengeSets", icon: Blocks },
-			{
-				to: "/training/",
-				labelKey: "nav.items.course",
-				icon: GraduationCap,
-				reloadDocument: true,
-			},
 			{ to: "/training", labelKey: "nav.items.training", icon: Dumbbell },
 			{ to: "/instances", labelKey: "nav.items.instances", icon: Boxes },
+			{ to: "/solves", labelKey: "nav.items.solves", icon: Activity },
 		],
 	},
 	{
 		labelKey: "nav.groups.community",
 		items: [
-			{ to: "/rank", labelKey: "nav.items.rank", icon: Trophy },
-			{ to: "/solves", labelKey: "nav.items.solves", icon: Activity },
 			{ to: "/community/announcements", labelKey: "nav.items.announcements", icon: Megaphone },
 			{ to: "/community/discussions", labelKey: "nav.items.discussions", icon: MessagesSquare },
 			{ to: "/writeups", labelKey: "nav.items.writeups", icon: BookOpen },
-			{ to: "/arsenal", labelKey: "nav.items.arsenal", icon: Swords },
 		],
 	},
 	{
-		labelKey: "nav.groups.me",
+		labelKey: "nav.groups.arsenal",
+		items: [{ to: "/arsenal", labelKey: "nav.items.arsenal", icon: Swords }],
+	},
+	{
+		labelKey: "nav.groups.account",
 		items: [{ to: "/profile", labelKey: "nav.items.profile", icon: UserCircle }],
 	},
 ];
@@ -141,10 +143,9 @@ export const adminNav: NavGroup[] = [
 
 /** 移动端底部导航（只放最高频入口）。 */
 export const playerMobileNav: NavItem[] = [
-	{ to: "/", labelKey: "nav.items.overview", icon: Home, end: true },
+	{ to: "/rank", labelKey: "nav.items.top", icon: Trophy },
 	{ to: "/events", labelKey: "nav.items.events", icon: CalendarDays },
 	{ to: "/challenges", labelKey: "nav.items.challenges", icon: Puzzle },
-	{ to: "/rank", labelKey: "nav.items.rank", icon: Trophy },
 	{ to: "/profile", labelKey: "nav.items.profile", icon: UserCircle },
 ];
 

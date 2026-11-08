@@ -3,7 +3,7 @@
  * React Router v7 自动做路由排名，因此静态段与参数段的书写顺序不影响匹配。
  */
 
-import { createBrowserRouter, type RouteObject } from "react-router";
+import { Navigate, createBrowserRouter, type RouteObject } from "react-router";
 
 import type { FeatureModule } from "~/features/types";
 
@@ -43,7 +43,11 @@ export function createAppRouter() {
 							<PlayerShell />
 						</RequireUser>
 					),
-					children: [...collectRoutes("player"), { path: "*", element: <NotFoundPage /> }],
+					children: [
+						{ path: "/", element: <Navigate to="/rank" replace /> },
+						...collectRoutes("player"),
+						{ path: "*", element: <NotFoundPage /> },
+					],
 				},
 				{
 					element: (

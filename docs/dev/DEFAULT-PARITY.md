@@ -99,3 +99,11 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 
 先做「应用外壳 + 题集列表/弹窗」，但这不是最终范围；样板验收通过后立即按
 §5 的顺序覆盖其余页面。
+
+
+## 9. 进度
+
+- 2026-11-08：题集样板完成（选手/管理两端筛选 + Dialog；部署 0.2.2）。
+- 2026-11-08：选手端外壳/导航按 Default 分组重排；`/` 改为 Top 选手落地页（`/rank`），
+  赛事、题库、题集、训练场、实例、解题流水归入 Competition；公告/讨论/题解归 Community；
+  武器库独立；资料归 Account。管理端导航暂保持现状，下一步逐页对齐。
