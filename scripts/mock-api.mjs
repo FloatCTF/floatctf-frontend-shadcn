@@ -1076,6 +1076,21 @@ let mockUsers = [
 	}),
 ];
 
+
+/** 角色列表（mock）：内置超级管理员 + 可创建的自定义角色。 */
+let mockRoles = [
+	{
+		id: "r-1",
+		key: "super-admin",
+		name: "超级管理员",
+		description: "拥有全部权限",
+		protected: true,
+		grants_all: true,
+		permissions: [],
+		user_count: 1,
+	},
+];
+
 const routes = [
 
 
@@ -1375,7 +1390,8 @@ const routes = [
 	["GET", /^\/api\/challenge_sets\/([^/]+)$/, (_m, res) => ok(res, null)],
 
 	// 社区
-	["GET", /^\/api\/announcements$/, (_m, res, req) => ok(res, announcements, req)],
+	["GET", /^\/api\/announcements$/, (_m, res, req) =>
+		okPage(res, announcements.filter((a) => mockFilterMatch(req, a)), req)],
 	["GET", /^\/api\/solves$/, (_m, res, req) => ok(res, solves, req)],
 	["GET", /^\/api\/solves\/top15users$/, (_m, res) => ok(res, topUsers)],
 	["GET", /^\/api\/writeups$/, (_m, res, req) => ok(res, unifiedWriteups, req)],
@@ -1720,19 +1736,44 @@ const routes = [
 			{ key: "roles.manage", domain: "身份", description: "管理角色与权限", high_risk: true },
 		])],
 	["GET", /^\/api\/admin\/permissions\/domains$/, (_m, res) => ok(res, ["事件", "身份"])],
-	["GET", /^\/api\/admin\/roles$/, (_m, res) =>
-		ok(res, [
-			{
-				id: "r-1",
-				key: "super-admin",
-				name: "超级管理员",
-				description: "拥有全部权限",
-				protected: true,
-				grants_all: true,
-				permissions: [],
-				user_count: 1,
-			},
-		])],
+	["GET", /^\/api\/admin\/roles$/, (_m, res) => ok(res, mockRoles)],
+	["POST", /^\/api\/admin\/roles$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const key = String(body.key ?? "").trim();
+			if (!key) return json(res, 200, { code: 400, message: "角色 key 不能为空", data: null, meta: null });
+			if (mockRoles.some((role) => role.key === key)) {
+				return json(res, 200, { code: 409, message: "角色 key 已存在", data: null, meta: null });
+			}
+			const role = {
+				id: `r-${mockRoles.length + 1}`,
+				key,
+				name: String(body.name ?? key),
+				description: String(body.description ?? ""),
+				protected: false,
+				grants_all: false,
+				permissions: Array.isArray(body.permissions) ? body.permissions : [],
+				user_count: 0,
+			};
+			mockRoles = [...mockRoles, role];
+			return ok(res, role);
+		})],
+	["PATCH", /^\/api\/admin\/roles\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const role = mockRoles.find((item) => item.id === m[1]);
+			if (!role) return json(res, 404, { code: 404, message: "角色不存在", data: null, meta: null });
+			if (role.protected) return json(res, 200, { code: 409, message: "内置角色不可修改", data: null, meta: null });
+			if (body.name !== undefined) role.name = String(body.name);
+			if (body.description !== undefined) role.description = String(body.description);
+			if (Array.isArray(body.permissions)) role.permissions = body.permissions;
+			return ok(res, role);
+		})],
+	["DELETE", /^\/api\/admin\/roles\/([^/]+)$/, (m, res) => {
+		const role = mockRoles.find((item) => item.id === m[1]);
+		if (!role) return json(res, 404, { code: 404, message: "角色不存在", data: null, meta: null });
+		if (role.protected) return json(res, 200, { code: 409, message: "内置角色不可删除", data: null, meta: null });
+		mockRoles = mockRoles.filter((item) => item.id !== m[1]);
+		return ok(res, null);
+	}],
 	["GET", /^\/api\/admin\/logs$/, (_m, res, req) => {
 		const rows = [
 				{

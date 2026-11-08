@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T01:12:54.218Z",
+	"generatedAt": "2026-11-08T01:21:06.684Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -12,6 +12,10 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/roles\\/([^/]+)"
 		},
 		{
 			"method": "DELETE",
@@ -395,6 +399,10 @@
 		},
 		{
 			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/roles\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
 			"pattern": "\\/api\\/discussions\\/([^/]+)"
 		},
 		{
@@ -452,6 +460,10 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/start"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/roles"
 		},
 		{
 			"method": "POST",

@@ -205,6 +205,7 @@ export function WriteupsPage(): ReactNode {
 						) : (
 							<EmptyBlock
 								variant="filtered"
+								title={t("community.writeups.filtered.title")}
 								description={t("community.writeups.filtered.description", {
 									count: query.data?.items.length ?? 0,
 									query: debouncedSearch.trim(),

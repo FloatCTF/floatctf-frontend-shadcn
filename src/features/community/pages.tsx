@@ -462,6 +462,7 @@ export function SolvesPage(): ReactNode {
 						) : (
 							<EmptyBlock
 								variant="filtered"
+								title={t("community.solves.filtered.title")}
 								description={t("community.solves.filtered.description")}
 								action={
 									<Button
@@ -632,6 +633,7 @@ export function AnnouncementsPage(): ReactNode {
 						) : (
 							<EmptyBlock
 								variant="filtered"
+								title={t("community.announcements.filtered.title")}
 								description={t("community.announcements.filtered.description", {
 									query: trimmed,
 								})}
@@ -795,6 +797,7 @@ export function ArsenalPage(): ReactNode {
 						) : (
 							<EmptyBlock
 								variant="filtered"
+								title={t("community.arsenal.filtered.title")}
 								description={t("community.arsenal.filtered.description", {
 									query: trimmed,
 								})}

@@ -97,6 +97,7 @@ export default {
 			action: "Browse challenges",
 		},
 		filtered: {
+			title: "No matching solves",
 			description:
 				"There is no solve record for this challenge within the records returned for you.",
 			clear: "Clear filter",
@@ -130,6 +131,7 @@ export default {
 			description: "Announcements appear here after an admin publishes one.",
 		},
 		filtered: {
+			title: "No matching announcements",
 			description: "No announcement title contains “{{query}}”.",
 			clear: "Clear search",
 		},
@@ -168,6 +170,7 @@ export default {
 			description: "Downloadable attachments appear here after an admin uploads a tool.",
 		},
 		filtered: {
+			title: "No matching tools",
 			description: "No tool name contains “{{query}}”.",
 			clear: "Clear search",
 		},
@@ -359,6 +362,7 @@ export default {
 			action: "Browse challenges",
 		},
 		filtered: {
+			title: "No matching write-ups",
 			description:
 				"None of the {{count}} loaded writeups matches “{{query}}”.",
 			clear: "Clear search",

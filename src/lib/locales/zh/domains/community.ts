@@ -94,6 +94,7 @@ export default {
 			action: "浏览题库",
 		},
 		filtered: {
+			title: "没有匹配的解题记录",
 			description: "这道题在你返回的记录范围内没有解题记录。",
 			clear: "清除筛选",
 		},
@@ -125,6 +126,7 @@ export default {
 			description: "管理员发布公告后会出现在这里。",
 		},
 		filtered: {
+			title: "没有匹配的公告",
 			description: "没有标题包含「{{query}}」的公告。",
 			clear: "清除搜索",
 		},
@@ -162,6 +164,7 @@ export default {
 			description: "管理员上传工具后，这里会列出可下载的附件。",
 		},
 		filtered: {
+			title: "没有匹配的工具",
 			description: "没有名称包含「{{query}}」的工具。",
 			clear: "清除搜索",
 		},
@@ -346,6 +349,7 @@ export default {
 			action: "去题库",
 		},
 		filtered: {
+			title: "没有匹配的题解",
 			description: "已加载的 {{count}} 条题解里没有匹配「{{query}}」的条目。",
 			clear: "清除搜索",
 		},
