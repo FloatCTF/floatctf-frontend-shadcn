@@ -14,7 +14,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Download, Megaphone, Puzzle, Swords, Trophy } from "lucide-react";
+import { Activity, Download, Megaphone, Swords, Trophy } from "lucide-react";
 
 import type { SolveResult, TopUser } from "@floatctf/sdk";
 import type { Announcements, Weapons } from "@floatctf/sdk/entity";
@@ -24,6 +24,7 @@ import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { TonePill } from "~/components/app/badges";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
+import { FilterBar, type FilterKey } from "~/components/app/filter-bar";
 import {
 	PageBody,
 	PageHeader,
@@ -35,21 +36,13 @@ import {
 import {
 	EmptyBlock,
 	ErrorBlock,
-	InlineError,
 	QueryState,
 	RefreshingBadge,
 	TableSkeleton,
 } from "~/components/app/states";
-import { RelativeTime, UserAvatar, UserCell } from "~/components/app/user-cell";
+import { RelativeTime, UserCell } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "~/components/ui/select";
-import { formatInt, formatScore } from "~/lib/format";
+import { formatInt } from "~/lib/format";
 import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
 
 import { SearchField } from "./components";
@@ -267,16 +260,9 @@ export function SolvesPage(): ReactNode {
 	const client = useClient();
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
-	const [challengeId, setChallengeId] = useState("all");
-
-	// 过滤选项：后端 `/solves` 只支持 id / challenge_id / event_id 三个键，
-	// 因此用「自己解题记录里出现过的题目」构造题目下拉（真实数据，不是枚举题库）。
-	const optionsQuery = useQuery({
-		queryKey: qk.solves.list({ page: 1, limit: 200, purpose: "filter-options" }),
-		queryFn: () => callList<SolveResult>(client.service.solves.fetch({ page: 1, limit: 200 })),
-	});
-
-	const filter = challengeId === "all" ? undefined : `challenge_id:${challengeId}`;
+	const [draftFilter, setDraftFilter] = useState("");
+	const [appliedFilter, setAppliedFilter] = useState("");
+	const filter = appliedFilter.trim() || undefined;
 	const query = useQuery({
 		queryKey: qk.solves.list({ page, limit: pageSize, filter }),
 		queryFn: () =>
@@ -284,22 +270,6 @@ export function SolvesPage(): ReactNode {
 		refetchInterval: 30_000,
 		refetchIntervalInBackground: false,
 	});
-
-	const challengeOptions = useMemo(() => {
-		const map = new Map<string, string>();
-		for (const item of optionsQuery.data?.items ?? []) {
-			map.set(item.challenge_id, item.challenge_name);
-		}
-		return [...map.entries()]
-			.map(([id, name]) => ({ id, name }))
-			.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
-	}, [optionsQuery.data]);
-
-	const items = query.data?.items ?? [];
-	const pageScore = items.reduce(
-		(sum, item) => sum + item.obtained_points + item.bonus_points,
-		0,
-	);
 
 	const columns: DataTableColumn<SolveResult>[] = [
 		{
@@ -318,7 +288,6 @@ export function SolvesPage(): ReactNode {
 		{
 			id: "solver",
 			header: t("community.solves.columns.solver"),
-			hideBelow: "sm",
 			sortValue: (row) => row.nickname,
 			cell: (row) => (
 				<UserCell
@@ -330,29 +299,10 @@ export function SolvesPage(): ReactNode {
 			),
 		},
 		{
-			id: "points",
-			header: t("community.solves.columns.points"),
-			align: "right",
-			sortValue: (row) => row.obtained_points + row.bonus_points,
-			cell: (row) => (
-				<span className="tnum text-sm">
-					+{formatScore(row.obtained_points)}
-					{row.bonus_points !== 0 ? (
-						<span className="text-muted-foreground">
-							{t("community.solves.points.bonus", {
-								score: formatScore(row.bonus_points),
-							})}
-						</span>
-					) : null}
-				</span>
-			),
-		},
-		{
-			id: "created_at",
-			header: t("community.solves.columns.createdAt"),
-			align: "right",
-			sortValue: (row) => row.created_at,
-			cell: (row) => <RelativeTime value={row.created_at} />,
+			id: "updated_at",
+			header: t("community.solves.columns.updatedAt"),
+			sortValue: (row) => row.updated_at ?? row.created_at,
+			cell: (row) => <RelativeTime value={row.updated_at ?? row.created_at} />,
 		},
 	];
 
@@ -361,151 +311,68 @@ export function SolvesPage(): ReactNode {
 			<PageHeader
 				title={t("community.solves.title")}
 				description={t("community.solves.subtitle")}
-				actions={
-					<Toolbar>
-						<Button variant="outline" asChild>
-							<Link to="/rank">
-								<Trophy aria-hidden="true" /> {t("community.solves.actions.rank")}
-							</Link>
-						</Button>
-						<Button asChild>
-							<Link to="/challenges">
-								<Puzzle aria-hidden="true" /> {t("community.solves.actions.challenges")}
-							</Link>
-						</Button>
-					</Toolbar>
-				}
 			/>
-
-			<div className="grid gap-4 sm:grid-cols-2">
-				<StatCard
-					label={t("community.solves.stats.totalLabel")}
-					value={query.isPending ? "…" : formatInt(query.data?.meta.total ?? items.length)}
-					hint={t("community.solves.stats.totalHint")}
-					icon={<Activity aria-hidden="true" className="size-4" />}
-				/>
-				<StatCard
-					label={t("community.solves.stats.pageScoreLabel")}
-					value={query.isPending ? "…" : formatScore(pageScore)}
-					hint={t("community.solves.stats.pageScoreHint", { count: items.length })}
-					icon={<Trophy aria-hidden="true" className="size-4" />}
-					tone="success"
-				/>
-			</div>
-
 			<SectionCard
 				title={t("community.solves.section.title")}
 				description={t("community.solves.section.description")}
-				actions={
-					<Toolbar>
-						<RefreshingBadge active={query.isFetching && !query.isPending} />
-						{optionsQuery.isError ? (
-							<InlineError error={optionsQuery.error} className="text-xs" />
-						) : null}
-						<Select
-							value={challengeId}
-							disabled={optionsQuery.isPending}
-							onValueChange={(value) => {
-								setChallengeId(value);
-								setPage(1);
-							}}
-						>
-							<SelectTrigger
-								size="sm"
-								className="w-[220px]"
-								aria-label={t("community.solves.filter.ariaLabel")}
-							>
-								<SelectValue placeholder={t("community.solves.filter.all")} />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="all">{t("community.solves.filter.all")}</SelectItem>
-								{challengeOptions.map((option) => (
-									<SelectItem key={option.id} value={option.id}>
-										{option.name}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</Toolbar>
-				}
 				contentClassName="px-0"
-				footer={
-					<PaginationBar
-						page={page}
-						pageSize={pageSize}
-						total={query.data?.meta.total ?? items.length}
-						onPageChange={setPage}
-						onPageSizeChange={(size) => {
-							setPageSize(size);
+				actions={
+					<FilterBar
+						keys={[
+							{ key: "challenge_id", label: t("community.solves.columns.challenge") },
+						] satisfies FilterKey[]}
+						value={draftFilter}
+						onChange={setDraftFilter}
+						onApply={() => {
+							setAppliedFilter(draftFilter.trim());
 							setPage(1);
 						}}
+						onClear={() => {
+							setDraftFilter("");
+							setAppliedFilter("");
+							setPage(1);
+						}}
+						placeholder={t("common.filter.placeholder")}
 					/>
+				}
+				footer={
+					query.data && query.data.items.length > 0 ? (
+						<PaginationBar
+							page={page}
+							pageSize={pageSize}
+							total={query.data.meta?.total ?? query.data.items.length}
+							onPageChange={setPage}
+							onPageSizeChange={(size) => {
+								setPageSize(size);
+								setPage(1);
+							}}
+						/>
+					) : null
 				}
 			>
 				<QueryState
 					query={query}
-					skeleton={<TableSkeleton rows={6} columns={4} />}
+					skeleton={<TableSkeleton rows={6} columns={3} />}
 					errorTitle={t("community.solves.errors.load")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
-						challengeId === "all" ? (
-							<EmptyBlock
-								title={t("community.solves.empty.title")}
-								description={t("community.solves.empty.description")}
-								icon={<Activity aria-hidden="true" />}
-								action={
-									<Button size="sm" asChild>
-										<Link to="/challenges">{t("community.solves.empty.action")}</Link>
-									</Button>
-								}
-							/>
-						) : (
-							<EmptyBlock
-								variant="filtered"
-								title={t("community.solves.filtered.title")}
-								description={t("community.solves.filtered.description")}
-								action={
-									<Button
-										size="sm"
-										variant="outline"
-										onClick={() => setChallengeId("all")}
-									>
-										{t("community.solves.filtered.clear")}
-									</Button>
-								}
-							/>
-						)
+						<EmptyBlock
+							title={t("community.solves.empty.title")}
+							description={t("community.solves.empty.description")}
+						/>
 					}
 				>
 					{(result) => (
 						<DataTable
 							data={result.items}
-							getRowId={(row) => row.id}
+							getRowId={(row) => String(row.id ?? `${row.challenge_id}:${row.nickname}`)}
 							columns={columns}
 							mobileCard={(row) => (
-								<div className="space-y-1.5">
-									<Link
-										to={`/challenges/${row.challenge_id}`}
-										className="text-sm font-medium hover:underline"
-									>
+								<div className="space-y-1">
+									<Link to={`/challenges/${row.challenge_id}`} className="text-sm font-medium hover:underline">
 										{row.challenge_name}
 									</Link>
-									<div className="flex items-center gap-2">
-										<UserAvatar
-											name={row.nickname}
-											avatar={row.avatar ?? null}
-											size="sm"
-										/>
-										<span className="truncate text-xs text-muted-foreground">
-											{row.nickname}
-										</span>
-									</div>
-									<div className="flex items-center justify-between text-xs text-muted-foreground">
-										<span className="tnum">
-											+{formatScore(row.obtained_points)}
-										</span>
-										<RelativeTime value={row.created_at} />
-									</div>
+									<p className="text-xs text-muted-foreground">{row.nickname}</p>
 								</div>
 							)}
 						/>
@@ -516,7 +383,6 @@ export function SolvesPage(): ReactNode {
 	);
 }
 
-/** 全站公告：后端支持 id / title / content 过滤，这里用标题过滤。 */
 export function AnnouncementsPage(): ReactNode {
 	const { t } = useTranslation();
 	useDocumentTitle(t("community.announcements.documentTitle"));

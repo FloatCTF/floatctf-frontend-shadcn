@@ -87,6 +87,7 @@ export default {
 			solver: "Solver",
 			points: "Score",
 			createdAt: "Submitted",
+			updatedAt: "Updated",
 		},
 		points: {
 			bonus: " (bonus {{score}})",

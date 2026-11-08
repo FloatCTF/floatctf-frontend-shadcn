@@ -40,12 +40,14 @@ export default {
 		filteredAction: "Clear filters",
 		errorTitle: "Failed to load instances",
 		column: {
-			subject: "Challenge / gamebox",
+			subject: "Content",
 			type: "Type",
 			status: "Status",
-			identifier: "Container",
+			identifier: "Identifier",
 			created: "Created",
-			expires: "Auto-reclaim",
+			expires: "Destroy at",
+			event: "Event",
+			user: "User",
 		},
 	},
 	type: {

@@ -84,6 +84,7 @@ export default {
 			solver: "解题者",
 			points: "得分",
 			createdAt: "提交时间",
+			updatedAt: "更新时间",
 		},
 		points: {
 			bonus: "（奖励 {{score}}）",

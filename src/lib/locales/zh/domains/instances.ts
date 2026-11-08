@@ -39,12 +39,14 @@ export default {
 		filteredAction: "清除筛选",
 		errorTitle: "加载实例失败",
 		column: {
-			subject: "题目 / 靶机",
+			subject: "内容",
 			type: "类型",
 			status: "状态",
-			identifier: "容器",
+			identifier: "标识",
 			created: "创建",
-			expires: "自动回收",
+			expires: "销毁时间",
+			event: "赛事",
+			user: "用户",
 		},
 	},
 	type: {

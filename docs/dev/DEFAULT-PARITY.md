@@ -130,3 +130,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
   赛事列表列改为 Default 的标题/赛制/参赛者/状态/可加入/已加入/开始/结束。
 
 - 2026-11-08：训练场入口改为 Default 的 Gameboxes（`/gameboxes`），列改为名称/分类/已解出/作者/版本/更新时间；名称点击启动或进入 run。
+
+- 2026-11-08：Instances 恢复 Default 列（内容/类型/状态/赛事/标识/用户/销毁时间/操作）与 FilterBar；Solves 恢复题目/用户/更新时间，去掉统计和题目下拉。
