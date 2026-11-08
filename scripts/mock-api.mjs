@@ -1801,7 +1801,13 @@ const routes = [
 	["POST", /^\/api\/users\/reset_password$/, (_m, res) => ok(res, "ok")],
 	["POST", /^\/api\/users\/reset$/, (_m, res) => ok(res, "ok")],
 	["GET", /^\/api\/users\/me$/, (_m, res) => ok(res, me)],
-	["PATCH", /^\/api\/users\/me$/, (_m, res) => ok(res, null)],
+	["PATCH", /^\/api\/users\/me$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			// 昵称/邮箱保存后必须真的持久化，否则刷新又变回去。
+			if (typeof body.nickname === "string" && body.nickname.trim()) me.nickname = body.nickname.trim();
+			if (typeof body.email === "string") me.email = body.email.trim();
+			return ok(res, null);
+		})],
 
 	// 赛事
 	["GET", /^\/api\/events$/, (_m, res, req) =>
