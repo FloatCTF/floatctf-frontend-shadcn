@@ -3016,6 +3016,23 @@ const routes = [
 			for (const key of ["name", "safe_name", "category", "description", "hidden", "version", "author"]) {
 				if (body[key] !== undefined) challenge[key] = body[key];
 			}
+			// 编辑表单会提交明文 flag（空串 = 清空）、容器端口与推荐资源；不持久化会出现
+			// 「保存成功但重开又变回去」。
+			if (body.static_flag_value !== undefined) {
+				challenge.static_flag_value = String(body.static_flag_value);
+			}
+			if (body.container_port !== undefined) {
+				challenge.container_port = body.container_port === null ? null : Number(body.container_port);
+			}
+			if (body.recommended_cpu_millis !== undefined) {
+				challenge.recommended_cpu_millis = Number(body.recommended_cpu_millis);
+			}
+			if (body.recommended_memory_bytes !== undefined) {
+				challenge.recommended_memory_bytes = Number(body.recommended_memory_bytes);
+			}
+			if (body.recommended_pids_limit !== undefined) {
+				challenge.recommended_pids_limit = Number(body.recommended_pids_limit);
+			}
 			challenge.updated_at = iso(now);
 			return ok(res, challenge);
 		})],
@@ -3025,6 +3042,13 @@ const routes = [
 			const before = challenges.length;
 			for (let index = challenges.length - 1; index >= 0; index -= 1) {
 				if (ids.includes(challenges[index].id)) challenges.splice(index, 1);
+			}
+			// 题库删除要级联清理赛事挂载与题集关联，否则选手端仍能看到已删除的题。
+			for (let index = eventChallenges.length - 1; index >= 0; index -= 1) {
+				if (ids.includes(eventChallenges[index].challenge.id)) eventChallenges.splice(index, 1);
+			}
+			for (const [setId, list] of Object.entries(mockSetChallenges)) {
+				mockSetChallenges[setId] = list.filter((id) => !ids.includes(id));
 			}
 			return ok(res, before - challenges.length);
 		})],
