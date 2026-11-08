@@ -189,3 +189,18 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 复测：题库编辑、题目删除级联、AWD/AWDP 控制台标签、移动端无横向溢出、社区删除无 404。
 
 验证：`vite build` / i18n / theme / mock-check 全绿；10 条重点路由 sweep 0 console error。
+
+## 第 7 轮补充（个人赛战队数据 / AWD 通用实例标签）
+
+已完成：
+
+- **个人赛不再显示 AWD 假战队**：`GET /admin/events/:id/teams` 之前对所有赛事返回同一份 AWD 战队，
+  导致 E1（Jeopardy 个人赛）出现「个人赛通常没有战队数据」+ 3 支 AWD 战队的矛盾。现在按
+  `participant_mode` 返回空列表，E1 显示空状态，E2（AWD 战队赛）仍返回 3 支。
+- **AWD/AWDP 隐藏通用「实例 / Writeup」标签**：通用实例是 Jeopardy 语义，AWD 下会显示
+  「签到 / Notes 题目实例」，与 AWD 运维页的 GameBox 实例矛盾；现在非 Jeopardy 只保留
+  配置 / 成员 / 战队 / 公告 / 日志 + 专属概览，深链接 `?tab=instances/writeups` 回退「配置」。
+- 事件 `team_count` 同步按 `participant_mode` 计算，个人赛为 0。
+
+验证：E1 战队空状态、E2 战队 3 行、E1 实例标签仍在、E2/E6 深链接回退配置；
+`vite build` / i18n / mock-check 全绿。
