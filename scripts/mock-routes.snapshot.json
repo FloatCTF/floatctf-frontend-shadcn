@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T01:43:58.937Z",
+	"generatedAt": "2026-11-08T01:49:31.115Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -24,6 +24,10 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/users"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/weapons"
 		},
 		{
 			"method": "DELETE",
@@ -394,6 +398,10 @@
 			"pattern": "\\/api\\/writeups\\/([^/]+)"
 		},
 		{
+			"method": "GET",
+			"pattern": "\\/public\\/(.+)"
+		},
+		{
 			"method": "PATCH",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd"
 		},
@@ -412,6 +420,10 @@
 		{
 			"method": "PATCH",
 			"pattern": "\\/api\\/admin\\/scheduled_tasks\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/weapons\\/([^/]+)"
 		},
 		{
 			"method": "PATCH",
@@ -484,6 +496,14 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/admin\\/scheduled_tasks\\/([^/]+)\\/run"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/weapons"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/weapons\\/([^/]+)\\/upload"
 		},
 		{
 			"method": "POST",

@@ -1205,6 +1205,58 @@ const mockTeamResult = (event) => {
 	};
 };
 
+/** 附件下载（mock）：/public/<key> 返回一个可下载的占位文件，并累加武器下载计数。 */
+const handlePublicFile = (key, res) => {
+	const weapon = weapons.find((item) => item.file_url.replace(/^\/+/, "") === key);
+	if (weapon) weapon.download_count = (weapon.download_count ?? 0) + 1;
+	const filename = key.split("/").pop() || "attachment.txt";
+	const body = `FloatCTF mock attachment\nkey: ${key}\n`;
+	res.writeHead(200, {
+		"content-type": "application/octet-stream",
+		"content-disposition": `attachment; filename="${filename}"`,
+		"content-length": Buffer.byteLength(body),
+	});
+	res.end(body);
+};
+
+
+/** 武器库附件（mock）：file_url 是对象存储 key，前端拼成 /public/<key> 下载。 */
+const weapons = [
+	{
+		id: "w-1",
+		name: "pwn 工具速查表",
+		category: "Pwn",
+		description: "常用 pwntools / ROPgadget 命令速查（纯文本）。",
+		has_file: true,
+		download_count: 143,
+		file_url: "weapons/pwn-cheatsheet.txt",
+		created_at: iso(now - 40 * D),
+		updated_at: iso(now - 5 * D),
+	},
+	{
+		id: "w-2",
+		name: "弱口令字典（示例）",
+		category: "Misc",
+		description: "演示用的 5 行弱口令列表，真实场景请自备字典。",
+		has_file: true,
+		download_count: 87,
+		file_url: "weapons/tiny-wordlist.txt",
+		created_at: iso(now - 32 * D),
+		updated_at: iso(now - 12 * D),
+	},
+	{
+		id: "w-3",
+		name: "模板：Writeup 骨架",
+		category: "写作",
+		description: "暂无附件（has_file=false）：用于验证下载按钮的禁用态。",
+		has_file: false,
+		download_count: 0,
+		file_url: "",
+		created_at: iso(now - 9 * D),
+		updated_at: iso(now - 9 * D),
+	},
+];
+
 const routes = [
 
 
@@ -1667,7 +1719,8 @@ const routes = [
 		if (target) target.comment_count = discussionComments.filter((c) => c.discussion_id === m[1]).length;
 		return ok(res, null);
 	}],
-	["GET", /^\/api\/weapons$/, (_m, res, req) => ok(res, [], req)],
+	["GET", /^\/public\/(.+)$/, (m, res) => handlePublicFile(m[1], res)],
+	["GET", /^\/api\/weapons$/, (_m, res, req) => ok(res, weapons, req)],
 	["GET", /^\/api\/instances$/, (_m, res, req) => ok(res, [], req)],
 
 	// AWD 驾驶舱
@@ -2016,7 +2069,54 @@ const routes = [
 	["GET", /^\/api\/admin\/docker\/networks$/, (_m, res, req) => ok(res, [], req)],
 	["GET", /^\/api\/admin\/announcements$/, (_m, res, req) => okPage(res, announcements.filter((a) => mockFilterMatch(req, a)), req)],
 	["GET", /^\/api\/admin\/discussions$/, (_m, res, req) => okPage(res, discussions.filter((d) => mockFilterMatch(req, d)), req)],
-	["GET", /^\/api\/admin\/weapons$/, (_m, res, req) => ok(res, [], req)],
+	["POST", /^\/api\/admin\/weapons$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const weapon = {
+				id: `w-${Date.now()}`,
+				name: String(body.name ?? "未命名武器"),
+				category: String(body.category ?? "Misc"),
+				description: String(body.description ?? ""),
+				has_file: false,
+				download_count: 0,
+				file_url: "",
+				created_at: iso(now),
+				updated_at: iso(now),
+			};
+			weapons.push(weapon);
+			return ok(res, weapon);
+		})],
+	["PATCH", /^\/api\/admin\/weapons\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const weapon = weapons.find((item) => item.id === m[1]);
+			if (!weapon) return json(res, 404, { code: 404, message: "武器不存在", data: null, meta: null });
+			weapon.name = body.name ?? weapon.name;
+			weapon.category = body.category ?? weapon.category;
+			weapon.description = body.description ?? weapon.description;
+			weapon.updated_at = iso(now);
+			return ok(res, weapon);
+		})],
+	["POST", /^\/api\/admin\/weapons\/([^/]+)\/upload$/, (m, res, req) => {
+		// multipart 表单：mock 不解析内容，只把附件状态置为已上传。
+		req.resume();
+		req.on("end", () => {
+			const weapon = weapons.find((item) => item.id === m[1]);
+			if (!weapon) return json(res, 404, { code: 404, message: "武器不存在", data: null, meta: null });
+			weapon.has_file = true;
+			weapon.file_url = `weapons/${weapon.id}.bin`;
+			weapon.updated_at = iso(now);
+			return ok(res, null);
+		});
+	}],
+	["DELETE", /^\/api\/admin\/weapons$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const before = weapons.length;
+			for (let index = weapons.length - 1; index >= 0; index -= 1) {
+				if (ids.includes(weapons[index].id)) weapons.splice(index, 1);
+			}
+			return ok(res, before - weapons.length);
+		})],
+	["GET", /^\/api\/admin\/weapons$/, (_m, res, req) => ok(res, weapons, req)],
 ];
 
 const server = http.createServer((req, res) => {
