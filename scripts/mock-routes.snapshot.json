@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-07T23:59:56.570Z",
+	"generatedAt": "2026-11-08T00:13:40.700Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -464,6 +464,10 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/session"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/submit\\/writeup"
 		},
 		{
 			"method": "POST",
