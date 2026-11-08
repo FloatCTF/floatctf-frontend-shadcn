@@ -393,6 +393,19 @@ export function EventWorkspacePage() {
 						now.getTime(),
 					);
 					const caps = eventCapabilities(data.event);
+					// 深链接可能带来过期/越权的 tab（?tab=arena 但本赛事是 Jeopardy）：
+					// Radix 对未知 value 不会选中任何项 → 页面变空白。统一回落到 overview。
+					const availableTabs = [
+						"overview",
+						...(caps.challenges ? ["challenges"] : []),
+						...(caps.arena ? ["arena"] : []),
+						...(caps.lab ? ["lab"] : []),
+						...(caps.scoreboard ? ["scoreboard"] : []),
+						...(caps.trend ? ["trend"] : []),
+						...(caps.instances ? ["instances"] : []),
+						"bulletin",
+					];
+					const activeTab = availableTabs.includes(tab) ? tab : "overview";
 					const resolvedEventId = eventIdOf(data);
 					const gated = status !== "upcoming" && !data.joined;
 					const isTeam = data.event.participant_mode === "team";
@@ -427,7 +440,7 @@ export function EventWorkspacePage() {
 										<MemberGateNotice event={data.event} />
 									) : (
 										<Tabs
-											value={tab}
+											value={activeTab}
 											onValueChange={(value) => {
 												params.set("tab", value);
 												setParams(params, { replace: true });
