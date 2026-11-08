@@ -352,3 +352,32 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 
 测试数据已清理：删除 `Real QA Event`、2 道测试题目与 `floatctf/test-c` 镜像；系统练习赛事保留。
 仍待：真实 AWD/AWDP 全流程（需要更多 fixture）；v0.2 截图重采。
+
+## 第 18 轮补充（真实 AWD E2E）
+
+已完成真实 AWD 全链路：
+
+- 构建 `floatctf/awd-flagserver:latest`、`floatctf/awd-judgeserver:latest`、
+  `floatctf/infra/awdp-judgeserver:latest`；加载 `br_netfilter` 并开启 bridge netfilter。
+- 导入 `examples/test-g` GameBox → 开通 AWD → 自动分配网络 → 挂载 GameBox → 选手先建队 →
+  部署 → 预检通过 → 开赛 → HardeningEnd → Attack 第 1 轮。
+- 选手驾驶舱真实显示 GameBox `test-g`（10.0.1.2）、WireGuard 配置、积分榜；
+  错误 flag 被后端拒绝（`flag 无效或已过期`）；GameBox 重置成功；暂停/恢复均成功。
+
+真实 API 下发现并修复：
+
+- **部署失败后状态查询不刷新**：首次部署失败进入 `deploy_failed`，但页面仍显示旧
+  `configuring`，部署按钮可用，再点收到 `Invalid transition: DeployFailed -> Deploying`。
+  现在生命周期动作失败后立即刷新所有 AWD 状态；`DeployFailed` / `VerificationFailed`
+  不再标成可部署，按钮禁用并给出“修改任意配置字段并保存后回到配置中”的恢复提示。
+- **手工开赛后选手端仍被赛程挡住**：管理员可在 event.start_time 之前手动开赛，此时
+  AWD 已 running，但选手端只按 event 时间判定 `upcoming`，进入竞技场显示“赛事尚未开始”。
+  现在 AWD 状态为 running / paused / network_error 时，优先信任 AWD 权威状态放行。
+- 保留真实 AWD 观测到的两个后端契约缺口，不在前端伪造：
+  1. `DeployFailed` 属于 `is_configurable()`，但状态机只允许 `DeployFailed -> Configuring`，
+     直接 deploy 永远非法；需要后端在 deploy 入口自动先回 Configuring，或前端提供一键恢复。
+  2. 队伍在 deploy 之后创建时，预检仍可通过，但该队没有 GameBox/网络段；开赛后选手端只能
+     看到“需要管理员重新部署”，而 running 状态又不允许重新部署。
+
+测试数据已清理：删除 AWD 赛事、test-g GameBox 与镜像；保留运行时基础镜像供后续真实 AWD 回归。
+验证：`vite build` / i18n / theme 全绿；清理后 10 条重点路由 0 console error。
