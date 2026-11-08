@@ -651,12 +651,17 @@ export function TrainingActionPanel({
 								accept=".tar.gz,.tgz,application/gzip"
 								className="hidden"
 								disabled={!patchGate.allowed || patchMutation.isPending}
-								onChange={(event) => {
+								onChange={async (event) => {
 									const file = event.target.files?.[0];
 									event.target.value = "";
 									if (!file) return;
 									if (!/\.(tar\.gz|tgz)$/i.test(file.name)) {
 										toast.error(t("training.actions.fix.patchFormat"));
+										return;
+									}
+									const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+									if (head[0] !== 0x1f || head[1] !== 0x8b) {
+										toast.error(t("training.actions.fix.patchGzip"));
 										return;
 									}
 									patchMutation.mutate(file);

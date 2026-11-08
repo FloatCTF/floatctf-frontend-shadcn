@@ -803,12 +803,17 @@ export function AwdpActionPanel({
 								tabIndex={-1}
 								aria-label={t("awdp.actions.patchLabel")}
 								disabled={!patchGate.allowed || patchMutation.isPending}
-								onChange={(event) => {
+								onChange={async (event) => {
 									const file = event.target.files?.[0];
 									event.target.value = "";
 									if (!file) return;
 									if (!/\.(tar\.gz|tgz)$/i.test(file.name)) {
 										toast.error(t("awdp.actions.patchFormat"));
+										return;
+									}
+									const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+									if (head[0] !== 0x1f || head[1] !== 0x8b) {
+										toast.error(t("awdp.actions.patchGzip"));
 										return;
 									}
 									patchMutation.mutate(file);

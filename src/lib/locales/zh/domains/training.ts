@@ -352,6 +352,7 @@ export default {
 			patchHint: "gzip 压缩的 tar 归档，根目录含 patch.sh；multipart 字段名为 patch_file，不要手动设置 Content-Type。",
 			chooseUpload: "选择并上传",
 			patchFormat: "请上传 patch.tar.gz 或 .tgz（gzip tar 归档，根目录含 patch.sh）。",
+			patchGzip: "文件不是 gzip 格式；请上传真正的 patch.tar.gz。",
 			patchResult: "补丁结果：",
 			applied: "已应用",
 			failed: "应用失败",

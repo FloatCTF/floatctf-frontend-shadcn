@@ -365,6 +365,7 @@ export default {
 			patchHint: "A gzip tar archive with patch.sh at its root; the multipart field name is patch_file, do not set Content-Type.",
 			chooseUpload: "Choose and upload",
 			patchFormat: "Upload patch.tar.gz or .tgz (a gzip tar archive containing patch.sh at its root).",
+			patchGzip: "The file is not gzip-compressed; upload a real patch.tar.gz.",
 			patchResult: "Patch result:",
 			applied: "Applied",
 			failed: "Failed to apply",
