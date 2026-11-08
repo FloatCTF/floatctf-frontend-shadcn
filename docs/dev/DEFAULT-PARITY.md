@@ -168,3 +168,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：管理端 Dashboard 顺序改为 Default 的统计/赛事/需要关注/最近活动/基础设施，移除独立版本卡。
 
 - 2026-11-08：管理端 GameBox 库列改为 Default 的名称/安全名/版本构建/镜像/可见性。
+
+- 2026-11-08：管理端公告列补 ID，列顺序与 Default 一致：ID/标题/内容/发布者/创建/更新。

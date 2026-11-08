@@ -28,10 +28,11 @@ export default {
 			placeholder: "Search titles or body",
 		},
 		columns: {
+			id: "ID",
 			title: "Title",
 			content: "Content",
 			publisher: "Publisher",
-			createdAt: "Published",
+			createdAt: "Created",
 			updatedAt: "Updated",
 		},
 		publisher: {

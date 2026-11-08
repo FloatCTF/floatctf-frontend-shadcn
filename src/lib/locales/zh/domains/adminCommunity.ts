@@ -28,10 +28,11 @@ export default {
 			placeholder: "搜索标题 / 正文",
 		},
 		columns: {
+			id: "ID",
 			title: "标题",
 			content: "内容",
 			publisher: "发布者",
-			createdAt: "发布时间",
+			createdAt: "创建时间",
 			updatedAt: "更新时间",
 		},
 		publisher: {

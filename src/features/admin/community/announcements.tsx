@@ -159,6 +159,13 @@ export function AdminAnnouncementsPage(): ReactNode {
 
 	const columns: DataTableColumn<Announcements>[] = [
 		{
+			id: "id",
+			header: t("adminCommunity.announcements.columns.id"),
+			sortValue: (row) => row.id,
+			cell: (row) => <MonoText className="text-xs text-muted-foreground">{row.id}</MonoText>,
+			hideBelow: "lg",
+		},
+		{
 			id: "title",
 			header: t("adminCommunity.announcements.columns.title"),
 			sortValue: (row) => row.title,
