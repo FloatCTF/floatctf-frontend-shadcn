@@ -240,3 +240,17 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 复测：无效题目只有 not-found 块；`/challenges/c-0003` 正常进入工作台。
 
 验证：`vite build` / i18n / theme / mock-check 全绿。
+
+## 第 11 轮补充（无效训练 Run / AWD·AWDP 无效赛事）
+
+已完成：
+
+- **无效训练 Run 不再被伪造**：mock 的 `GET /service/awdp/runs/:id` 对任意 id 都返回一份可操作
+  的 run，导致 `/training/runs/does-not-exist` 显示 web-shop 工作台和「run does-not」。
+  现在只接受真实存在的 run-1 / run-2 / run-done，其它返回 404；页面显示「未找到该训练 run +
+  返回训练场」。
+- **AWD/AWDP 无效赛事深链接**：`/arena/does-not-exist`、`/lab/does-not-exist` 原先显示
+  「加载赛事信息失败 + 重试」；现在显示「赛事不存在 + 返回赛事列表」，不再给无效重试。
+- 复测：`/training/runs/run-1`、`/arena/<真实赛事>`、`/lab/<真实赛事>` 正常。
+
+验证：`vite build` / i18n / theme / mock-check 全绿。
