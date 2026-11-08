@@ -18,8 +18,8 @@ export function RequireUser({ children }: { children: ReactNode }) {
 	const authenticated = useIsUserAuthenticated();
 	const location = useLocation();
 	if (!authenticated) {
-		const next = `${location.pathname}${location.search}`;
-		return <Navigate to={`/login?next=${encodeURIComponent(next || "/")}`} replace />;
+		const next = safeNextPath(`${location.pathname}${location.search}`, "/");
+		return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />;
 	}
 	return <>{children}</>;
 }
@@ -28,8 +28,8 @@ export function RequireAdmin({ children }: { children: ReactNode }) {
 	const authenticated = useIsAdminAuthenticated();
 	const location = useLocation();
 	if (!authenticated) {
-		const next = `${location.pathname}${location.search}`;
-		return <Navigate to={`/admin/login?next=${encodeURIComponent(next || "/admin")}`} replace />;
+		const next = safeNextPath(`${location.pathname}${location.search}`, "/admin");
+		return <Navigate to={`/admin/login?next=${encodeURIComponent(next)}`} replace />;
 	}
 	return <>{children}</>;
 }
