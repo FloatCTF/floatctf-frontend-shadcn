@@ -593,3 +593,17 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 实测：8 字节坏 PNG 被拦截且 textarea 保持空；合法 tiny PNG 正常插入 `![...](/public/images/...)`。
 
 验证：`vite build` / i18n（5029 keys）/ theme 全绿。
+
+## 第 34 轮补充（Writeup PDF 魔数）
+
+赛事 Writeup 只按 MIME / 后缀判断 PDF；一个文本文件改名 `fake.pdf` 能进入待提交，
+点提交后才收到后端英文错误 `Writeup must be a valid PDF file`。
+
+- 选择文件时读取前 1024 字节，要求包含 `%PDF-`；
+- 不匹配时立即中文 toast，`file` 保持空；
+- 合法 PDF 仍正常进入待提交状态。
+
+实测：`fake.pdf` 被前端拦截；带 `%PDF-` 头的文件正常显示文件名。
+测试赛事已删除。
+
+验证：`vite build` / i18n（5030 keys）/ theme 全绿。
