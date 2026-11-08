@@ -48,6 +48,11 @@ export default {
 			description: "Try a different search keyword or role key.",
 		},
 		columns: {
+			id: "ID",
+			key: "Key",
+			name: "Name",
+			description: "Description",
+			protected: "Built-in",
 			role: "Role",
 			flags: "Attributes",
 			permissions: "Permissions",

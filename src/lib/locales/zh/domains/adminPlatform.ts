@@ -45,6 +45,11 @@ export default {
 			description: "试试调整搜索关键字或角色 key。",
 		},
 		columns: {
+			id: "ID",
+			key: "标识",
+			name: "名称",
+			description: "说明",
+			protected: "内置",
 			role: "角色",
 			flags: "属性",
 			permissions: "权限",

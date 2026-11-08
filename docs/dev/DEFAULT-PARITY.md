@@ -154,3 +154,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：管理端 AWDP 控制台增加 Default 的配置/概览/靶机箱/积分榜/WriteUps/数据/实例子页，复用真实 AWDP 运维面板。
 
 - 2026-11-08：管理端用户列改为 Default 的 ID/用户名/昵称/邮箱。
+
+- 2026-11-08：管理端角色列改为 Default 的 ID/标识/名称/说明/权限/内置/持有账号。

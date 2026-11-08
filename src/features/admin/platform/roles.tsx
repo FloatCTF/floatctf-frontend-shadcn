@@ -191,11 +191,14 @@ export function AdminRolesPage(): ReactNode {
 	}
 
 	function renderPermissions(row: RoleDto): ReactNode {
+		if (row.grants_all) {
+			return <span className="text-xs">{t("adminPlatform.roles.permissionsAll")}</span>;
+		}
+		const list = row.permissions ?? [];
+		if (list.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
 		return (
-			<span className="tnum text-xs text-muted-foreground">
-				{row.grants_all
-					? t("adminPlatform.roles.permissionsAll")
-					: t("adminPlatform.common.countItems", { count: row.permissions.length })}
+			<span className="line-clamp-2 max-w-xl break-words text-xs text-muted-foreground">
+				{list.join(", ")}
 			</span>
 		);
 	}
@@ -246,20 +249,32 @@ export function AdminRolesPage(): ReactNode {
 
 	const columns: DataTableColumn<RoleDto>[] = [
 		{
+			id: "id",
+			header: t("adminPlatform.roles.columns.id"),
+			cell: (row) => <MonoText className="text-xs text-muted-foreground">{row.id}</MonoText>,
+			sortValue: (row) => row.id,
+			hideBelow: "md",
+		},
+		{
+			id: "key",
+			header: t("adminPlatform.roles.columns.key"),
+			cell: (row) => <MonoText>{row.key}</MonoText>,
+			sortValue: (row) => row.key,
+		},
+		{
 			id: "name",
-			header: t("adminPlatform.roles.columns.role"),
-			cell: (row) => (
-				<div className="flex min-w-0 flex-col">
-					<span className="truncate text-sm font-medium">{row.name}</span>
-					<MonoText className="text-xs text-muted-foreground">{row.key}</MonoText>
-				</div>
-			),
+			header: t("adminPlatform.roles.columns.name"),
+			cell: (row) => <span className="text-sm font-medium">{row.name}</span>,
 			sortValue: (row) => row.name,
 		},
 		{
-			id: "flags",
-			header: t("adminPlatform.roles.columns.flags"),
-			cell: (row) => renderFlags(row),
+			id: "description",
+			header: t("adminPlatform.roles.columns.description"),
+			cell: (row) => (
+				<span className="line-clamp-2 max-w-xl text-xs text-muted-foreground">
+					{row.description || "—"}
+				</span>
+			),
 			hideBelow: "sm",
 		},
 		{
@@ -267,6 +282,13 @@ export function AdminRolesPage(): ReactNode {
 			header: t("adminPlatform.roles.columns.permissions"),
 			cell: (row) => renderPermissions(row),
 			sortValue: (row) => (row.grants_all ? Number.MAX_SAFE_INTEGER : row.permissions.length),
+			hideBelow: "lg",
+		},
+		{
+			id: "protected",
+			header: t("adminPlatform.roles.columns.protected"),
+			cell: (row) => <span className="text-sm">{row.protected ? t("common.yes") : t("common.no")}</span>,
+			sortValue: (row) => (row.protected ? 1 : 0),
 			hideBelow: "md",
 		},
 		{
@@ -274,13 +296,6 @@ export function AdminRolesPage(): ReactNode {
 			header: t("adminPlatform.roles.columns.holders"),
 			cell: (row) => <span className="tnum text-sm">{row.user_count}</span>,
 			sortValue: (row) => row.user_count,
-			hideBelow: "lg",
-		},
-		{
-			id: "actions",
-			header: "",
-			align: "right",
-			cell: (row) => renderRowMenu(row),
 		},
 	];
 
