@@ -778,3 +778,19 @@ SQL 控制台的 int2/int4 后端映射 bug 仍待后端修复。
 - 测试题目已删除。
 
 本轮未发现新的前端逻辑错误。
+
+## 第 48 轮补充（前端安全静态审计）
+
+对本前端做静态扫描，未发现新的安全问题：
+
+- 无原生 `alert()` / `prompt()`；`confirm(` 命中均为自定义 `useConfirm`；
+- 无 `dangerouslySetInnerHTML`，Markdown 由受控渲染器输出；
+- 无 token / access_token 拼进 URL 的真实代码；`/reset?token=…` 只是忘记密码页的
+  说明文案；
+- token 只在 `shadcn.user.token` / `shadcn.admin.token` 两个 localStorage 键中
+  持久化，SDK 不写存储；
+- 敏感值渲染：设置 `SMTP_URI` 列表 / 解析值、题目静态 flag 列表与编辑、
+  AWD WireGuard 私钥均使用 SecretValue / Secret 形态；
+- 无 mock / 占位业务数据进入生产页面。
+
+本轮未发现新的前端逻辑错误。
