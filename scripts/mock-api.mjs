@@ -2063,6 +2063,7 @@ const routes = [
 		});
 	}],
 	["POST", /^\/api\/users\/reset_password$/, (_m, res) => ok(res, "ok")],
+	["PATCH", /^\/api\/uploads\/avatar$/, (_m, res) => ok(res, "/public/avatars/mock.png")],
 	["POST", /^\/api\/users\/reset$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			if (String(body.password ?? "") !== String(body.confirmed_password ?? "")) {
@@ -2419,6 +2420,18 @@ const routes = [
 	["GET", /^\/api\/weapons$/, (_m, res, req) => ok(res, weapons, req)],
 	["GET", /^\/api\/instances$/, (_m, res, req) =>
 		ok(res, Object.values(mockChallengeInstances), req)],
+	["DELETE", /^\/api\/instances$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			let removed = 0;
+			for (const [key, instance] of Object.entries(mockChallengeInstances)) {
+				if (ids.includes(instance.id)) {
+					delete mockChallengeInstances[key];
+					removed += 1;
+				}
+			}
+			return ok(res, removed);
+		})],
 
 	// AWD 驾驶舱
 	["GET", /^\/api\/events\/([^/]+)\/awd\/status$/, (m, res) => {
@@ -2515,15 +2528,17 @@ const routes = [
 		})],
 	["GET", /^\/api\/admin\/awd\/network\/health$/, (_m, res) =>
 		ok(res, {
-			nftables: "ok",
-			wireguard: "ok",
-			docker: "ok",
-			firewall_runtime: "nftables",
-			floatctf_table: "present",
+			// 与后端 PlatformHostStatus 的实际字符串一致：Healthy (...)/Missing、
+			// Available/Unknown；前端按这些前缀映射状态。
+			nftables: "Healthy (mock)",
+			wireguard: "Healthy",
+			docker: "Available",
+			firewall_runtime: "native nftables",
+			floatctf_table: "inet floatctf_awd",
 			docker_firewall_backend: "iptables",
 			firewalld: "inactive",
-			ipv4_forwarding: "1",
-			ipv6_policy: "disabled",
+			ipv4_forwarding: "enabled",
+			ipv6_policy: "blocked",
 			capability_supported: true,
 			notes: [],
 		})],

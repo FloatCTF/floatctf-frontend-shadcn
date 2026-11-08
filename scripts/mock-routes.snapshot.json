@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T05:44:38.353Z",
+	"generatedAt": "2026-11-08T06:21:29.995Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -112,6 +112,10 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/events\\/([^/]+)\\/team\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/instances"
 		},
 		{
 			"method": "DELETE",
