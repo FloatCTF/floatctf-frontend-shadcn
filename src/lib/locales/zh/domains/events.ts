@@ -343,6 +343,7 @@ export default {
 		overviewAction: "AWDP 总览",
 		loading: "读取 AWDP 总览…",
 		loadError: "读取 AWDP 总览失败",
+		rulesDescription: "开赛前请阅读 AWDP 规则与 Break/Fix 计分说明。",
 		phase: "当前阶段",
 		round: "轮次",
 		score: "我的得分",

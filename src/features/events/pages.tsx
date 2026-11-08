@@ -582,7 +582,7 @@ export function EventWorkspacePage() {
 
 											<TabsContent value="overview" className="mt-4">
 												{isAwdp ? (
-													<LabSummaryTab eventId={resolvedEventId} />
+													<LabSummaryTab eventId={resolvedEventId} info={data} />
 												) : isAwd ? (
 													<ArenaSummaryTab eventId={resolvedEventId} info={data} />
 												) : (
@@ -650,7 +650,7 @@ export function EventWorkspacePage() {
 											) : null}
 											{!isAwd && !isAwdp && caps.lab && canAccessContent ? (
 												<TabsContent value="lab" className="mt-4">
-													<LabSummaryTab eventId={resolvedEventId} />
+													<LabSummaryTab eventId={resolvedEventId} info={data} />
 												</TabsContent>
 											) : null}
 											{!isAwd && !isAwdp && caps.scoreboard ? (

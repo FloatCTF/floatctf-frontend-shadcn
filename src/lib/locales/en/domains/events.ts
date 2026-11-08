@@ -348,6 +348,7 @@ export default {
 		overviewAction: "AWDP overview",
 		loading: "Reading AWDP overview…",
 		loadError: "Failed to read the AWDP overview",
+		rulesDescription: "Read the AWDP rules and Break/Fix scoring notes before the match.",
 		phase: "Current phase",
 		round: "Round",
 		score: "My score",

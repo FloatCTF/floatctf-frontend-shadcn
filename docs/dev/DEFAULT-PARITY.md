@@ -196,3 +196,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：选手端 AWD 概览补 Default 的 Flag 提交面板（阶段门禁由后端 status 派生）。
 
 - 2026-11-08：选手端 AWD 概览补 Default 的战队信息与赛事 Writeup 提交面板。
+
+- 2026-11-08：选手端 AWDP 概览补 Default 的赛事规则、战队信息与 Writeup 提交。

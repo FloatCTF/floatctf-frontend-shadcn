@@ -816,7 +816,13 @@ export function ArenaSummaryTab({
 	);
 }
 
-export function LabSummaryTab({ eventId }: { eventId: string }) {
+export function LabSummaryTab({
+	eventId,
+	info,
+}: {
+	eventId: string;
+	info: EventInfo;
+}) {
 	const { t } = useTranslation();
 	const awdpPhase = useEnumLabel(AWDP_PHASE_KEYS);
 	const client = useClient();
@@ -829,6 +835,14 @@ export function LabSummaryTab({ eventId }: { eventId: string }) {
 
 	return (
 		<div className="space-y-4">
+			<SectionCard
+				title={t("events.overview.rulesTitle")}
+				description={t("events.awdp.rulesDescription")}
+			>
+				<MarkdownView emptyText={t("events.overview.rulesEmpty")}>
+					{info.event.rules}
+				</MarkdownView>
+			</SectionCard>
 			<QueryState
 				query={query}
 				skeleton={<LoadingBlock label={t("events.awdp.loading")} />}
@@ -862,6 +876,44 @@ export function LabSummaryTab({ eventId }: { eventId: string }) {
 								value={overview.gameboxes.length}
 							/>
 						</div>
+						<EventWriteupPanel info={info} />
+
+						{info.team_result ? (
+							<SectionCard
+								title={t("events.awd.teamTitle")}
+								description={t("events.awd.teamDescription")}
+							>
+								<KeyValueList
+									columns={1}
+									items={[
+										{
+											key: t("events.awd.teamName"),
+											value: (
+												<span className="font-medium">
+													{info.team_result.team.name}
+												</span>
+											),
+										},
+										{
+											key: t("events.awd.teamId"),
+											value: <MonoText>{info.team_result.team.id}</MonoText>,
+										},
+										...info.team_result.members.map((member) => ({
+											key: member.member.role,
+											value: (
+												<span>
+													{member.member_name}{" "}
+													<span className="text-xs text-muted-foreground">
+														{formatDateTime(member.member.joined_at, { seconds: true })}
+													</span>
+												</span>
+											),
+										})),
+									]}
+								/>
+							</SectionCard>
+						) : null}
+
 						<SectionCard
 							title={t("events.awdp.workbenchTitle")}
 							description={t("events.awdp.workbenchDescription")}
