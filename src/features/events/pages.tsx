@@ -435,8 +435,6 @@ export function EventWorkspacePage() {
 								"overview",
 								...(caps.challenges && canAccessContent ? ["challenges"] : []),
 								...(caps.instances && canAccessContent ? ["instances"] : []),
-								...(caps.arena && canAccessContent ? ["arena"] : []),
-								...(caps.lab && canAccessContent ? ["lab"] : []),
 								...(caps.scoreboard ? ["scoreboard"] : []),
 								...(caps.trend ? ["trend"] : []),
 								"bulletin",
@@ -552,16 +550,6 @@ export function EventWorkspacePage() {
 													</TabsTrigger>
 												) : null}
 	
-												{!isAwd && caps.arena && canAccessContent ? (
-													<TabsTrigger value="arena" className="shrink-0">
-														{t("events.workspace.tabs.arena")}
-													</TabsTrigger>
-												) : null}
-												{!isAwd && !isAwdp && caps.lab && canAccessContent ? (
-													<TabsTrigger value="lab" className="shrink-0">
-														{t("events.workspace.tabs.lab")}
-													</TabsTrigger>
-												) : null}
 												{!isAwd && !isAwdp && caps.scoreboard ? (
 													<TabsTrigger value="scoreboard" className="shrink-0">
 														{t("events.workspace.tabs.scoreboard")}
@@ -641,16 +629,6 @@ export function EventWorkspacePage() {
 											{!isAwd && caps.instances && canAccessContent ? (
 												<TabsContent value="instances" className="mt-4">
 													<InstancesTab eventId={resolvedEventId} />
-												</TabsContent>
-											) : null}
-											{!isAwd && caps.arena && canAccessContent ? (
-												<TabsContent value="arena" className="mt-4">
-													<ArenaSummaryTab eventId={resolvedEventId} info={data} />
-												</TabsContent>
-											) : null}
-											{!isAwd && !isAwdp && caps.lab && canAccessContent ? (
-												<TabsContent value="lab" className="mt-4">
-													<LabSummaryTab eventId={resolvedEventId} info={data} />
 												</TabsContent>
 											) : null}
 											{!isAwd && !isAwdp && caps.scoreboard ? (
