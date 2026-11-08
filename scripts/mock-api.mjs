@@ -291,12 +291,16 @@ const trend = trendNames.map((name, index) => ({
 	})),
 }));
 
-const topUsers = teams.slice(0, 15).map(([name, score, solved], index) => ({
-	no: index + 1,
-	nickname: name,
-	solved_count: solved,
-	solved_last_at: iso(now - index * 40 * 60000),
-}));
+// 后端约定：按解出题数降序，同分按最近解题时间倒序；no 为排序后的名次。
+const topUsers = teams
+	.slice(0, 15)
+	.map(([name, score, solved], index) => ({
+		nickname: name,
+		solved_count: solved,
+		solved_last_at: iso(now - index * 40 * 60000),
+	}))
+	.sort((a, b) => b.solved_count - a.solved_count || Date.parse(b.solved_last_at) - Date.parse(a.solved_last_at))
+	.map((row, index) => ({ no: index + 1, ...row }));
 
 const announcements = [
 	{
@@ -1825,6 +1829,13 @@ const routes = [
 			// 昵称/邮箱保存后必须真的持久化，否则刷新又变回去。
 			if (typeof body.nickname === "string" && body.nickname.trim()) me.nickname = body.nickname.trim();
 			if (typeof body.email === "string") me.email = body.email.trim();
+			if (typeof body.password === "string" && body.password.length > 0) {
+				// 后端同样要求最短长度；mock 只做校验，不保存明文。
+				if (body.password.length < 8) {
+					return json(res, 200, { code: 400, message: "密码长度至少 8 位", data: null, meta: null });
+				}
+				me.password_changed_at = iso(now);
+			}
 			return ok(res, null);
 		})],
 
