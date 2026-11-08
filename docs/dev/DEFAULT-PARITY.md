@@ -188,3 +188,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：选手端题目详情恢复 Default 的左右分栏：左侧题目/公开题解，右侧常驻「我的题解」编辑器。
 
 - 2026-11-08：选手端未加入赛事时保留概览/公告 Tab，概览内展示参赛提示，不再隐藏整个 Tabs。
+
+- 2026-11-08：选手端 Writeup 详情去掉额外元信息卡，作者/邮箱/时间并入页头，正文直接展示，贴近 Default。

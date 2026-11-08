@@ -331,6 +331,15 @@ export function WriteupDetailPage(): ReactNode {
 								{t("community.writeups.detail.createdLabel")}{" "}
 								<RelativeTime value={writeup.created_at} />
 							</span>
+							{writeup.email ? (
+								<a
+									href={`mailto:${writeup.email}`}
+									className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+								>
+									<Mail aria-hidden="true" className="size-4" />
+									{writeup.email}
+								</a>
+							) : null}
 						</span>
 					) : (
 						t("community.writeups.detail.subtitleFallback")
@@ -376,41 +385,6 @@ export function WriteupDetailPage(): ReactNode {
 			>
 				{(data) => (
 					<div className="space-y-5">
-						<SectionCard
-							title={t("community.writeups.detail.metaTitle")}
-							description={t("community.writeups.detail.metaDescription")}
-						>
-							<div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-								<span className="text-muted-foreground">
-									{t("community.writeups.detail.contentLabel")}
-									{data.writeup_type === "challenge" ? (
-										<Link
-											to={`/challenges/${data.content_id}`}
-											className="text-foreground hover:underline"
-										>
-											{data.category ? `${data.category} / ` : ""}
-											{data.content_name}
-										</Link>
-									) : (
-										<span className="text-foreground">{data.content_name}</span>
-									)}
-								</span>
-								<span className="text-muted-foreground">
-									{t("community.writeups.detail.authorLabel")}
-									<span className="text-foreground">{data.nickname}</span>
-								</span>
-								{data.email ? (
-									<a
-										href={`mailto:${data.email}`}
-										className="inline-flex items-center gap-1 text-muted-foreground hover:underline"
-									>
-										<Mail aria-hidden="true" className="size-4" />
-										{data.email}
-									</a>
-								) : null}
-							</div>
-						</SectionCard>
-
 						<SectionCard
 							title={t("community.writeups.detail.contentTitle")}
 							description={t("community.writeups.detail.contentDescription")}
