@@ -946,6 +946,36 @@ const broadcastSse = (data) => {
 };
 
 /** mock 里少数需要看请求体的路由（flag 校验）：其余路由忽略 body。 */
+
+/** 解析后端 `filter` 查询参数（`key:value`，空格续接，`&`/`|` 分隔）；mock 只实现 AND 包含匹配。 */
+const parseFilter = (req) => {
+	const url = new URL(req.url ?? "", "http://mock.local");
+	const raw = url.searchParams.get("filter") ?? "";
+	const tokens = raw.split(/\s+/).filter(Boolean);
+	const filters = {};
+	let index = 0;
+	while (index < tokens.length) {
+		const token = tokens[index];
+		if (token === "&" || token === "|") {
+			index += 1;
+			continue;
+		}
+		const [key, ...rest] = token.split(":");
+		let value = rest.join(":");
+		index += 1;
+		while (index < tokens.length && tokens[index] !== "&" && tokens[index] !== "|") {
+			value += ` ${tokens[index]}`;
+			index += 1;
+		}
+		if (key && value) filters[key] = value;
+	}
+	return filters;
+};
+
+/** 不区分大小写的包含匹配（mock 的通用过滤）。 */
+const matchesContains = (value, needle) =>
+	String(value ?? "").toLowerCase().includes(String(needle ?? "").toLowerCase());
+
 const readJsonBody = (req) =>
 	new Promise((resolve) => {
 		let raw = "";
@@ -1298,7 +1328,16 @@ const routes = [
 	["GET", /^\/api\/solves\/top15users$/, (_m, res) => ok(res, topUsers)],
 	["GET", /^\/api\/writeups$/, (_m, res, req) => ok(res, unifiedWriteups, req)],
 	["GET", /^\/api\/writeups\/([^/]+)$/, (_m, res) => ok(res, unifiedWriteupDetail)],
-	["GET", /^\/api\/discussions$/, (_m, res, req) => ok(res, discussions, req)],
+	["GET", /^\/api\/discussions$/, (_m, res, req) => {
+		const f = parseFilter(req);
+		const list = discussions.filter(
+			(d) =>
+				(!f.title || matchesContains(d.title, f.title)) &&
+				(!f.author_id || d.author_id === f.author_id) &&
+				(!f.author_nickname || matchesContains(d.author_nickname, f.author_nickname)),
+		);
+		return ok(res, list, req);
+	}],
 	["POST", /^\/api\/discussions$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const title = String(body.title ?? "").trim();
