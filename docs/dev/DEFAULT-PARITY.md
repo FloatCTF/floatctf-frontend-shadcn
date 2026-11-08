@@ -184,3 +184,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：版本页去掉重复 Version 行，仅保留 floatctf-web / floatctf-api。
 
 - 2026-11-08：选手端讨论详情改为 Default 单列：正文在上、评论区在下，不再左右分栏。
+
+- 2026-11-08：选手端题目详情恢复 Default 的左右分栏：左侧题目/公开题解，右侧常驻「我的题解」编辑器。

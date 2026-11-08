@@ -47,7 +47,7 @@ import type { ChallengesListItem } from "@floatctf/sdk";
 import type { ChallengeSets } from "@floatctf/sdk/entity";
 import { formatRelative } from "~/lib/format";
 import { useDebouncedValue, useDocumentTitle, useNow } from "~/lib/hooks";
-import { ChallengeWorkbench, ChallengeWriteups } from "./workbench";
+import { ChallengeWorkbench, ChallengeWriteups, MyWriteupEditor } from "./workbench";
 
 /** 表格里统一的空值占位（theme.md §3.3）。 */
 function EmptyCell() {
@@ -435,31 +435,45 @@ export function ChallengeDetailPage() {
 								) : null
 							}
 						/>
-						<Tabs defaultValue="challenge" className="flex min-h-0 flex-1 flex-col gap-3">
-							<TabsList className="w-fit">
-								<TabsTrigger value="challenge">
-									{t("jeopardy.detail.tabs.challenge")}
-								</TabsTrigger>
-								<TabsTrigger value="writeup">
-									{t("jeopardy.detail.tabs.writeup")}
-								</TabsTrigger>
-							</TabsList>
-							<TabsContent value="challenge" className="min-h-0 flex-1">
-								<ChallengeWorkbench
-									challenge={challenge}
-									mode={{ kind: "practice" }}
-									className="lg:min-h-0 lg:flex-1"
-								/>
-							</TabsContent>
-							<TabsContent value="writeup" className="min-h-0 flex-1 overflow-y-auto">
-								<SectionCard
-									title={t("jeopardy.detail.writeupsTitle")}
-									description={t("jeopardy.detail.writeupsDescription")}
-								>
-									<ChallengeWriteups challengeId={challengeId} />
-								</SectionCard>
-							</TabsContent>
-						</Tabs>
+						<div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[5fr_7fr]">
+							<Tabs
+								defaultValue="challenge"
+								className="flex min-h-0 flex-col gap-3"
+							>
+								<TabsList className="w-fit">
+									<TabsTrigger value="challenge">
+										{t("jeopardy.detail.tabs.challenge")}
+									</TabsTrigger>
+									<TabsTrigger value="writeup">
+										{t("jeopardy.detail.tabs.writeup")}
+									</TabsTrigger>
+								</TabsList>
+								<TabsContent value="challenge" className="min-h-0 flex-1">
+									<ChallengeWorkbench
+										challenge={challenge}
+										mode={{ kind: "practice" }}
+										showWriteup={false}
+										className="lg:min-h-0 lg:flex-1"
+									/>
+								</TabsContent>
+								<TabsContent value="writeup" className="min-h-0 flex-1 overflow-y-auto">
+									<SectionCard
+										title={t("jeopardy.detail.writeupsTitle")}
+										description={t("jeopardy.detail.writeupsDescription")}
+									>
+										<ChallengeWriteups challengeId={challengeId} />
+									</SectionCard>
+								</TabsContent>
+							</Tabs>
+
+							<SectionCard
+								title={t("jeopardy.workbench.myWriteup.title")}
+								description={t("jeopardy.workbench.myWriteup.description")}
+								className="min-h-0 overflow-y-auto"
+							>
+								<MyWriteupEditor challengeId={challengeId} />
+							</SectionCard>
+						</div>
 					</>
 				)}
 			</QueryState>

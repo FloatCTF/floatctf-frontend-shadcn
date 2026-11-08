@@ -61,6 +61,8 @@ export interface ChallengeWorkbenchProps {
 	className?: string;
 	/** 附着在左栏底部的额外区块（题库详情页用它放公开题解）。 */
 	children?: ReactNode;
+	/** 详情页右侧已有常驻题解编辑器时，隐藏左栏里的折叠入口。 */
+	showWriteup?: boolean;
 }
 
 /** 后端把实例入口写成一条 `<a href=...>`（见 instance_service.rs）；这里只取 URL，不注入 HTML。 */
@@ -87,7 +89,13 @@ function instanceStatusTone(status: string | undefined): "success" | "warning" |
 	}
 }
 
-export function ChallengeWorkbench({ challenge, mode, className, children }: ChallengeWorkbenchProps) {
+export function ChallengeWorkbench({
+	challenge,
+	mode,
+	className,
+	children,
+	showWriteup = true,
+}: ChallengeWorkbenchProps) {
 	const { t } = useTranslation();
 	const confirm = useConfirm();
 	const client = useClient();
@@ -282,30 +290,32 @@ export function ChallengeWorkbench({ challenge, mode, className, children }: Cha
 					) : null}
 				</SectionCard>
 
-				<SectionCard
-					title={t("jeopardy.workbench.myWriteup.title")}
-					description={t("jeopardy.workbench.myWriteup.description")}
-					actions={
-						<Button
-							variant="ghost"
-							size="sm"
-							aria-expanded={writeupOpen}
-							onClick={() => setWriteupOpen((value) => !value)}
-						>
-							{writeupOpen
-								? t("jeopardy.workbench.myWriteup.collapse")
-								: t("jeopardy.workbench.myWriteup.expand")}
-						</Button>
-					}
-				>
-					{writeupOpen ? (
-						<MyWriteupEditor challengeId={challenge.id} />
-					) : (
-						<p className="text-sm text-muted-foreground">
-							{t("jeopardy.workbench.myWriteup.hint")}
-						</p>
-					)}
-				</SectionCard>
+				{showWriteup ? (
+					<SectionCard
+						title={t("jeopardy.workbench.myWriteup.title")}
+						description={t("jeopardy.workbench.myWriteup.description")}
+						actions={
+							<Button
+								variant="ghost"
+								size="sm"
+								aria-expanded={writeupOpen}
+								onClick={() => setWriteupOpen((value) => !value)}
+							>
+								{writeupOpen
+									? t("jeopardy.workbench.myWriteup.collapse")
+									: t("jeopardy.workbench.myWriteup.expand")}
+							</Button>
+						}
+					>
+						{writeupOpen ? (
+							<MyWriteupEditor challengeId={challenge.id} />
+						) : (
+							<p className="text-sm text-muted-foreground">
+								{t("jeopardy.workbench.myWriteup.hint")}
+							</p>
+						)}
+					</SectionCard>
+				) : null}
 
 				{children}
 			</div>
