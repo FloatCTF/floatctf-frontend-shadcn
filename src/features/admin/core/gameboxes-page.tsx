@@ -30,7 +30,7 @@ import {
 	Trash2,
 } from "lucide-react";
 
-import { call, callList, uploadFile } from "~/api/call";
+import { call, callList, uploadFile, callVoid } from "~/api/call";
 import { useAppQueryClient, useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { TonePill } from "~/components/app/badges";
@@ -274,7 +274,8 @@ export function AdminGameboxesPage(): ReactNode {
 
 	const hide = useMutation({
 		mutationFn: (id: string) =>
-			call<null>(client.awd.admin.hideGamebox(id), t("adminCore.actions.hideGamebox")),
+			// 该接口返回 data:null，必须用 callVoid。
+			callVoid(client.awd.admin.hideGamebox(id), t("adminCore.actions.hideGamebox")),
 		onSuccess: () => {
 			toast.success(
 				t("adminCore.gameboxes.toasts.hidden"),

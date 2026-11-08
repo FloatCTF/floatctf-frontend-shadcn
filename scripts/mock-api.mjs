@@ -1917,9 +1917,12 @@ const routes = [
 	["DELETE", /^\/api\/admin\/events\/([^/]+)\/users$/, (m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const ids = eventMemberIds(m[1]);
-			const removing = Array.isArray(body.user_id_list) ? body.user_id_list.map(String) : [];
+			// SDK 发的是 id_list（user_id_list 只是部分端点的别名）。
+			const raw = body.id_list ?? body.user_id_list ?? [];
+			const removing = Array.isArray(raw) ? raw.map(String) : [];
+			const matched = ids.filter((id) => removing.includes(id));
 			mockEventMembers[m[1]] = ids.filter((id) => !removing.includes(id));
-			return ok(res, removing.length);
+			return ok(res, matched.length);
 		})],
 	["GET", /^\/api\/admin\/events$/, (_m, res, req) => okPage(res, adminEvents.filter((e) => mockFilterMatch(req, e)), req)],
 	["GET", /^\/api\/admin\/events\/([^/]+)$/, (m, res) => {

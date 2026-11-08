@@ -21,7 +21,7 @@ import { Link, useParams } from "react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Minus, Plus, RefreshCw } from "lucide-react";
 
-import { call, callList } from "~/api/call";
+import { call, callList, callVoid } from "~/api/call";
 import { useAppQueryClient, useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { TonePill } from "~/components/app/badges";
@@ -109,7 +109,8 @@ export function AdminChallengeSetDetailPage(): ReactNode {
 
 	const addChallenges = useMutation({
 		mutationFn: (ids: string[]) =>
-			call<null>(
+			// 该接口返回 data:null，必须用 callVoid。
+			callVoid(
 				client.admin.challenges.addChallengeToSet({ set_id: setId, challenge_id_list: ids }),
 				t("adminCore.actions.addChallengesToSet"),
 			),
