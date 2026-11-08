@@ -46,7 +46,7 @@ import {
 	SelectValue,
 } from "~/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import type { EventChallengeResult, EventInfo } from "@floatctf/sdk";
+import type { AwdPlayerStatus, AwdpOverview, EventChallengeResult, EventInfo } from "@floatctf/sdk";
 import { formatRange, formatScore } from "~/lib/format";
 import {
 	EVENT_STATUS_TONE,
@@ -423,6 +423,25 @@ export function EventWorkspacePage() {
 	});
 
 	const info = query.data;
+	const liveEventId = info ? eventIdOf(info) : eventId;
+	const canProbeLive = info !== undefined && info.joined && !isPracticeEvent(info.event);
+	const awdLiveQuery = useQuery({
+		queryKey: qk.awd.status(liveEventId),
+		queryFn: () => call<AwdPlayerStatus>(client.awd.player.status(liveEventId), t("events.workspace.loading")),
+		enabled: canProbeLive && info?.event.family === "awd",
+		retry: false,
+	});
+	const awdpLiveQuery = useQuery({
+		queryKey: qk.awdp.overview(liveEventId),
+		queryFn: () => call<AwdpOverview>(client.awdp.player.overview(liveEventId), t("events.workspace.loading")),
+		enabled: canProbeLive && info?.event.family === "awdp",
+		retry: false,
+	});
+	const liveBeforeWindow =
+		(info?.event.family === "awd" &&
+			awdLiveQuery.data !== undefined &&
+			["running", "paused", "network_error"].includes(awdLiveQuery.data.status)) ||
+		(info?.event.family === "awdp" && awdpLiveQuery.data?.started_at != null);
 	useDocumentTitle(
 		info
 			? t("events.workspace.documentTitle", { title: info.event.title })
@@ -464,7 +483,8 @@ export function EventWorkspacePage() {
 					// - 赛事题目 / 实例 / AWD / AWDP 工作台都要求已参赛且已开赛；
 					// - 积分榜赛前可看（矩阵为空），公告始终可见。
 					// 不满足时不要渲染一个点开必失败的标签（后端会直接 400/403）。
-					const canAccessContent = data.joined && status !== "upcoming";
+					const canAccessContent =
+						data.joined && (status !== "upcoming" || liveBeforeWindow);
 					// 深链接可能带来过期/越权的 tab（?tab=arena 但本赛事是 Jeopardy）：
 					// Radix 对未知 value 不会选中任何项 → 页面变空白。统一回落到 overview。
 					const availableTabs = [
