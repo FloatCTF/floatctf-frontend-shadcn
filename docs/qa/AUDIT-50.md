@@ -155,3 +155,21 @@ node scripts/mock-check.mjs
 - 中英切换后 10 条核心路由无 missing key 警告。
 
 验证：`vite build` / i18n / theme / mock-check 全绿；7 条重点路由 sweep 0 console error。
+
+## 第 5 轮补充（社区删除 404 / 实例批量销毁 / 头像 / 宿主健康语义）
+
+已完成：
+
+- **删除讨论不再留下 404**：详情页删除后 detail/comments 查询仍挂载，原先 invalidate 会在跳转前
+  重新请求已删除 id。现在删除成功先禁用/移除详情查询，只失效列表与「我的」；实测 console 0 error。
+- **实例批量销毁可用**：mock 缺 `DELETE /api/instances`，页面会显示「未实现」。补齐后
+  选中 2 个实例 → 批量销毁 → toast「已销毁 2 个实例」，列表 2→0。
+- **头像上传可用**：补齐 `PATCH /api/uploads/avatar`；浏览器内构造 PNG 上传 → 「头像已更新」。
+- **宿主网络健康语义对齐**：mock 返回 `ok`，但前端按后端真实值 `Healthy (...)`/`Available` 映射，
+  导致「状态缺失 + 原始值 ok」自相矛盾；改为后端同款字符串后显示「正常 / 可用 / 未运行」。
+- **健康条目排版**：keyName 与 raw 值之间加分隔，避免渲染成 `nftablesHealthy (mock)`。
+
+深测通过：讨论创建 → 点赞 → 评论 → 编辑 → 删除全链路；实例批量销毁；头像上传；平台网络设置保存；
+AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
+
+验证：`vite build` / i18n / theme / mock-check 全绿；mock 路由 235 条。
