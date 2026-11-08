@@ -480,3 +480,15 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 测试赛事已删除。
 
 验证：`vite build` / i18n（5024 keys）/ theme 全绿。
+
+## 第 25 轮补充（细节与真实文件链路）
+
+- `AbsoluteTime` 上一轮已把 epoch 0 显示为「—」，但 tooltip 仍带 1970；
+  现在未知时间连 title 也不输出，前端注册表页不再出现任何 1970 线索。
+- 真实 AWDP 训练 Writeup：
+  - Markdown 保存成功，刷新后内容仍在；
+  - 「插入图片」上传真实 PNG 成功，插入 `/public/images/...` Markdown，Caddy 返回 200；
+  - 保存后刷新，图片链接仍在。
+- 320×568 扫 15 条重点路由：无横向溢出、无 console error。
+
+验证：`vite build` / i18n（5024 keys）/ theme 全绿。
