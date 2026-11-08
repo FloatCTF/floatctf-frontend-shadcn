@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { Blocks, CheckCircle2, ChevronRight, Puzzle, Search } from "lucide-react";
 
 import { call, callList } from "~/api/call";
+import { isNotFound } from "~/api/errors";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
@@ -386,6 +387,22 @@ export function ChallengeDetailPage() {
 			? t("jeopardy.detail.documentTitle", { name: query.data.name })
 			: t("jeopardy.detail.documentTitleFallback"),
 	);
+
+	if (query.isError && isNotFound(query.error)) {
+		return (
+			<PageBody>
+				<NotFoundBlock
+					title={t("jeopardy.detail.notFoundTitle")}
+					description={t("jeopardy.detail.notFoundDescription")}
+					action={
+						<Button asChild variant="outline">
+							<Link to="/challenges">{t("jeopardy.detail.backToCatalog")}</Link>
+						</Button>
+					}
+				/>
+			</PageBody>
+		);
+	}
 
 	return (
 		<PageBody className="lg:flex lg:h-[calc(100svh-3.5rem)] lg:flex-col lg:gap-4 lg:space-y-0 lg:overflow-hidden">
