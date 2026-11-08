@@ -794,3 +794,17 @@ SQL 控制台的 int2/int4 后端映射 bug 仍待后端修复。
 - 无 mock / 占位业务数据进入生产页面。
 
 本轮未发现新的前端逻辑错误。
+
+## 第 49 轮补充（最终质量门禁）
+
+本轮完整跑一遍前端门禁：
+
+- `pnpm --filter @floatctf/frontend-shadcn typecheck` → 通过；
+- `pnpm --filter @floatctf/frontend-shadcn build` → 通过
+  （`dist/assets/frontend.js` 3,913.08 kB / gzip 889.54 kB）；
+- `node scripts/i18n-check.mjs` → zh/en 5037 keys 一致；
+- `node scripts/theme-audit.mjs` → 通过；
+- `node scripts/mock-check.mjs` → 235 条 mock 路由完整；SDK 端点 148/157，
+  9 个未 mock 仅信息提示。
+
+无失败项。
