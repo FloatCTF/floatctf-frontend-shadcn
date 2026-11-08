@@ -25,9 +25,12 @@ export default {
 		columns: {
 			event: "Event",
 			family: "Family",
+			participant: "Participant",
 			status: "Status",
-			window: "Window",
+			canJoin: "Can join",
 			joined: "Participation",
+			startsAt: "Starts",
+			endsAt: "Ends",
 		},
 	},
 	status: {

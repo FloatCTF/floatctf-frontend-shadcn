@@ -9,16 +9,16 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronRight, Search } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 
 import { call, callList } from "~/api/call";
 import { isNotFound } from "~/api/errors";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
+import { FilterBar, type FilterKey } from "~/components/app/filter-bar";
 import {
 	PageBody,
-	FilterChips,
 	PageHeader,
 	PaginationBar,
 	SectionCard,
@@ -37,7 +37,6 @@ import {
 } from "~/components/app/workspace-access";
 import { TonePill } from "~/components/app/badges";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
 import {
 	Select,
 	SelectContent,
@@ -47,7 +46,7 @@ import {
 } from "~/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import type { AwdPlayerStatus, AwdpOverview, EventChallengeResult, EventInfo } from "@floatctf/sdk";
-import { formatRange, formatScore } from "~/lib/format";
+import { formatDateTime, formatRange, formatScore } from "~/lib/format";
 import {
 	EVENT_STATUS_TONE,
 	computeEventStatus,
@@ -56,7 +55,7 @@ import {
 	isPracticeEvent,
 	participationGate,
 } from "~/lib/event-status";
-import { useDebouncedValue, useDocumentTitle, useNow } from "~/lib/hooks";
+import { useDocumentTitle, useNow } from "~/lib/hooks";
 
 import {
 	EventStatusPill,
@@ -94,48 +93,42 @@ export function EventsListPage() {
 	useDocumentTitle(t("events.list.documentTitle"));
 	const client = useClient();
 	const now = useNow(30_000);
-	const [search, setSearch] = useState("");
-	const [family, setFamily] = useState("all");
-	const [statusFilter, setStatusFilter] = useState("all");
-	const [onlyJoined, setOnlyJoined] = useState(false);
+	const [draftFilter, setDraftFilter] = useState("");
+	const [appliedFilter, setAppliedFilter] = useState("");
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
-	const debouncedSearch = useDebouncedValue(search, 300);
-
-	const clearFilters = () => {
-		setSearch("");
-		setFamily("all");
-		setStatusFilter("all");
-		setOnlyJoined(false);
-		setPage(1);
-	};
 
 	const query = useQuery({
 		queryKey: qk.events.list({ page: 1, limit: 200 }),
 		queryFn: () => callList<EventInfo>(client.service.events.fetch({ page: 1, limit: 200 })),
 	});
-
 	const items = query.data?.items ?? [];
 
-	const filtered = useMemo(() => {
-		const keyword = debouncedSearch.trim().toLowerCase();
-		return items.filter((item) => {
-			const status = computeEventStatus(
-				item.event.start_time,
-				item.event.end_time ?? null,
-				now.getTime(),
-			);
-			if (family !== "all" && item.event.family !== family) return false;
-			if (statusFilter !== "all" && status !== statusFilter) return false;
-			if (onlyJoined && !item.joined) return false;
-			if (keyword === "") return true;
+	function matchesFilter(row: EventInfo, raw: string): boolean {
+		const clauses = raw
+			.split("&")
+			.map((clause) => clause.trim())
+			.filter(Boolean);
+		if (clauses.length === 0) return true;
+		return clauses.every((clause) => {
+			const separator = clause.indexOf(":");
+			const key = (separator >= 0 ? clause.slice(0, separator) : "").trim().toLowerCase();
+			const value = (separator >= 0 ? clause.slice(separator + 1) : clause).trim().toLowerCase();
+			if (key === "title") return row.event.title.toLowerCase().includes(value);
+			if (key === "family") return row.event.family.toLowerCase() === value;
+			if (key === "allow_join") return String(row.event.allow_join) === value;
 			return (
-				item.event.title.toLowerCase().includes(keyword) ||
-				(item.event.description ?? "").toLowerCase().includes(keyword)
+				`${row.event.title} ${row.event.family} ${row.event.description ?? ""}`
+					.toLowerCase()
+					.includes(clause.toLowerCase())
 			);
 		});
-	}, [items, family, statusFilter, onlyJoined, debouncedSearch, now]);
+	}
 
+	const filtered = useMemo(
+		() => (appliedFilter ? items.filter((row) => matchesFilter(row, appliedFilter)) : items),
+		[items, appliedFilter],
+	);
 	const sorted = useMemo(
 		() =>
 			[...filtered].sort(
@@ -151,21 +144,25 @@ export function EventsListPage() {
 			header: t("events.list.columns.event"),
 			sortValue: (row) => row.event.title,
 			cell: (row) => (
-				<div className="min-w-0">
-					<Link to={`/events/${eventIdOf(row)}`} className="truncate text-sm font-medium hover:underline">
-						{row.event.title}
-					</Link>
-					<p className="truncate text-xs text-muted-foreground">
-						{labels.purpose(row.event.purpose)} · {labels.mode(row.event.participant_mode)}
-					</p>
-				</div>
+				<Link
+					to={`/events/${eventIdOf(row)}`}
+					className="truncate text-sm font-medium hover:underline"
+				>
+					{row.event.title}
+				</Link>
 			),
 		},
 		{
 			id: "family",
 			header: t("events.list.columns.family"),
 			sortValue: (row) => row.event.family,
-			cell: (row) => <TonePill tone="neutral">{labels.family(row.event.family)}</TonePill>,
+			cell: (row) => <span className="text-sm">{labels.family(row.event.family)}</span>,
+		},
+		{
+			id: "participant",
+			header: t("events.list.columns.participant"),
+			cell: (row) => <span className="text-sm">{labels.mode(row.event.participant_mode)}</span>,
+			hideBelow: "sm",
 		},
 		{
 			id: "status",
@@ -175,64 +172,45 @@ export function EventsListPage() {
 			cell: (row) => <EventStatusPill event={row.event} />,
 		},
 		{
-			id: "window",
-			header: t("events.list.columns.window"),
-			hideBelow: "lg",
-			cell: (row) => (
-				<span className="text-xs text-muted-foreground">
-					{formatRange(row.event.start_time, row.event.end_time ?? null)}
-				</span>
-			),
+			id: "allow_join",
+			header: t("events.list.columns.canJoin"),
+			cell: (row) =>
+				row.event.allow_join ? (
+					<Check className="size-4 text-emerald-600 dark:text-emerald-400" aria-label={t("common.yes")} />
+				) : null,
+			hideBelow: "md",
 		},
 		{
 			id: "joined",
 			header: t("events.list.columns.joined"),
-			cell: (row) => {
-				if (row.joined) return <TonePill tone="success">{t("events.list.joined")}</TonePill>;
-				const gate = participationGate(row.event, now.getTime());
-				// 练习赛 / 系统赛事没有「报名」概念，显示「—」比「未加入」诚实。
-				return gate.kind === "not-competition" || gate.kind === "system-managed" ? (
-					<span className="text-xs text-muted-foreground">—</span>
-				) : (
-					<TonePill tone="muted">{t("events.list.notJoined")}</TonePill>
-				);
-			},
+			cell: (row) =>
+				row.joined ? (
+					<Check className="size-4 text-emerald-600 dark:text-emerald-400" aria-label={t("common.yes")} />
+				) : null,
 		},
 		{
-			id: "action",
-			header: "",
-			align: "right",
-			cell: (row) => {
-				const gate = participationGate(row.event, now.getTime());
-				// 练习赛不进赛事工作区（后端拒绝报名/取题），直接去对应练习入口。
-				if (!row.joined && gate.kind === "not-competition") {
-					const to = row.event.family === "awdp" ? "/training" : "/challenges";
-					return (
-						<Button variant="ghost" size="sm" asChild>
-							<Link to={to}>
-								{t("events.list.practiceEntry")} <ChevronRight aria-hidden="true" />
-							</Link>
-						</Button>
-					);
-				}
-				return (
-					<Button variant="ghost" size="sm" asChild>
-						<Link to={`/events/${eventIdOf(row)}`}>
-							{t("events.list.open")} <ChevronRight aria-hidden="true" />
-						</Link>
-					</Button>
-				);
-			},
+			id: "starts_at",
+			header: t("events.list.columns.startsAt"),
+			sortValue: (row) => Date.parse(row.event.start_time),
+			cell: (row) => <span className="tnum text-xs">{formatDateTime(row.event.start_time)}</span>,
+			hideBelow: "lg",
+		},
+		{
+			id: "ends_at",
+			header: t("events.list.columns.endsAt"),
+			sortValue: (row) => (row.event.end_time ? Date.parse(row.event.end_time) : 0),
+			cell: (row) => (
+				<span className="tnum text-xs">
+					{row.event.end_time ? formatDateTime(row.event.end_time) : "—"}
+				</span>
+			),
+			hideBelow: "lg",
 		},
 	];
 
 	return (
 		<PageBody>
-			<PageHeader
-				title={t("events.list.title")}
-				description={t("events.list.description")}
-			/>
-
+			<PageHeader title={t("events.list.title")} description={t("events.list.description")} />
 			<SectionCard
 				title={t("events.list.cardTitle")}
 				description={
@@ -245,8 +223,49 @@ export function EventsListPage() {
 					) : undefined
 				}
 				contentClassName="px-0"
+				actions={
+					<div className="flex w-full flex-wrap items-center gap-2">
+						<Select
+							value={String(pageSize)}
+							onValueChange={(value) => {
+								setPageSize(Number(value));
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className="w-28" aria-label={t("common.pagination.pageSize")}>
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{[10, 20, 50, 100].map((size) => (
+									<SelectItem key={size} value={String(size)}>
+										{size} / {t("common.pagination.page")}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<FilterBar
+							keys={[
+								{ key: "title", label: t("events.list.columns.event") },
+								{ key: "family", label: t("events.list.columns.family") },
+								{ key: "allow_join", label: t("events.list.columns.canJoin") },
+							] satisfies FilterKey[]}
+							value={draftFilter}
+							onChange={setDraftFilter}
+							onApply={() => {
+								setAppliedFilter(draftFilter.trim());
+								setPage(1);
+							}}
+							onClear={() => {
+								setDraftFilter("");
+								setAppliedFilter("");
+								setPage(1);
+							}}
+							placeholder={t("common.filter.placeholder")}
+						/>
+					</div>
+				}
 				footer={
-					filtered.length > pageSize ? (
+					filtered.length > 0 ? (
 						<PaginationBar
 							page={page}
 							pageSize={pageSize}
@@ -260,118 +279,15 @@ export function EventsListPage() {
 					) : null
 				}
 			>
-				<div className="flex flex-wrap items-center gap-2 px-4 pb-4">
-					<div className="relative w-full sm:max-w-xs">
-						<Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							value={search}
-							onChange={(event) => {
-								setSearch(event.target.value);
-								setPage(1);
-							}}
-							placeholder={t("events.list.searchPlaceholder")}
-							aria-label={t("events.list.searchPlaceholder")}
-							className="w-full pl-8"
-						/>
-					</div>
-					<Select
-						value={family}
-						onValueChange={(value) => {
-							setFamily(value);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className="w-full sm:w-40" aria-label={t("events.list.familyFilter")}>
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">{t("events.family.all")}</SelectItem>
-							<SelectItem value="jeopardy">{t("events.family.jeopardy")}</SelectItem>
-							<SelectItem value="awd">{t("events.family.awd")}</SelectItem>
-							<SelectItem value="awdp">{t("events.family.awdp")}</SelectItem>
-						</SelectContent>
-					</Select>
-					<Select
-						value={statusFilter}
-						onValueChange={(value) => {
-							setStatusFilter(value);
-							setPage(1);
-						}}
-					>
-						<SelectTrigger className="w-full sm:w-32" aria-label={t("events.list.statusFilter")}>
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">{t("events.status.all")}</SelectItem>
-							<SelectItem value="upcoming">{t("events.status.upcoming")}</SelectItem>
-							<SelectItem value="ongoing">{t("events.status.ongoing")}</SelectItem>
-							<SelectItem value="ended">{t("events.status.ended")}</SelectItem>
-						</SelectContent>
-					</Select>
-					<Button
-						variant={onlyJoined ? "default" : "outline"}
-						size="sm"
-						onClick={() => {
-							setOnlyJoined((value) => !value);
-							setPage(1);
-						}}
-					>
-						{t("events.list.onlyJoined")}
-					</Button>
-				</div>
-
-				<FilterChips
-					filters={[
-						...(family !== "all"
-							? [
-									{
-										key: "family",
-										label: t(`events.family.${family}`),
-										onRemove: () => {
-											setFamily("all");
-											setPage(1);
-										},
-									},
-								]
-							: []),
-						...(statusFilter !== "all"
-							? [
-									{
-										key: "status",
-										label: t(`events.status.${statusFilter}`),
-										onRemove: () => {
-											setStatusFilter("all");
-											setPage(1);
-										},
-									},
-								]
-							: []),
-						...(onlyJoined
-							? [
-									{
-										key: "joined",
-										label: t("events.list.onlyJoined"),
-										onRemove: () => {
-											setOnlyJoined(false);
-											setPage(1);
-										},
-									},
-								]
-							: []),
-					]}
-					onClearAll={clearFilters}
-					className="px-4"
-				/>
 				<QueryState
 					query={query}
-					skeleton={<TableSkeleton rows={6} columns={5} />}
+					skeleton={<TableSkeleton rows={6} columns={6} />}
 					errorTitle={t("events.list.loadError")}
 					isEmpty={() => items.length === 0}
 					empty={
 						<EmptyBlock
 							title={t("events.list.emptyTitle")}
 							description={t("events.list.emptyDescription")}
-							icon={<CalendarDays className="size-5" aria-hidden="true" />}
 						/>
 					}
 				>
@@ -382,7 +298,15 @@ export function EventsListPage() {
 								title={t("events.list.filteredTitle")}
 								description={t("events.list.filteredDescription")}
 								action={
-									<Button variant="outline" size="sm" onClick={clearFilters}>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => {
+											setDraftFilter("");
+											setAppliedFilter("");
+											setPage(1);
+										}}
+									>
 										{t("events.list.filteredAction")}
 									</Button>
 								}
@@ -394,14 +318,16 @@ export function EventsListPage() {
 								columns={columns}
 								mobileCard={(row) => (
 									<Link to={`/events/${eventIdOf(row)}`} className="block space-y-1">
-										<div className="flex items-center justify-between gap-2">
-											<span className="truncate text-sm font-medium">{row.event.title}</span>
-											<EventStatusPill event={row.event} />
-										</div>
+										<p className="text-sm font-medium">{row.event.title}</p>
 										<p className="text-xs text-muted-foreground">
-											{labels.family(row.event.family)} ·{" "}
-											{row.joined ? t("events.list.joined") : t("events.list.notJoined")}
+											{labels.family(row.event.family)} · {labels.mode(row.event.participant_mode)}
 										</p>
+										<div className="flex items-center justify-between gap-2">
+											<EventStatusPill event={row.event} />
+											<span className="text-xs text-muted-foreground">
+												{formatRange(row.event.start_time, row.event.end_time ?? null)}
+											</span>
+										</div>
 									</Link>
 								)}
 							/>

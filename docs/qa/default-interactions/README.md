@@ -96,3 +96,36 @@
   - Add/Edit 使用右侧抽屉；
   - 创建后刷新列表，不自动打开内容弹窗；
   - 题集内容仍在详情页维护；详情页添加题目使用 Dialog。
+
+## 5. 选手端 · Events
+
+入口：`/service/events`
+
+![](./events-list.png)
+
+- 工具栏：每页条数（10/20/50/100）、Add Filter、过滤输入、Clear、Apply Filters；
+- 表头：标题、赛制、参赛者、状态、可加入、已加入、开始时间、结束时间；
+- 标题是链接，进入对应赛制的事件工作区；
+- 可加入 / 已加入用勾选表示；
+- 没有卡片视图、没有额外的“打开”操作列。
+
+## 6. 选手端 · Event Workspace
+
+### Jeopardy（未加入时）
+
+![](./event-jeopardy-overview.png)
+
+- 顶部：赛事标题 + 倒计时进度；
+- 一级 Tab：`Overview / Challenges / Instances / Scoreboard / Trend / Announcement`；
+- 未加入时 Tab 仍然显示，内容区给出「你尚未加入本赛事」提示；不是把整个工作区替换成门禁页。
+- 总览是「赛事说明/规则 + 右侧操作」布局，不是跨 Tab 常驻侧栏。
+
+### AWD
+
+![](./event-awd-overview.png)
+
+- 顶部：赛事标题 + `poll/live`；
+- 一级 Tab：`Overview / GameBoxes / Scoreboard / WireGuard / SSH`；
+- 内容区按子页切换，不是把全部内容塞进单个 arena 页。
+
+> 当前 shadcn 事件页已按这些 Tab 和总览布局调整；未加入时的 Tab 展示仍需按上图核对。

@@ -125,3 +125,6 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：根据 Default 实测截图纠正题集交互：选手端恢复 FilterBar + 名称链接
   详情页；管理端恢复名称链接 / 行操作 Edit/Delete / 右侧编辑抽屉，移除整行内容弹窗。
   审计记录见 `docs/qa/default-interactions/README.md`。
+
+- 2026-11-08：抽出共享 FilterBar；题集与赛事列表统一 Add Filter / Clear / Apply；
+  赛事列表列改为 Default 的标题/赛制/参赛者/状态/可加入/已加入/开始/结束。

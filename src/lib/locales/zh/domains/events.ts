@@ -25,9 +25,12 @@ export default {
 		columns: {
 			event: "赛事",
 			family: "家族",
+			participant: "参赛者",
 			status: "状态",
-			window: "时间窗",
+			canJoin: "可加入",
 			joined: "参赛",
+			startsAt: "开始时间",
+			endsAt: "结束时间",
 		},
 	},
 	status: {

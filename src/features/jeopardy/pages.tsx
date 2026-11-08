@@ -4,17 +4,18 @@
  * 平台列表接口没有服务端分类过滤，`QueryParams.filter` 只有一个自由文本字段）。
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Blocks, CheckCircle2, ChevronRight, Filter, Puzzle, Search } from "lucide-react";
+import { Blocks, CheckCircle2, ChevronRight, Puzzle, Search } from "lucide-react";
 
 import { call, callList } from "~/api/call";
 import { isNotFound } from "~/api/errors";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
+import { FilterBar, type FilterKey } from "~/components/app/filter-bar";
 import {
 	MonoText,
 	PageBody,
@@ -33,14 +34,6 @@ import {
 } from "~/components/app/states";
 import { TonePill } from "~/components/app/badges";
 import { Button } from "~/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import {
 	Select,
@@ -479,7 +472,6 @@ export function ChallengeSetsPage() {
 	useDocumentTitle(t("jeopardy.sets.documentTitle"));
 	const client = useClient();
 	const now = useNow(60_000);
-	const inputRef = useRef<HTMLInputElement>(null);
 	const [draftFilter, setDraftFilter] = useState("");
 	const [appliedFilter, setAppliedFilter] = useState("");
 	const query = useQuery({
@@ -521,17 +513,6 @@ export function ChallengeSetsPage() {
 			),
 		},
 	];
-
-	function addFilter(key: "name" | "description") {
-		const token = `${key}:`;
-		setDraftFilter((current) => {
-			const trimmed = current.trim();
-			if (!trimmed) return token;
-			if (trimmed.includes(token)) return current;
-			return `${trimmed} & ${token}`;
-		});
-		requestAnimationFrame(() => inputRef.current?.focus());
-	}
 
 	function matchesFilter(row: ChallengeSets, raw: string): boolean {
 		const clauses = raw
@@ -578,7 +559,6 @@ export function ChallengeSetsPage() {
 			>
 				{(sets) => {
 					const filtered = appliedFilter ? sets.filter((row) => matchesFilter(row, appliedFilter)) : sets;
-					const apply = () => setAppliedFilter(draftFilter.trim());
 					const clear = () => {
 						setDraftFilter("");
 						setAppliedFilter("");
@@ -589,41 +569,20 @@ export function ChallengeSetsPage() {
 							description={t("jeopardy.sets.listDescription")}
 							contentClassName="px-0"
 							actions={
-								<div className="flex w-full flex-wrap items-center gap-1 sm:w-auto">
-									<DropdownMenu>
-										<DropdownMenuTrigger asChild>
-											<Button variant="outline" size="sm">
-												<Filter aria-hidden="true" />
-												{t("jeopardy.sets.addFilter")}
-											</Button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent align="start">
-											<DropdownMenuLabel>{t("jeopardy.sets.filterBy")}</DropdownMenuLabel>
-											<DropdownMenuSeparator />
-											<DropdownMenuItem onSelect={() => addFilter("name")}>
-												{t("jeopardy.sets.columns.name")}
-											</DropdownMenuItem>
-											<DropdownMenuItem onSelect={() => addFilter("description")}>
-												{t("jeopardy.sets.columns.description")}
-											</DropdownMenuItem>
-										</DropdownMenuContent>
-									</DropdownMenu>
-									<Input
-										ref={inputRef}
-										value={draftFilter}
-										onChange={(event) => setDraftFilter(event.target.value)}
-										placeholder={t("jeopardy.sets.filterPlaceholder")}
-										className="min-w-0 flex-1 sm:w-72"
-										aria-label={t("jeopardy.sets.filterPlaceholder")}
-									/>
-									<Button variant="outline" size="sm" onClick={clear}>
-										{t("common.clear")}
-									</Button>
-									<Button size="sm" onClick={apply}>
-										<Search aria-hidden="true" />
-										{t("jeopardy.sets.applyFilters")}
-									</Button>
-								</div>
+								<FilterBar
+									keys={[
+										{ key: "name", label: t("jeopardy.sets.columns.name") },
+										{ key: "description", label: t("jeopardy.sets.columns.description") },
+									] satisfies FilterKey[]}
+									value={draftFilter}
+									onChange={setDraftFilter}
+									onApply={() => setAppliedFilter(draftFilter.trim())}
+									onClear={() => {
+										setDraftFilter("");
+										setAppliedFilter("");
+									}}
+									placeholder={t("jeopardy.sets.filterPlaceholder")}
+								/>
 							}
 						>
 							<DataTable
