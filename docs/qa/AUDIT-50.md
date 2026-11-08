@@ -229,3 +229,14 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 复测：`set-1` 正常显示名称/描述/题目；无效 ID 只有 not-found 块；题集添加/移出仍正常。
 
 验证：`vite build` / i18n / mock-check 全绿。
+
+## 第 10 轮补充（无效题目深链接）
+
+已完成：
+
+- **选手端无效题目显示 not-found**：`/challenges/does-not-exist` 原先显示「加载题目失败 + 重试」，
+  重试不会让不存在的题目出现。现在显示「题目不存在 + 返回题库」，不再提供无效重试。
+- 补中英文 `jeopardy.detail.notFound*` / `backToCatalog` 文案；有效题目详情不受影响。
+- 复测：无效题目只有 not-found 块；`/challenges/c-0003` 正常进入工作台。
+
+验证：`vite build` / i18n / theme / mock-check 全绿。
