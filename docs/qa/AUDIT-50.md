@@ -321,3 +321,33 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
   分数保持 200。
 
 验证：`vite build` / i18n / theme / mock-check 全绿。
+
+## 第 17 轮补充（真实 dev API E2E）
+
+已启动真实开发栈并完成端到端验证：
+
+- 宿主机：安装 `build-essential`（补齐 `cc`）、启动 `floatctf-helper`、把开发者加入 `floatctf` 组；
+  `mise` 固定 `postgres@18.6`；PostgreSQL / Redis / RustFS / Caddy 容器健康，60 个 migrations 全部应用；
+  API `:9090`、Caddy `:7780`、Default Vite `:13000`、shadcn Vite `:13400`。
+- shadcn 以真实 API 登录 `1000000 / testuser` 与 `sysadmin`，不再使用 mock。
+
+真实 API 下发现并修复：
+
+- **练习赛没有官方数据大屏**：真实后端对 practice 返回 400
+  `UnsupportedForPurpose: practice has no official event scoreboard`。管理端现在对
+  `purpose != competition` 隐藏「数据大屏」，深链接回退「配置」。
+- **手工建题中文名无提示**：后端要求从 name 派生 safe_name，中文名会返回
+  `CHALLENGE_SAFE_NAME_REQUIRED`。前端在创建前校验并提示「加入英文字母/数字，或使用题目包导入」，
+  不再把技术错误直接抛给用户。
+- **趋势图单点重复 key**：真实数据只有一个解出时间时，趋势图的三个 x tick 完全相同，
+  React 报 `two children with the same key`。现在 `maxX === minX` 只渲染一个 tick。
+
+真实 E2E 链路：
+
+1. PostgreSQL 空库登录 → 管理端导入 `examples/test-c` 题目包 → build ready；
+2. 创建 `Real QA Event`、设置进行中时间、挂载并发布 test-c；
+3. 选手加入赛事 → 启动真实容器实例 → 从容器 `/flag` 取 flag 提交；
+4. 成功计分（100 → 动态 99.95）、`已解出 #1`、实例自动回收；
+5. 选手积分榜 / 趋势、管理端数据大屏均显示真实数据；21 条重点路由 sweep 0 console error。
+
+仍待：清理本轮测试赛事/题目；真实 AWD/AWDP 全流程（需要更多 fixture）；v0.2 截图重采。
