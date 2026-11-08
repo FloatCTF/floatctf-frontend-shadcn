@@ -1,6 +1,10 @@
 {
-	"generatedAt": "2026-11-08T02:26:55.547Z",
+	"generatedAt": "2026-11-08T02:30:54.803Z",
 	"routes": [
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes"
+		},
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/challenge_sets"
@@ -68,6 +72,10 @@
 		{
 			"method": "GET",
 			"pattern": "\\/api\\/admin\\/announcements"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes"
 		},
 		{
 			"method": "GET",
@@ -435,6 +443,10 @@
 		},
 		{
 			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd"
 		},
 		{
@@ -472,6 +484,22 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/__sse\\/close"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/([^/]+)\\/hide"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/build"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/check"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/scan"
 		},
 		{
 			"method": "POST",

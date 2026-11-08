@@ -1311,6 +1311,57 @@ let mockChallengeSets = [
 ];
 const mockSetChallenges = { "set-1": ["c-0002"] };
 
+
+/** GameBox 库（mock）：管理端模板库，隐藏与删除都作用在这份状态上。 */
+let mockGameboxLibrary = [
+	{
+		id: "gb-lib-1",
+		name: "web-shop",
+		safe_name: "web-shop",
+		category: "Web",
+		description: "练习用 Web 靶机：修复 SESSION 伪造漏洞。",
+		hidden: false,
+		version: "1.0.0",
+		build_status: "ready",
+		package_digest: "sha256:web-shop",
+		image_ref: "floatctf/gamebox-web-shop:1.0.0",
+		image_repo_digest: "sha256:web-shop",
+		username: "ctf",
+		cpu_millis: 500,
+		memory_bytes: 268435456,
+		pids_limit: 128,
+		healthchecks_json: null,
+		judge_script_name: "judge.py",
+		judge_script_content: "# mock",
+		judge_args_json: null,
+		judge_timeout_secs: 60,
+		judge_retry_interval_secs: 10,
+	},
+	{
+		id: "gb-lib-2",
+		name: "pwn-ret2win",
+		safe_name: "pwn-ret2win",
+		category: "Pwn",
+		description: "栈溢出：覆盖返回地址拿到 shell。",
+		hidden: true,
+		version: "1.2.0",
+		build_status: "ready",
+		package_digest: "sha256:pwn-ret2win",
+		image_ref: "floatctf/gamebox-pwn:1.2.0",
+		image_repo_digest: "sha256:pwn-ret2win",
+		username: "ctf",
+		cpu_millis: 300,
+		memory_bytes: 134217728,
+		pids_limit: 64,
+		healthchecks_json: null,
+		judge_script_name: "judge.py",
+		judge_script_content: "# mock",
+		judge_args_json: null,
+		judge_timeout_secs: 60,
+		judge_retry_interval_secs: 10,
+	},
+];
+
 const routes = [
 
 
@@ -1355,6 +1406,36 @@ const routes = [
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/network$/, (m, res) => ok(res, awdEventNetwork(m[1]))],
 	["PUT", /^\/api\/admin\/events\/([^/]+)\/awd\/network$/, (m, res) => ok(res, null)],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/network\/reallocate$/, (_m, res) => ok(res, null)],
+	["GET", /^\/api\/admin\/awd\/gameboxes$/, (_m, res, req) => okPage(res, mockGameboxLibrary.filter((row) => mockFilterMatch(req, row)), req)],
+	["POST", /^\/api\/admin\/awd\/gameboxes\/([^/]+)\/hide$/, (m, res) => {
+		const box = mockGameboxLibrary.find((row) => row.id === m[1]);
+		if (!box) return json(res, 404, { code: 404, message: "GameBox 不存在", data: null, meta: null });
+		box.hidden = true;
+		return ok(res, null);
+	}],
+	["PATCH", /^\/api\/admin\/awd\/gameboxes\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const box = mockGameboxLibrary.find((row) => row.id === m[1]);
+			if (!box) return json(res, 404, { code: 404, message: "GameBox 不存在", data: null, meta: null });
+			Object.assign(box, {
+				name: body.name ?? box.name,
+				description: body.description ?? box.description,
+				cpu_millis: body.cpu_millis ?? box.cpu_millis,
+				memory_bytes: body.memory_bytes ?? box.memory_bytes,
+				pids_limit: body.pids_limit ?? box.pids_limit,
+			});
+			return ok(res, box);
+		})],
+	["DELETE", /^\/api\/admin\/awd\/gameboxes$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const before = mockGameboxLibrary.length;
+			mockGameboxLibrary = mockGameboxLibrary.filter((row) => !ids.includes(row.id));
+			return ok(res, before - mockGameboxLibrary.length);
+		})],
+	["POST", /^\/api\/admin\/awd\/gameboxes\/scan$/, (_m, res) => ok(res, [])],
+	["POST", /^\/api\/admin\/awd\/gameboxes\/check$/, (_m, res) => ok(res, [])],
+	["POST", /^\/api\/admin\/awd\/gameboxes\/build$/, (_m, res) => ok(res, [])],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => ok(res, awdEventGameboxes(m[1]))],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => ok(res, awdEventGameboxes(m[1])[0])],
 	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)$/, (_m, res) => ok(res, null)],
@@ -1908,7 +1989,17 @@ const routes = [
 		)],
 
 	// 管理端
-	["GET", /^\/api\/admin\/dashboard\/summary$/, (_m, res) => ok(res, dashboardSummary)],
+	["GET", /^\/api\/admin\/dashboard\/summary$/, (_m, res) =>
+		// 统计口径必须与各列表一致：账号/武器/GameBox 都从实际数据取。
+		ok(res, {
+			...dashboardSummary,
+			stats: {
+				...dashboardSummary.stats,
+				users: mockUsers.length,
+				weapons: weapons.length,
+				gameboxes: mockGameboxLibrary.length,
+			},
+		})],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/writeups$/, (m, res, req) => {
 		const rows = [
 			{
