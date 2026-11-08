@@ -107,6 +107,10 @@ const EMPTY_FORM: ChallengeFormState = {
 function validate(form: ChallengeFormState, mode: "create" | "edit", t: TFunction): ChallengeFormErrors {
 	const errors: ChallengeFormErrors = {};
 	if (!form.name.trim()) errors.name = t("adminCore.challenges.validation.nameRequired");
+	// 后端 create 用 name 派生 safe_name；没有 ASCII 字母/数字时必然失败。
+	else if (mode === "create" && !/[A-Za-z0-9]/.test(form.name)) {
+		errors.name = t("adminCore.challenges.validation.safeNameRequired");
+	}
 	if (!form.category.trim()) {
 		errors.category = t("adminCore.challenges.validation.categoryRequired");
 	}
@@ -985,6 +989,7 @@ export function AdminChallengesPage(): ReactNode {
 							htmlFor="challenge-name"
 							required
 							error={errors.name}
+							hint={t("adminCore.challenges.sheet.nameHint")}
 						>
 							<Input
 								id="challenge-name"

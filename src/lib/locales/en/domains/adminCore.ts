@@ -373,6 +373,7 @@ export default {
 			submitCreate: "Create challenge",
 			submitSave: "Save changes",
 			name: "Challenge name",
+			nameHint: "Manual create derives an ASCII safe_name from the name (at least one letter/digit); use package import with an explicit safe_name for non-ASCII names.",
 			category: "Category",
 			categoryHint: "For example web / pwn / misc.",
 			description: "Description",
@@ -393,6 +394,7 @@ export default {
 		},
 		validation: {
 			nameRequired: "Challenge name is required",
+			safeNameRequired: "Cannot derive a safe_name from this name; add ASCII letters/digits or use package import.",
 			categoryRequired: "Category is required",
 			portRange:
 				"Container port must be an integer from 1–65535; leave empty for no Docker runtime.",

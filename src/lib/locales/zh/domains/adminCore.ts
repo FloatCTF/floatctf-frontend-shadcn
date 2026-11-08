@@ -360,6 +360,7 @@ export default {
 			submitCreate: "创建题目",
 			submitSave: "保存修改",
 			name: "题目名称",
+			nameHint: "手工创建要求名称可派生 ASCII safe_name（至少含一个英文字母/数字）；中文名请使用题目包导入并在包内提供 safe_name。",
 			category: "分类",
 			categoryHint: "如 web / pwn / misc。",
 			description: "描述",
@@ -379,6 +380,7 @@ export default {
 		},
 		validation: {
 			nameRequired: "题目名称不能为空",
+			safeNameRequired: "名称无法派生 safe_name；请加入英文字母/数字，或改用题目包导入。",
 			categoryRequired: "分类不能为空",
 			portRange: "容器端口应为 1–65535 的整数；留空表示无 docker 运行时。",
 		},

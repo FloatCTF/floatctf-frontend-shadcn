@@ -91,7 +91,9 @@ export function TrendChart({
 		padding.top + innerHeight - ((value - minY) / (maxY - minY || 1)) * innerHeight;
 
 	const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => minY + ratio * (maxY - minY));
-	const xTickValues = [minX, minX + (maxX - minX) / 2, maxX];
+	// 所有点同一时刻（例如刚解出第一题）时，三个 tick 完全相同；
+	// 直接用它们做 key 会触发 React duplicate key，也会重复画三遍同一标签。
+	const xTickValues = maxX === minX ? [minX] : [minX, minX + (maxX - minX) / 2, maxX];
 
 	const hoveredEntries =
 		hoverX === null

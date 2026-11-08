@@ -28,7 +28,7 @@ import {
 } from "~/components/app/states";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import type { Events } from "@floatctf/sdk/entity";
+import { EventPurpose, type Events } from "@floatctf/sdk/entity";
 import { formatRange } from "~/lib/format";
 import { useDocumentTitle } from "~/lib/hooks";
 
@@ -88,15 +88,16 @@ export function EventConsolePage(): ReactNode {
 	// 「题目 / 数据大屏」是 Jeopardy 语义；AWD/AWDP 用各自运维页的 GameBox/数据标签，
 	// 否则 AWD 页面会出现「挂题数 0、累计解出 0」但积分榜有分的矛盾。
 	const rawTab = normalizeTab(searchParams.get("tab"));
+	const isOfficial = event?.purpose === EventPurpose.Competition;
 	const familyMismatch =
 		event !== null &&
 		((rawTab === "awd" && event.family !== "awd") ||
 			(rawTab === "awdp" && event.family !== "awdp") ||
 			((rawTab === "challenges" ||
-				rawTab === "data" ||
 				rawTab === "instances" ||
 				rawTab === "writeups") &&
 				event.family !== "jeopardy") ||
+			(rawTab === "data" && (event.family !== "jeopardy" || !isOfficial)) ||
 			(rawTab === "teams" && event.participant_mode !== "team"));
 	const tab: TabKey = familyMismatch ? "config" : rawTab;
 
@@ -281,7 +282,7 @@ export function EventConsolePage(): ReactNode {
 								{t("adminEvents.console.tabs.writeups")}
 							</TabsTrigger>
 						) : null}
-						{event.family === "jeopardy" ? (
+						{event.family === "jeopardy" && isOfficial ? (
 							<TabsTrigger value="data">{t("adminEvents.console.tabs.data")}</TabsTrigger>
 						) : null}
 						{event.family === "awd" ? (
@@ -325,7 +326,7 @@ export function EventConsolePage(): ReactNode {
 						<EventWriteupsTab eventId={event.id} />
 					</TabsContent>
 				) : null}
-				{event.family === "jeopardy" ? (
+				{event.family === "jeopardy" && isOfficial ? (
 					<TabsContent value="data" className="mt-4">
 						<EventDataTab eventId={event.id} />
 					</TabsContent>
