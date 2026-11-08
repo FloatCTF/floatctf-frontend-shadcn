@@ -689,6 +689,11 @@ const awdpAdminInstances = [
  * 战队列表与积分榜必须同源：两者都用 `teams`（下标即 `team-${index}`），
  * 否则管理端「按战队调分」会改到另一个队、积分榜看起来没反应。
  */
+const eventTeams = (eventId) => {
+	const event = events.find((item) => item.id === eventId);
+	if (!event || event.participant_mode !== "team") return [];
+	return awdTeams(eventId);
+};
 const awdTeams = (eventId) =>
 	teams
 		.slice(0, 3)
@@ -1783,7 +1788,7 @@ const routes = [
 			return ok(res, box);
 		})],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/instances$/, (_m, res) => ok(res, [])],
-	["GET", /^\/api\/admin\/events\/([^/]+)\/teams$/, (m, res) => ok(res, awdTeams(m[1]))],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/teams$/, (m, res) => ok(res, eventTeams(m[1]))],
 	["DELETE", /^\/api\/admin\/events\/([^/]+)\/teams$/, (m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
@@ -2939,7 +2944,7 @@ const routes = [
 		return ok(res, {
 			event,
 			user_count: memberCount,
-			team_count: isAwd ? awdTeams(event.id).length : 0,
+			team_count: event.participant_mode === "team" ? eventTeams(event.id).length : 0,
 			solved_recent_15: isJeopardy
 				? solves.map((solve) => ({
 						user_nickname: solve.nickname,
