@@ -698,3 +698,21 @@ INT2 / INT4 也走 `try_get::<i64>`，sqlx Postgres 无法把 int2/int4 解码�
 
 这是后端行映射 bug，不是前端渲染问题；按前端任务边界未擅自修改后端，建议后端按
 INT2 → i16、INT4 → i32、INT8 → i64 分别解码。前端已如实展示后端数据。
+
+## 第 42 轮补充（非法 UUID 路径的 not-found）
+
+`/admin/events/does-not-exist` 等非法 UUID 路径，后端返回 400「路径参数格式错误」，
+前端只把 404 视为 not-found，于是显示技术错误 + 重试。
+
+- `isNotFound` 增加一种等价处理：HTTP 400 且 platformMessage 含「路径参数」/
+  `path parameter` 时，按“资源不存在”处理；
+- 受影响的赛事详情、AWD/AWDP 运维、选手赛事工作台等统一显示 not-found；
+- AWD 运维页此前完全没有 not-found 分支，这次补上，并新增中英文文案。
+
+实测：
+- `/admin/events/does-not-exist` → 赛事不存在；
+- `/admin/events/does-not-exist/awd` → AWD 赛事不存在，无重试按钮；
+- `/admin/events/does-not-exist/awdp` → AWDP 赛事不存在；
+- `/events/does-not-exist` → 赛事不存在。
+
+验证：`vite build` / i18n（5037 keys）/ theme 全绿。
