@@ -14,7 +14,7 @@ import { useNavigate } from "react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRight, Blocks, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 
-import { call, callList } from "~/api/call";
+import { call, callList, callVoid } from "~/api/call";
 import { useAppQueryClient, useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { useConfirm } from "~/components/app/confirm";
@@ -81,13 +81,15 @@ export function AdminChallengeSetsPage(): ReactNode {
 		mutationFn: (input: { mode: "create" | "edit"; id?: string; body: SetFormState }) => {
 			const body = { name: input.body.name.trim(), description: input.body.description };
 			if (input.mode === "create") {
-				return call<ChallengeSets>(
+				// 后端 create 成功返回 data:null（ok_none），SDK 类型却标成 ChallengeSets；
+				// 用 call 会把成功当成“没有返回数据”，导致弹失败但 DB 已创建。
+				return callVoid(
 					client.admin.challenges.createChallengeSet(body),
 					t("adminCore.actions.createChallengeSet"),
 				);
 			}
 			// patchChallengeSet(Partial<ChallengeSets>) 的 URL 用 `.id` 拼接，**必须**带 id。
-			return call<ChallengeSets>(
+			return callVoid(
 				client.admin.challenges.patchChallengeSet({ id: input.id ?? "", ...body }),
 				t("adminCore.actions.updateChallengeSet"),
 			);
