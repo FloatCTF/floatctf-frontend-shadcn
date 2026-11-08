@@ -351,7 +351,8 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 5. 选手积分榜 / 趋势、管理端数据大屏均显示真实数据；21 条重点路由 sweep 0 console error。
 
 测试数据已清理：删除 `Real QA Event`、2 道测试题目与 `floatctf/test-c` 镜像；系统练习赛事保留。
-仍待：真实 AWD/AWDP 全流程（需要更多 fixture）；v0.2 截图重采。
+仍待：真实 AWD/AWDP 全流程（需要更多 fixture）。
+v0.2 截图重采已完成（2026-11-08，见 README §8）。
 
 ## 第 18 轮补充（真实 AWD E2E）
 

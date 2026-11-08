@@ -226,8 +226,8 @@ export const feature: FeatureModule = {
 
 ## 8. 界面截图
 
-> **注意**：以下截图采自 **v0.1 主题**。v0.2 已按 [docs/theme.md](../../docs/theme.md)
-> 全面重做（中性黑白、亮色默认、Geist、中英双语），截图待重采。
+> **截图版本**：**v0.2 主题**（中性黑白、亮色默认、Geist、中英双语），
+> 2026-11-08 按 [docs/theme.md](../../docs/theme.md) 重采，视口 1600×920。
 
 全部截图在**真实 API + 真实播种数据**下采集（见 [docs/E2E-ACCEPTANCE.md](./docs/E2E-ACCEPTANCE.md)），
 原图在 [`docs/images/`](./docs/images/)。
