@@ -205,6 +205,7 @@ export default {
 			description: "Try a different search keyword.",
 		},
 		columns: {
+			id: "ID",
 			key: "Key",
 			value: "Value",
 			resolved: "Resolved value",

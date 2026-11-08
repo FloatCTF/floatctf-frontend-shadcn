@@ -194,6 +194,7 @@ export default {
 			description: "试试调整搜索关键字。",
 		},
 		columns: {
+			id: "ID",
 			key: "键",
 			value: "值",
 			resolved: "解析值",

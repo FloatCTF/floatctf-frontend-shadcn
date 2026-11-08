@@ -199,6 +199,13 @@ export function AdminSettingsPage(): ReactNode {
 
 	const columns: DataTableColumn<SettingsDto>[] = [
 		{
+			id: "id",
+			header: t("adminPlatform.settings.columns.id"),
+			sortValue: (row) => row.id,
+			cell: (row) => <MonoText className="text-xs text-muted-foreground">{row.id}</MonoText>,
+			hideBelow: "lg",
+		},
+		{
 			id: "key",
 			header: t("adminPlatform.settings.columns.key"),
 			sortValue: (row) => row.key,
@@ -238,27 +245,6 @@ export function AdminSettingsPage(): ReactNode {
 				),
 		},
 		{
-			id: "type",
-			header: t("adminPlatform.settings.columns.type"),
-			hideBelow: "sm",
-			sortValue: (row) => row.type,
-			cell: (row) => (
-				<TonePill tone="muted">{settingTypeLabel(row.type)}</TonePill>
-			),
-		},
-		{
-			id: "protected",
-			header: t("adminPlatform.settings.columns.protected"),
-			hideBelow: "md",
-			cell: (row) => (
-				<BooleanPill
-					value={row.protected}
-					trueText={t("adminPlatform.common.protected")}
-					falseText={t("adminPlatform.common.deletable")}
-				/>
-			),
-		},
-		{
 			id: "description",
 			header: t("adminPlatform.settings.columns.description"),
 			hideBelow: "xl",
@@ -269,9 +255,14 @@ export function AdminSettingsPage(): ReactNode {
 			),
 		},
 		{
+			id: "type",
+			header: t("adminPlatform.settings.columns.type"),
+			sortValue: (row) => row.type,
+			cell: (row) => <TonePill tone="muted">{settingTypeLabel(row.type)}</TonePill>,
+		},
+		{
 			id: "updated_at",
 			header: t("adminPlatform.settings.columns.updatedAt"),
-			align: "right",
 			sortValue: (row) => Date.parse(row.updated_at),
 			cell: (row) => <AbsoluteTime value={row.updated_at} />,
 		},
