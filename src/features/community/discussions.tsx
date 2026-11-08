@@ -152,6 +152,7 @@ function discussionColumns(
 					<span
 						className="tnum inline-flex items-center gap-1"
 						title={t("community.discussions.table.viewCount")}
+						aria-label={t("community.discussions.table.viewCountAria", { count: row.view_count })}
 					>
 						<Eye aria-hidden="true" className="size-4" />
 						{row.view_count}
@@ -159,6 +160,7 @@ function discussionColumns(
 					<span
 						className="tnum inline-flex items-center gap-1"
 						title={t("community.discussions.table.likeCount")}
+						aria-label={t("community.discussions.table.likeCountAria", { count: row.like_count })}
 					>
 						<ThumbsUp aria-hidden="true" className="size-4" />
 						{row.like_count}
@@ -166,6 +168,7 @@ function discussionColumns(
 					<span
 						className="tnum inline-flex items-center gap-1"
 						title={t("community.discussions.table.commentCount")}
+						aria-label={t("community.discussions.table.commentCountAria", { count: row.comment_count })}
 					>
 						<MessageSquare aria-hidden="true" className="size-4" />
 						{row.comment_count}

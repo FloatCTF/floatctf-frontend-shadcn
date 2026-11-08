@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T00:40:39.599Z",
+	"generatedAt": "2026-11-08T00:48:56.307Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -12,6 +12,18 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/discussions\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/discussions\\/([^/]+)\\/comments\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/discussions\\/([^/]+)\\/like"
 		},
 		{
 			"method": "DELETE",
@@ -379,6 +391,14 @@
 		},
 		{
 			"method": "PATCH",
+			"pattern": "\\/api\\/discussions\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/discussions\\/([^/]+)\\/comments\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
 			"pattern": "\\/api\\/users\\/me"
 		},
 		{
@@ -436,6 +456,18 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/challenges\\/([^/]+)\\/submit"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/discussions"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/discussions\\/([^/]+)\\/comments"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/discussions\\/([^/]+)\\/like"
 		},
 		{
 			"method": "POST",

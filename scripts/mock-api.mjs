@@ -321,6 +321,43 @@ const solves = [
 	updated_at: iso(now - (index + 1) * 37 * 60000),
 }));
 
+/** 讨论评论（mock）：与 `discussions[].comment_count` 对齐，支持新增/编辑/删除。 */
+let discussionComments = [
+	{
+		id: "c-1",
+		discussion_id: "d-1",
+		author_id: "u-2",
+		author_nickname: "NOP Sled",
+		author_avatar: null,
+		content: "我这边也超时，换成 `nc -vz 10.42.16.11 31337` 能看到端口是开的，但应用层没响应。",
+		parent_id: null,
+		created_at: iso(now - 80 * 60000),
+		updated_at: iso(now - 80 * 60000),
+	},
+	{
+		id: "c-2",
+		discussion_id: "d-1",
+		author_id: "u-3",
+		author_nickname: "SegFault Club",
+		author_avatar: null,
+		content: "重置一次 GameBox 之后好了，估计是容器里的服务没起来。",
+		parent_id: null,
+		created_at: iso(now - 60 * 60000),
+		updated_at: iso(now - 60 * 60000),
+	},
+	{
+		id: "c-3",
+		discussion_id: "d-1",
+		author_id: "u-1",
+		author_nickname: "李明",
+		author_avatar: null,
+		content: "确认是实例问题；已经在赛事公告里同步了，重置即可。",
+		parent_id: null,
+		created_at: iso(now - 35 * 60000),
+		updated_at: iso(now - 35 * 60000),
+	},
+];
+
 const discussions = [
 	{
 		id: "d-1",
@@ -331,6 +368,7 @@ const discussions = [
 		author_avatar: null,
 		view_count: 128,
 		like_count: 6,
+		is_liked: false,
 		comment_count: 3,
 		created_at: iso(now - 90 * 60000),
 		updated_at: iso(now - 30 * 60000),
@@ -344,6 +382,7 @@ const discussions = [
 		author_avatar: null,
 		view_count: 128,
 		like_count: 6,
+		is_liked: false,
 		comment_count: 3,
 		created_at: iso(now - 6 * H),
 		updated_at: iso(now - 2 * H),
@@ -1260,10 +1299,104 @@ const routes = [
 	["GET", /^\/api\/writeups$/, (_m, res, req) => ok(res, unifiedWriteups, req)],
 	["GET", /^\/api\/writeups\/([^/]+)$/, (_m, res) => ok(res, unifiedWriteupDetail)],
 	["GET", /^\/api\/discussions$/, (_m, res, req) => ok(res, discussions, req)],
+	["POST", /^\/api\/discussions$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const title = String(body.title ?? "").trim();
+			const content = String(body.content ?? "").trim();
+			if (!title || !content) {
+				return json(res, 200, { code: 400, message: "标题与正文都不能为空", data: null, meta: null });
+			}
+			const discussion = {
+				id: `d-${Date.now()}`,
+				title,
+				content,
+				author_id: me.id,
+				author_nickname: me.nickname,
+				author_avatar: me.avatar,
+				view_count: 0,
+				like_count: 0,
+				is_liked: false,
+				comment_count: 0,
+				created_at: iso(now),
+				updated_at: iso(now),
+			};
+			discussions.unshift(discussion);
+			return ok(res, discussion);
+		})],
+	["PATCH", /^\/api\/discussions\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const target = discussions.find((d) => d.id === m[1]);
+			if (!target) return json(res, 404, { code: 404, message: "讨论不存在", data: null, meta: null });
+			if (body.title !== undefined) target.title = String(body.title);
+			if (body.content !== undefined) target.content = String(body.content);
+			target.updated_at = iso(now);
+			return ok(res, target);
+		})],
+	["DELETE", /^\/api\/discussions\/([^/]+)$/, (m, res) => {
+		const index = discussions.findIndex((d) => d.id === m[1]);
+		if (index < 0) return json(res, 404, { code: 404, message: "讨论不存在", data: null, meta: null });
+		discussions.splice(index, 1);
+		discussionComments = discussionComments.filter((c) => c.discussion_id !== m[1]);
+		return ok(res, null);
+	}],
 	["GET", /^\/api\/discussions\/([^/]+)$/, (m, res) => {
 		ok(res, discussions.find((item) => item.id === m[1]) ?? discussions[0]);
 	}],
-	["GET", /^\/api\/discussions\/([^/]+)\/comments$/, (_m, res, req) => ok(res, [], req)],
+	["POST", /^\/api\/discussions\/([^/]+)\/like$/, (m, res) => {
+		const target = discussions.find((d) => d.id === m[1]);
+		if (!target) return json(res, 404, { code: 404, message: "讨论不存在", data: null, meta: null });
+		// 幂等：已点赞再加一次不涨计数。
+		if (!target.is_liked) {
+			target.is_liked = true;
+			target.like_count = (target.like_count ?? 0) + 1;
+		}
+		return ok(res, null);
+	}],
+	["DELETE", /^\/api\/discussions\/([^/]+)\/like$/, (m, res) => {
+		const target = discussions.find((d) => d.id === m[1]);
+		if (!target) return json(res, 404, { code: 404, message: "讨论不存在", data: null, meta: null });
+		if (target.is_liked) {
+			target.is_liked = false;
+			target.like_count = Math.max(0, (target.like_count ?? 0) - 1);
+		}
+		return ok(res, null);
+	}],
+	["GET", /^\/api\/discussions\/([^/]+)\/comments$/, (m, res, req) =>
+		ok(res, discussionComments.filter((c) => c.discussion_id === m[1]), req)],
+	["POST", /^\/api\/discussions\/([^/]+)\/comments$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const content = String(body.content ?? "").trim();
+			if (!content) return json(res, 200, { code: 400, message: "评论内容不能为空", data: null, meta: null });
+			const comment = {
+				id: `c-${Date.now()}`,
+				discussion_id: m[1],
+				author_id: me.id,
+				author_nickname: me.nickname,
+				author_avatar: me.avatar,
+				content,
+				parent_id: body.parent_id ?? null,
+				created_at: iso(now),
+				updated_at: iso(now),
+			};
+			discussionComments = [...discussionComments, comment];
+			const target = discussions.find((d) => d.id === m[1]);
+			if (target) target.comment_count = discussionComments.filter((c) => c.discussion_id === m[1]).length;
+			return ok(res, comment);
+		})],
+	["PATCH", /^\/api\/discussions\/([^/]+)\/comments\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const comment = discussionComments.find((c) => c.id === m[2] && c.discussion_id === m[1]);
+			if (!comment) return json(res, 404, { code: 404, message: "评论不存在", data: null, meta: null });
+			comment.content = String(body.content ?? comment.content);
+			comment.updated_at = iso(now);
+			return ok(res, comment);
+		})],
+	["DELETE", /^\/api\/discussions\/([^/]+)\/comments\/([^/]+)$/, (m, res) => {
+		discussionComments = discussionComments.filter((c) => !(c.id === m[2] && c.discussion_id === m[1]));
+		const target = discussions.find((d) => d.id === m[1]);
+		if (target) target.comment_count = discussionComments.filter((c) => c.discussion_id === m[1]).length;
+		return ok(res, null);
+	}],
 	["GET", /^\/api\/weapons$/, (_m, res, req) => ok(res, [], req)],
 	["GET", /^\/api\/instances$/, (_m, res, req) => ok(res, [], req)],
 

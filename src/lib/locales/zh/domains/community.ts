@@ -200,6 +200,9 @@ export default {
 			viewCount: "浏览",
 			likeCount: "点赞",
 			commentCount: "评论",
+			viewCountAria: "浏览 {{count}} 次",
+			likeCountAria: "点赞 {{count}}",
+			commentCountAria: "评论 {{count}} 条",
 			mobile: {
 				views: "浏览 {{count}}",
 				likes: "点赞 {{count}}",

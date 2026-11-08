@@ -207,6 +207,9 @@ export default {
 			viewCount: "Views",
 			likeCount: "Likes",
 			commentCount: "Comments",
+			viewCountAria: "{{count}} views",
+			likeCountAria: "{{count}} likes",
+			commentCountAria: "{{count}} comments",
 			mobile: {
 				views: "{{count}} views",
 				likes: "{{count}} likes",
