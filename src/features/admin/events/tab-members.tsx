@@ -77,7 +77,7 @@ export function EventMembersTab({
 	const ban = useMutation({
 		mutationFn: async (userIds: string[]) => {
 			for (const userId of userIds) {
-				await call(
+				await callVoid(
 					client.admin.event_users.banned({ event_id: eventId, user_id: userId }),
 					t("adminEvents.actions.banMember"),
 				);
@@ -94,7 +94,7 @@ export function EventMembersTab({
 	const unban = useMutation({
 		mutationFn: async (userIds: string[]) => {
 			for (const userId of userIds) {
-				await call(
+				await callVoid(
 					client.admin.event_users.unbanned({ event_id: eventId, user_id: userId }),
 					t("adminEvents.actions.unbanMember"),
 				);
@@ -417,7 +417,8 @@ function AddMembersSheet({
 
 	const filter = useMemo(() => {
 		const cleaned = keyword.replace(/[&|]/g, " ").trim();
-		return cleaned === "" ? undefined : `nickname:${cleaned}`;
+		// 后端 users 列表支持多个 OR 条件：按昵称或账号搜索，否则输入学号/用户名时搜不到人。
+		return cleaned === "" ? undefined : `nickname:${cleaned} | username:${cleaned}`;
 	}, [keyword]);
 
 	const query = useQuery({

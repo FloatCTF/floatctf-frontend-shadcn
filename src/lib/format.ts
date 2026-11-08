@@ -188,7 +188,9 @@ export function toDatetimeLocalValue(value: DateInput): string {
 	const date = parseDate(value);
 	if (!date) return "";
 	const pad = (n: number) => String(n).padStart(2, "0");
-	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+	// 必须保留秒：否则「打开编辑 → 不改时间 → 保存」会把 start/end 截断到分钟，
+	// 最多产生 59 秒的静默漂移。
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 export function fromDatetimeLocalValue(value: string): string | null {

@@ -24,11 +24,16 @@ import {
 } from "~/components/app/page";
 import {
 	EmptyBlock,
+	ErrorBlock,
 	LoadingBlock,
 	NotFoundBlock,
 	QueryState,
 	TableSkeleton,
 } from "~/components/app/states";
+import {
+	WorkspaceAccessBlock,
+	type WorkspaceAccessReason,
+} from "~/components/app/workspace-access";
 import { TonePill } from "~/components/app/badges";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -47,6 +52,7 @@ import {
 	computeEventStatus,
 	eventCapabilities,
 	eventIdOf,
+	isPracticeEvent,
 	participationGate,
 } from "~/lib/event-status";
 import { useDebouncedValue, useDocumentTitle, useNow } from "~/lib/hooks";
@@ -96,8 +102,8 @@ export function EventsListPage() {
 	};
 
 	const query = useQuery({
-		queryKey: qk.events.list({ limit: 200 }),
-		queryFn: () => callList<EventInfo>(client.service.events.fetch({ limit: 200 })),
+		queryKey: qk.events.list({ page: 1, limit: 200 }),
+		queryFn: () => callList<EventInfo>(client.service.events.fetch({ page: 1, limit: 200 })),
 	});
 
 	const items = query.data?.items ?? [];
@@ -436,16 +442,21 @@ export function EventWorkspacePage() {
 						now.getTime(),
 					);
 					const caps = eventCapabilities(data.event);
+					// 「能看到这个标签」不等于「能调用它的后端接口」：
+					// - 赛事题目 / 实例 / AWD / AWDP 工作台都要求已参赛且已开赛；
+					// - 积分榜赛前可看（矩阵为空），公告始终可见。
+					// 不满足时不要渲染一个点开必失败的标签（后端会直接 400/403）。
+					const canAccessContent = data.joined && status !== "upcoming";
 					// 深链接可能带来过期/越权的 tab（?tab=arena 但本赛事是 Jeopardy）：
 					// Radix 对未知 value 不会选中任何项 → 页面变空白。统一回落到 overview。
 					const availableTabs = [
 						"overview",
-						...(caps.challenges ? ["challenges"] : []),
-						...(caps.arena ? ["arena"] : []),
-						...(caps.lab ? ["lab"] : []),
+						...(caps.challenges && canAccessContent ? ["challenges"] : []),
+						...(caps.arena && canAccessContent ? ["arena"] : []),
+						...(caps.lab && canAccessContent ? ["lab"] : []),
 						...(caps.scoreboard ? ["scoreboard"] : []),
 						...(caps.trend ? ["trend"] : []),
-						...(caps.instances ? ["instances"] : []),
+						...(caps.instances && canAccessContent ? ["instances"] : []),
 						"bulletin",
 					];
 					const activeTab = availableTabs.includes(tab) ? tab : "overview";
@@ -493,17 +504,17 @@ export function EventWorkspacePage() {
 												<TabsTrigger value="overview" className="shrink-0">
 													{t("events.workspace.tabs.overview")}
 												</TabsTrigger>
-												{caps.challenges ? (
+												{caps.challenges && canAccessContent ? (
 													<TabsTrigger value="challenges" className="shrink-0">
 														{t("events.workspace.tabs.challenges")}
 													</TabsTrigger>
 												) : null}
-												{caps.arena ? (
+												{caps.arena && canAccessContent ? (
 													<TabsTrigger value="arena" className="shrink-0">
 														{t("events.workspace.tabs.arena")}
 													</TabsTrigger>
 												) : null}
-												{caps.lab ? (
+												{caps.lab && canAccessContent ? (
 													<TabsTrigger value="lab" className="shrink-0">
 														{t("events.workspace.tabs.lab")}
 													</TabsTrigger>
@@ -518,7 +529,7 @@ export function EventWorkspacePage() {
 														{t("events.workspace.tabs.trend")}
 													</TabsTrigger>
 												) : null}
-												{caps.instances ? (
+												{caps.instances && canAccessContent ? (
 													<TabsTrigger value="instances" className="shrink-0">
 														{t("events.workspace.tabs.instances")}
 													</TabsTrigger>
@@ -531,17 +542,17 @@ export function EventWorkspacePage() {
 											<TabsContent value="overview" className="mt-4">
 												<OverviewTab info={data} />
 											</TabsContent>
-											{caps.challenges ? (
+											{caps.challenges && canAccessContent ? (
 												<TabsContent value="challenges" className="mt-4">
 													<ChallengesTab eventId={resolvedEventId} participantMode={data.event.participant_mode} />
 												</TabsContent>
 											) : null}
-											{caps.arena ? (
+											{caps.arena && canAccessContent ? (
 												<TabsContent value="arena" className="mt-4">
 													<ArenaSummaryTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
-											{caps.lab ? (
+											{caps.lab && canAccessContent ? (
 												<TabsContent value="lab" className="mt-4">
 													<LabSummaryTab eventId={resolvedEventId} />
 												</TabsContent>
@@ -556,7 +567,7 @@ export function EventWorkspacePage() {
 													<TrendTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
-											{caps.instances ? (
+											{caps.instances && canAccessContent ? (
 												<TabsContent value="instances" className="mt-4">
 													<InstancesTab eventId={resolvedEventId} />
 												</TabsContent>
@@ -613,20 +624,35 @@ export function EventChallengePage() {
 	const { t } = useTranslation();
 	const { eventId = "", challengeId = "" } = useParams<{ eventId: string; challengeId: string }>();
 	const client = useClient();
+	const now = useNow(30_000);
 
 	const eventQuery = useQuery({
 		queryKey: qk.events.detail(eventId),
 		queryFn: () => call<EventInfo>(client.service.events.get(eventId), t("events.challengePage.loadError")),
 		enabled: eventId !== "",
 	});
+	const eventInfo = eventQuery.data;
+	const eventStatus = eventInfo
+		? computeEventStatus(eventInfo.event.start_time, eventInfo.event.end_time, now.getTime())
+		: "unknown";
+
+	let access: WorkspaceAccessReason | null = null;
+	if (eventInfo) {
+		// 赛事题目只属于 Jeopardy（AWDP 的靶机在 `/lab`，AWD 在 `/arena`）。
+		if (eventInfo.event.family !== "jeopardy") access = "wrong-family";
+		else if (isPracticeEvent(eventInfo.event)) access = "practice";
+		else if (!eventInfo.joined) access = "not-joined";
+		else if (eventStatus === "upcoming") access = "not-started";
+	}
+	const canAccess = eventQuery.isSuccess && access === null;
 
 	const challengesQuery = useQuery({
-		queryKey: qk.events.challenges(eventId, { limit: 200 }),
+		queryKey: qk.events.challenges(eventId, { page: 1, limit: 200 }),
 		queryFn: () =>
 			callList<EventChallengeResult>(
-				client.service.events.fetchChallenges(eventId, { limit: 200 }),
+				client.service.events.fetchChallenges(eventId, { page: 1, limit: 200 }),
 			),
-		enabled: eventId !== "",
+		enabled: eventId !== "" && canAccess,
 	});
 
 	const item = (challengesQuery.data?.items ?? []).find(
@@ -640,6 +666,21 @@ export function EventChallengePage() {
 
 	return (
 		<PageBody>
+			{eventQuery.isPending ? (
+				<LoadingBlock label={t("events.challengePage.loading")} />
+			) : eventQuery.isError ? (
+				<ErrorBlock
+					error={eventQuery.error}
+					title={t("events.workspace.loadError")}
+					onRetry={() => void eventQuery.refetch()}
+				/>
+			) : access ? (
+				<WorkspaceAccessBlock
+					reason={access}
+					eventId={eventId}
+					practiceEntry="challenges"
+				/>
+			) : (
 			<QueryState
 				query={challengesQuery}
 				skeleton={<LoadingBlock label={t("events.challengePage.loading")} />}
@@ -713,6 +754,7 @@ export function EventChallengePage() {
 					)
 				}
 			</QueryState>
+			)}
 		</PageBody>
 	);
 }

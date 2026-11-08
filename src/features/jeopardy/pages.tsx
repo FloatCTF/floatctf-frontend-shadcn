@@ -69,8 +69,8 @@ export function ChallengesCatalogPage() {
 	};
 
 	const query = useQuery({
-		queryKey: qk.challenges.list({ limit: 200 }),
-		queryFn: () => callList(client.service.challenges.fetch({ limit: 200 })),
+		queryKey: qk.challenges.list({ page: 1, limit: 200 }),
+		queryFn: () => callList(client.service.challenges.fetch({ page: 1, limit: 200 })),
 	});
 
 	const items = query.data?.items ?? [];

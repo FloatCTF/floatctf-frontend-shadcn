@@ -731,6 +731,7 @@ export default {
 			teams: {
 				label: "Teams",
 				hint: "Always 0 for individual events",
+				hintTeam: "Number of participating teams",
 			},
 			challenges: {
 				label: "Challenges",

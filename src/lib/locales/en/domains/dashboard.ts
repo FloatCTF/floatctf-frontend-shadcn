@@ -19,7 +19,7 @@ export default {
 		},
 		ongoing: {
 			label: "Ongoing events",
-			hint: "Based on each event's time window",
+			hint: "Among events you joined, judged by the time window",
 		},
 		solves: {
 			label: "Practice solves",

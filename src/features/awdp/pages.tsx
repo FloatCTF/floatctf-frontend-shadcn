@@ -40,11 +40,17 @@ import {
 	LoadingBlock,
 	PermissionDeniedBlock,
 } from "~/components/app/states";
+import {
+	WorkspaceAccessBlock,
+	type WorkspaceAccessReason,
+} from "~/components/app/workspace-access";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { computeEventStatus, isPracticeEvent } from "~/lib/event-status";
 import { formatDateTime, formatDuration, formatInt, formatPoints } from "~/lib/format";
-import { useDocumentTitle } from "~/lib/hooks";
+import { useDocumentTitle, useNow } from "~/lib/hooks";
+import type { EventInfo } from "@floatctf/sdk";
 
 import {
 	AwdpActionPanel,
@@ -71,15 +77,39 @@ export function LabPage(): ReactNode {
 
 	const client = useClient();
 	const { useAwdpEventStream } = useBindings();
-	const stream = useAwdpEventStream({ eventId, enabled: Boolean(eventId) });
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
+	const now = useNow(30_000);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
+
+	const eventQuery = useQuery({
+		queryKey: qk.events.detail(eventId),
+		queryFn: () =>
+			call<EventInfo>(client.service.events.get(eventId), t("awdp.calls.event")),
+		enabled: Boolean(eventId),
+	});
+	const eventInfo = eventQuery.data;
+	const eventStatus = eventInfo
+		? computeEventStatus(eventInfo.event.start_time, eventInfo.event.end_time, now.getTime())
+		: "unknown";
+
+	// 与后端一致：练习赛 / 未参赛 / 未开始都不允许进入比赛工作台。
+	// 练习 AWDP 走 `/training`（`awdp.runs`），不是事件工作区。
+	let access: WorkspaceAccessReason | null = null;
+	if (eventInfo) {
+		if (eventInfo.event.family !== "awdp") access = "wrong-family";
+		else if (isPracticeEvent(eventInfo.event)) access = "practice";
+		else if (!eventInfo.joined) access = "not-joined";
+		else if (eventStatus === "upcoming") access = "not-started";
+	}
+	const canAccess = eventQuery.isSuccess && access === null;
+
+	const stream = useAwdpEventStream({ eventId, enabled: Boolean(eventId) && canAccess });
 
 	const overviewQuery = useQuery({
 		queryKey: qk.awdp.overview(eventId),
 		queryFn: () => call<AwdpOverview>(client.awdp.player.overview(eventId), t("awdp.calls.overview")),
-		enabled: Boolean(eventId),
+		enabled: Boolean(eventId) && canAccess,
 	});
 
 	const overview = overviewQuery.data;
@@ -221,17 +251,29 @@ export function LabPage(): ReactNode {
 					) : null
 				}
 				actions={
-					<RealtimePill
-						state={stream.connectionState}
-						onRefresh={() => {
-							stream.invalidateAwdp();
-							refreshAll();
-						}}
-					/>
+					canAccess ? (
+						<RealtimePill
+							state={stream.connectionState}
+							onRefresh={() => {
+								stream.invalidateAwdp();
+								refreshAll();
+							}}
+						/>
+					) : undefined
 				}
 			/>
 
-			{overviewQuery.isPending ? (
+			{eventQuery.isPending ? (
+				<LoadingBlock label={t("awdp.states.loadingOverview")} />
+			) : eventQuery.isError ? (
+				<ErrorBlock
+					error={eventQuery.error}
+					title={t("awdp.states.loadOverview")}
+					onRetry={() => void eventQuery.refetch()}
+				/>
+			) : access ? (
+				<WorkspaceAccessBlock reason={access} eventId={eventId} practiceEntry="training" />
+			) : overviewQuery.isPending ? (
 				<LoadingBlock label={t("awdp.states.loadingOverview")} />
 			) : overviewQuery.isError ? (
 				isForbidden(overviewQuery.error) ? (
@@ -418,6 +460,9 @@ export function LabPage(): ReactNode {
 						</div>
 
 						<AwdpActionPanel
+							// 切换 GameBox 或实例重建后必须重置面板内状态：
+							// 否则 A 靶机的 flag / accepted 结果会显示在 B 靶机下面。
+							key={`${selectedGameboxId}:${instance?.runtime_generation ?? 0}`}
 							eventId={eventId}
 							gamebox={selected}
 							instance={instance}

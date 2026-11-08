@@ -15,7 +15,7 @@
  * 所有用户可见文案走 `adminCore.challenges.*` / `adminCore.form.*` / `adminCore.ops.*`。
  */
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
@@ -142,6 +142,11 @@ export function AdminChallengesPage(): ReactNode {
 	const list = useAdminListState(SEARCH_KEYS);
 
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	// 筛选条件变化后，已选中但被筛掉的行不能再进入批量删除：
+	// 用户看不到它们，却会在确认框里删掉。
+	useEffect(() => {
+		setSelectedIds([]);
+	}, [list.filter]);
 	const [editing, setEditing] = useState<{ mode: "create" | "edit"; row?: ChallengesListItem } | null>(
 		null,
 	);

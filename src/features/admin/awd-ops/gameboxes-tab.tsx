@@ -378,13 +378,23 @@ function EditEventGameboxSheet({
 			judge_retry_interval_secs:
 				intOrError(form.judge_retry_interval_secs, 1, 3_600, t) ?? undefined,
 		};
-		// 后端 updateEventGamebox 对这两个字段没有 double_option：显式 null 会被忽略（不是清空），
-		// 因此这里禁止「把已有值清空」，避免出现静默无效的保存。
-		if (form.judge_timeout_secs.trim() === "" && row.judge_timeout_secs !== null) {
-			nextErrors.judge_timeout_secs = t("adminAwdOps.gameboxes.editSheet.cannotClear");
-		}
-		if (form.judge_retry_interval_secs.trim() === "" && row.judge_retry_interval_secs !== null) {
-			nextErrors.judge_retry_interval_secs = t("adminAwdOps.gameboxes.editSheet.cannotClear");
+		// 后端 updateEventGamebox 没有 double_option：显式 null 会被忽略（不是清空），
+		// 因此这里禁止「把已有值清空」。同时必须阻止空串走 Number("") → 0：
+		// 那会把 CPU 限额/分值/罚分静默改成 0，是货真价实的数据事故。
+		const cannotClearKeys = [
+			"cpu_millis",
+			"memory_bytes",
+			"pids_limit",
+			"attack_score",
+			"judge_down_penalty",
+			"first_bonus",
+			"judge_timeout_secs",
+			"judge_retry_interval_secs",
+		] as const;
+		for (const key of cannotClearKeys) {
+			if (form[key].trim() === "" && row[key] !== null && row[key] !== undefined) {
+				nextErrors[key] = t("adminAwdOps.gameboxes.editSheet.cannotClear");
+			}
 		}
 		setErrors(nextErrors);
 		if (Object.values(nextErrors).some((value) => value !== undefined)) return;
@@ -392,18 +402,18 @@ function EditEventGameboxSheet({
 		const patch: EventGameboxPatch = {};
 		if (form.enabled !== row.enabled) patch.enabled = form.enabled;
 		if (form.hidden !== row.hidden) patch.hidden = form.hidden;
-		if (form.cpu_millis !== String(row.cpu_millis)) patch.cpu_millis = Number(form.cpu_millis);
-		if (form.memory_bytes !== String(row.memory_bytes)) {
+		if (form.cpu_millis !== String(row.cpu_millis) && form.cpu_millis.trim() !== "") patch.cpu_millis = Number(form.cpu_millis);
+		if (form.memory_bytes !== String(row.memory_bytes) && form.memory_bytes.trim() !== "") {
 			patch.memory_bytes = Number(form.memory_bytes);
 		}
-		if (form.pids_limit !== String(row.pids_limit)) patch.pids_limit = Number(form.pids_limit);
-		if (form.attack_score !== String(row.attack_score)) {
+		if (form.pids_limit !== String(row.pids_limit) && form.pids_limit.trim() !== "") patch.pids_limit = Number(form.pids_limit);
+		if (form.attack_score !== String(row.attack_score) && form.attack_score.trim() !== "") {
 			patch.attack_score = Number(form.attack_score);
 		}
-		if (form.judge_down_penalty !== String(row.judge_down_penalty)) {
+		if (form.judge_down_penalty !== String(row.judge_down_penalty) && form.judge_down_penalty.trim() !== "") {
 			patch.judge_down_penalty = Number(form.judge_down_penalty);
 		}
-		if (form.first_bonus !== String(row.first_bonus)) patch.first_bonus = Number(form.first_bonus);
+		if (form.first_bonus !== String(row.first_bonus) && form.first_bonus.trim() !== "") patch.first_bonus = Number(form.first_bonus);
 		const originalTimeout = row.judge_timeout_secs === null ? "" : String(row.judge_timeout_secs);
 		if (form.judge_timeout_secs !== originalTimeout && form.judge_timeout_secs.trim() !== "") {
 			patch.judge_timeout_secs = Number(form.judge_timeout_secs);

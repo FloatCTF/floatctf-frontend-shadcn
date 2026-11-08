@@ -36,10 +36,18 @@ import {
 	LoadingBlock,
 	PermissionDeniedBlock,
 } from "~/components/app/states";
+import {
+	WorkspaceAccessBlock,
+	type WorkspaceAccessReason,
+} from "~/components/app/workspace-access";
 import { Button } from "~/components/ui/button";
-import { computeEventStatus, EVENT_STATUS_TONE } from "~/lib/event-status";
+import {
+	computeEventStatus,
+	EVENT_STATUS_TONE,
+	isPracticeEvent,
+} from "~/lib/event-status";
 import { formatInt, formatPoints } from "~/lib/format";
-import { useDocumentTitle } from "~/lib/hooks";
+import { useDocumentTitle, useNow } from "~/lib/hooks";
 
 import {
 	AwdFlagPanel,
@@ -58,21 +66,39 @@ export function ArenaPage(): ReactNode {
 
 	const client = useClient();
 	const { useAwdEventStream } = useBindings();
-	const stream = useAwdEventStream({ eventId, enabled: Boolean(eventId) });
-
-	const statusQuery = useQuery({
-		queryKey: qk.awd.status(eventId),
-		queryFn: () =>
-			call<AwdPlayerStatus>(client.awd.player.status(eventId), t("awd.actionNames.status")),
-		enabled: Boolean(eventId),
-		retry: false,
-	});
+	const now = useNow(30_000);
 
 	const eventQuery = useQuery({
 		queryKey: qk.events.detail(eventId),
 		queryFn: () =>
 			call<EventInfo>(client.service.events.get(eventId), t("awd.actionNames.event")),
 		enabled: Boolean(eventId),
+	});
+
+	const eventInfo = eventQuery.data;
+	const eventStatus = eventInfo
+		? computeEventStatus(eventInfo.event.start_time, eventInfo.event.end_time, now.getTime())
+		: "unknown";
+
+	// 后端对未参赛 / 未开始 / 赛制不符的赛事会直接拒绝选手端 AWD 接口。
+	// 先把闸门放在请求之前：深链接不会先打一发必失败的 403，再给一个没有出路的错误块。
+	let access: WorkspaceAccessReason | null = null;
+	if (eventInfo) {
+		if (eventInfo.event.family !== "awd") access = "wrong-family";
+		else if (isPracticeEvent(eventInfo.event)) access = "practice";
+		else if (!eventInfo.joined) access = "not-joined";
+		else if (eventStatus === "upcoming") access = "not-started";
+	}
+	const canAccess = eventQuery.isSuccess && access === null;
+
+	const stream = useAwdEventStream({ eventId, enabled: Boolean(eventId) && canAccess });
+
+	const statusQuery = useQuery({
+		queryKey: qk.awd.status(eventId),
+		queryFn: () =>
+			call<AwdPlayerStatus>(client.awd.player.status(eventId), t("awd.actionNames.status")),
+		enabled: Boolean(eventId) && canAccess,
+		retry: false,
 	});
 
 	// 命令面板的上下文命令：只注册本页真实存在的动作（聚焦提交框 / 刷新权威状态）。
@@ -101,12 +127,8 @@ export function ArenaPage(): ReactNode {
 	);
 
 	const status = statusQuery.data;
-	const eventInfo = eventQuery.data;
 	const myTeamId = eventInfo?.team_result?.team.id ?? null;
 	const eventTitle = eventInfo?.event.title ?? t("awd.arena.titleFallback");
-	const eventStatus = eventInfo
-		? computeEventStatus(eventInfo.event.start_time, eventInfo.event.end_time)
-		: "unknown";
 
 	useDocumentTitle(t("awd.documentTitle", { title: eventTitle }));
 
@@ -154,14 +176,30 @@ export function ArenaPage(): ReactNode {
 					) : null
 				}
 				actions={
-					<RealtimePill
-						state={stream.connectionState}
-						onRefresh={() => stream.invalidateAwd()}
-					/>
+					canAccess ? (
+						<RealtimePill
+							state={stream.connectionState}
+							onRefresh={() => stream.invalidateAwd()}
+						/>
+					) : undefined
 				}
 			/>
 
-			{statusQuery.isPending ? (
+			{eventQuery.isPending ? (
+				<LoadingBlock label={t("awd.arena.loading")} />
+			) : eventQuery.isError ? (
+				<ErrorBlock
+					error={eventQuery.error}
+					title={t("awd.arena.errors.event")}
+					onRetry={() => eventQuery.refetch()}
+				/>
+			) : access ? (
+				<WorkspaceAccessBlock
+					reason={access}
+					eventId={eventId}
+					practiceEntry={eventInfo?.event.family === "awdp" ? "training" : "events"}
+				/>
+			) : statusQuery.isPending ? (
 				<LoadingBlock label={t("awd.arena.loading")} />
 			) : statusQuery.isError ? (
 				isNotFound(statusQuery.error) ? (
@@ -224,14 +262,6 @@ export function ArenaPage(): ReactNode {
 								</p>
 							</div>
 						</div>
-					) : null}
-
-					{eventQuery.isError ? (
-						<ErrorBlock
-							error={eventQuery.error}
-							title={t("awd.arena.errors.event")}
-							onRetry={() => eventQuery.refetch()}
-						/>
 					) : null}
 
 					{/* 总览指标放顶部一行：窄侧栏里塞表格会横向溢出，也浪费左列高度。 */}

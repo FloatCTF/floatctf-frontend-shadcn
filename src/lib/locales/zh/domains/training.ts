@@ -44,6 +44,8 @@ export default {
 		},
 		actions: {
 			continue: "继续训练",
+			enter: "进入训练",
+			viewRun: "查看记录",
 			start: "开始训练",
 		},
 		toast: {
@@ -412,6 +414,11 @@ export default {
 			round: "回合",
 			cutoff: "截止",
 			status: "状态",
+		},
+		status: {
+			pending: "待判定",
+			evaluating: "判定中",
+			completed: "已判定",
 		},
 	},
 	evaluations: {

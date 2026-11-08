@@ -192,7 +192,39 @@ export function DataTable<T>({
 					) : (
 						rows.map((row) => (
 							<div key={row.id} className="rounded-lg border p-3">
-								{mobileCard(row.original)}
+								<div className="flex items-start gap-2">
+									{selectable ? (
+										<Checkbox
+											className="mt-0.5"
+											checked={row.getIsSelected()}
+											disabled={!row.getCanSelect()}
+											onCheckedChange={(value) => row.toggleSelected(value === true)}
+											aria-label={t("common.table.selectRow")}
+											onClick={(event) => event.stopPropagation()}
+										/>
+									) : null}
+									<div
+										className={cn("min-w-0 flex-1", onRowClick && "cursor-pointer")}
+										role={onRowClick ? "button" : undefined}
+										tabIndex={onRowClick ? 0 : undefined}
+										onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+										onKeyDown={
+											onRowClick
+												? (event) => {
+														if (event.key === "Enter" || event.key === " ") {
+															event.preventDefault();
+															onRowClick(row.original);
+														}
+													}
+												: undefined
+										}
+									>
+										{mobileCard(row.original)}
+									</div>
+								</div>
+								{rowActions ? (
+									<div className="mt-2 flex justify-end">{rowActions(row.original)}</div>
+								) : null}
 							</div>
 						))
 					)}
@@ -275,6 +307,9 @@ export function DataTable<T>({
 									onKeyDown={
 										onRowClick
 											? (event) => {
+													// 行内还有复选框 / 操作按钮：只有焦点在行本身时才响应，
+													// 否则在复选框上按 Space 会同时触发“打开行”。
+													if (event.target !== event.currentTarget) return;
 													if (event.key === "Enter" || event.key === " ") {
 														event.preventDefault();
 														onRowClick(row.original);

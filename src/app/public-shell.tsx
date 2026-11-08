@@ -72,7 +72,7 @@ export function PublicShell({ children }: { children?: ReactNode }) {
 			{/* 表单区 */}
 			<div className="relative flex min-h-svh flex-col md:min-h-0">
 				<div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 px-4 py-4 lg:px-6">
-					<Link to="/" className="flex items-center gap-2 md:invisible" aria-hidden="false">
+					<Link to="/" className="flex items-center gap-2 md:hidden">
 						<BrandMark size="sm" />
 						<span className="text-sm font-semibold tracking-tight">FloatCTF</span>
 					</Link>

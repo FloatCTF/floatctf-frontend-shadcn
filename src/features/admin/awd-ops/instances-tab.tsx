@@ -47,7 +47,7 @@ export function AwdInstancesTab({ eventId }: { eventId: string }) {
 		queryKey: qk.admin.eventInstances(eventId),
 		queryFn: () =>
 			callList<AdminInstanceRow>(
-				client.admin.instances.listForEvent(eventId, { limit: 200 }),
+				client.admin.instances.listForEvent(eventId, { page: 1, limit: 200 }),
 			).then((result) => result.items),
 		enabled: eventId !== "",
 	});

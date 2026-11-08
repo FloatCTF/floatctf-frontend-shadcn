@@ -111,8 +111,14 @@ export function EventConsolePage(): ReactNode {
 			qk.admin.eventData(eventId),
 			qk.awd.adminStatus(eventId),
 			qk.awd.adminScores(eventId),
+			qk.awd.prechecks(eventId),
+			qk.awd.eventGameboxes(eventId),
+			qk.awd.eventNetwork(eventId),
 			qk.awdp.adminConfig(eventId),
 			qk.awdp.adminScores(eventId),
+			qk.awdp.adminGameboxes(eventId),
+			qk.awdp.adminInstances(eventId),
+			qk.awdp.adminData(eventId),
 		];
 		for (const key of keys) void queryClient.invalidateQueries({ queryKey: key });
 	}

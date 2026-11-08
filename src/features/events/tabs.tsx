@@ -124,14 +124,27 @@ export function OverviewTab({ info }: { info: EventInfo }) {
 			>
 				<MarkdownView emptyText={t("events.overview.rulesEmpty")}>{info.event.rules}</MarkdownView>
 			</SectionCard>
-			{/* 后端只接受正式赛的 writeup（练习赛返回 400）：不满足条件就不渲染入口。 */}
-			{info.event.purpose === EventPurpose.Competition ? (
-				<SectionCard
-					title={t("events.writeup.title")}
-					description={t("events.writeup.description")}
-				>
-					<EventWriteupPanel info={info} />
-				</SectionCard>
+			{/* 后端只接受正式赛的 writeup（练习赛返回 400），且要求已加入赛事；
+			    未加入时提交必然 403 —— 不渲染一个点了必失败的入口。 */}
+			{info.event.purpose === EventPurpose.Competition &&
+			info.event.family === "jeopardy" ? (
+				info.joined ? (
+					<SectionCard
+						title={t("events.writeup.title")}
+						description={t("events.writeup.description")}
+					>
+						<EventWriteupPanel info={info} />
+					</SectionCard>
+				) : (
+					<SectionCard
+						title={t("events.writeup.lockedTitle")}
+						description={t("events.writeup.lockedDescription")}
+					>
+						<p className="text-sm text-muted-foreground">
+							{t("events.writeup.lockedHint")}
+						</p>
+					</SectionCard>
+				)
 			) : null}
 		</div>
 	);
@@ -153,8 +166,8 @@ export function ChallengesTab({
 	const [pageSize, setPageSize] = useState(20);
 
 	const query = useQuery({
-		queryKey: qk.events.challenges(eventId, { limit: 200 }),
-		queryFn: () => callList(client.service.events.fetchChallenges(eventId, { limit: 200 })),
+		queryKey: qk.events.challenges(eventId, { page: 1, limit: 200 }),
+		queryFn: () => callList(client.service.events.fetchChallenges(eventId, { page: 1, limit: 200 })),
 	});
 
 	const items = query.data?.items ?? [];
@@ -580,7 +593,7 @@ export function InstancesTab({ eventId }: { eventId: string }) {
 				{(items) => (
 					<DataTable
 						data={items}
-						getRowId={(row) => row.id}
+						getRowId={(row) => row.instance.id}
 						columns={columns}
 						rowActions={(row) => (
 							<Button

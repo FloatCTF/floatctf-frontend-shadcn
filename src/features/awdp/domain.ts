@@ -127,11 +127,13 @@ export function awdpEvaluationKindLabel(kind: string, t: TFunction): string {
 	}
 }
 
-/** Fix 回合状态：后端只写 `pending` / `completed`（`repo/round_repo.rs`）。 */
+/** Fix 回合状态：后端会写 `pending` / `evaluating` / `completed`（`repo/round_repo.rs`）。 */
 export function awdpRoundStatusLabel(status: string | null | undefined, t: TFunction): string {
 	switch (status) {
 		case "pending":
 			return t("awdp.rounds.statusPending");
+		case "evaluating":
+			return t("awdp.rounds.statusEvaluating");
 		case "completed":
 			return t("awdp.rounds.statusCompleted");
 		case null:
@@ -147,6 +149,8 @@ export function awdpRoundStatusTone(status: string | null | undefined): PillTone
 	switch (status) {
 		case "pending":
 			return "warning";
+		case "evaluating":
+			return "info";
 		case "completed":
 			return "info";
 		default:

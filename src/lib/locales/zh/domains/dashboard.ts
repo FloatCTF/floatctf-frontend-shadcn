@@ -19,7 +19,7 @@ export default {
 		},
 		ongoing: {
 			label: "进行中的赛事",
-			hint: "按赛事时间窗实时判定",
+			hint: "你已加入的赛事中，按时间窗判定",
 		},
 		solves: {
 			label: "我的练习解题",

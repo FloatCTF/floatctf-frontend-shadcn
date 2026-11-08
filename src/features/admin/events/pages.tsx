@@ -221,9 +221,18 @@ export function EventsListPage(): ReactNode {
 						{t("adminEvents.list.row.edit")}
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
-					<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove([row])}>
-						<Trash2 /> {t("adminEvents.list.row.delete")}
-					</DropdownMenuItem>
+					{row.system_key ? (
+						<DropdownMenuItem
+							disabled
+							title={t("adminEvents.config.hints.systemManaged")}
+						>
+							<Trash2 /> {t("adminEvents.list.row.delete")}
+						</DropdownMenuItem>
+					) : (
+						<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove([row])}>
+							<Trash2 /> {t("adminEvents.list.row.delete")}
+						</DropdownMenuItem>
+					)}
 				</DropdownMenuContent>
 			</DropdownMenu>
 		);

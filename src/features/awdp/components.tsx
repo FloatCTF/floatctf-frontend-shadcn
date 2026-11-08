@@ -649,6 +649,7 @@ export function AwdpActionPanel({
 		onError: (error) => toast.apiError(t("awdp.actions.checkFailed"), error),
 	});
 
+	const sourceWindowRef = useRef<Window | null>(null);
 	const sourceMutation = useMutation({
 		mutationFn: () =>
 			call<string>(
@@ -656,16 +657,39 @@ export function AwdpActionPanel({
 				t("awdp.calls.sourceUrl"),
 			),
 		onSuccess: (url) => {
+			const opened = sourceWindowRef.current;
+			sourceWindowRef.current = null;
 			if (!url) {
+				opened?.close();
 				toast.error(t("awdp.actions.sourceMissingUrl"));
 				return;
 			}
-			// presigned URL 直接交给浏览器下载，不 fetch 到内存。
-			window.open(url, "_blank", "noopener,noreferrer");
+			// 窗口已在点击时同步打开：这里只导航，避免异步 onSuccess 里 window.open 被拦截。
+			if (!opened || opened.closed) {
+				toast.error(t("common.popupBlocked"));
+				return;
+			}
+			opened.location.href = url;
 			toast.success(t("awdp.actions.sourceOpened"));
 		},
-		onError: (error) => toast.apiError(t("awdp.actions.sourceFailed"), error),
+		onError: (error) => {
+			sourceWindowRef.current?.close();
+			sourceWindowRef.current = null;
+			toast.apiError(t("awdp.actions.sourceFailed"), error);
+		},
 	});
+
+	function openSource() {
+		// 必须在用户点击的同步栈里打开，弹窗拦截器才认；稍后由 onSuccess 导航。
+		const opened = window.open("about:blank", "_blank");
+		if (!opened) {
+			toast.error(t("common.popupBlocked"));
+			return;
+		}
+		opened.opener = null;
+		sourceWindowRef.current = opened;
+		sourceMutation.mutate();
+	}
 
 	if (!gamebox) {
 		return (
@@ -746,11 +770,13 @@ export function AwdpActionPanel({
 									? t("awdp.actions.scored")
 									: t("awdp.actions.notScored")}
 							</TonePill>
-							<TonePill tone={breakResult.already_broken ? "warning" : "muted"}>
-								{breakResult.already_broken
-									? t("awdp.actions.alreadyBroken")
-									: t("awdp.actions.firstBreak")}
-							</TonePill>
+							{breakResult.accepted ? (
+								<TonePill tone={breakResult.already_broken ? "warning" : "muted"}>
+									{breakResult.already_broken
+										? t("awdp.actions.alreadyBroken")
+										: t("awdp.actions.firstBreak")}
+								</TonePill>
+							) : null}
 						</div>
 					) : null}
 				</div>
@@ -847,7 +873,7 @@ export function AwdpActionPanel({
 									? t("awdp.actions.downloadSourceHint")
 									: sourceGate.reason
 							}
-							onClick={() => sourceMutation.mutate()}
+							onClick={openSource}
 						>
 							<Download />
 							{t("awdp.actions.downloadSource")}

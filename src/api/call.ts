@@ -151,8 +151,18 @@ export async function call<T>(request: Promise<unknown>, what?: string): Promise
 export function unwrapList<T>(response: unknown): { items: T[]; meta: QueryParams } {
 	const envelope = asEnvelope(response);
 	const data = unwrap<T[] | null | undefined>(response);
+	if (!Array.isArray(data)) {
+		// 列表接口的空值是 `[]`；`null` / `undefined` 是契约违约。静默变成空列表
+		// 会把「端点缺失 / 响应形状错误」伪装成「暂时没有数据」。
+		throw new FloatCTFError({
+			message: i18n.t("errors.emptyResponse", {
+				what: i18n.t("errors.requestFailed"),
+			}),
+			kind: "platform",
+		});
+	}
 	return {
-		items: Array.isArray(data) ? data : [],
+		items: data,
 		meta: (envelope?.meta as QueryParams | undefined) ?? {},
 	};
 }

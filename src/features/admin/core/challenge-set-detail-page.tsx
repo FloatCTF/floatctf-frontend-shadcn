@@ -61,7 +61,7 @@ export function AdminChallengeSetDetailPage(): ReactNode {
 	const queryClient = useAppQueryClient();
 	const confirm = useConfirm();
 
-	const metaParams: QueryParams = { filter: `id:${setId}`, limit: 1 };
+	const metaParams: QueryParams = { filter: `id:${setId}`, page: 1, limit: 1 };
 	const setMeta = useQuery({
 		queryKey: qk.admin.challengeSets(metaParams),
 		queryFn: () => callList<ChallengeSets>(client.admin.challenges.getChallengeSets(metaParams)),

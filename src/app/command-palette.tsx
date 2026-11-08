@@ -65,6 +65,7 @@ const useCommandStore = create<CommandStore>((set) => ({
 
 /** 页面注册上下文命令；`deps` 变化会重新注册。 */
 export function useCommands(commands: AppCommand[], deps: unknown[] = []): void {
+	const { i18n } = useTranslation();
 	const register = useCommandStore((state) => state.register);
 	const unregister = useCommandStore((state) => state.unregister);
 	const ids = useMemo(() => commands.map((command) => command.id), [commands]);
@@ -72,7 +73,7 @@ export function useCommands(commands: AppCommand[], deps: unknown[] = []): void 
 		register(commands);
 		return () => unregister(ids);
 		// biome-ignore lint/correctness/useExhaustiveDependencies: 由调用方通过 deps 控制
-	}, [register, unregister, ids.join("|"), ...deps]);
+	}, [register, unregister, ids.join("|"), i18n.language, ...deps]);
 }
 
 interface PaletteState {

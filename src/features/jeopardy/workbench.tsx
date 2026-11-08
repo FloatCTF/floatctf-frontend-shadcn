@@ -157,9 +157,12 @@ export function ChallengeWorkbench({ challenge, mode, className, children }: Cha
 	});
 
 	const submit = useMutation({
+		// 后端 `POST /submit/flag` 是 `UniResponse<()>`：成功时 data 为 null。
+		// SDK 类型声称返回 ChallengeSolves，但不能拿 `call()` 要求非空 data，
+		// 否则「flag 正确」会被当成「没有返回数据」而显示提交失败。
 		mutationFn: (input: { instanceId: string; flag: string }) =>
 			eventId
-				? call(
+				? callVoid(
 						client.service.submit.submitSingle({
 							event_id: eventId,
 							instance_id: input.instanceId,
@@ -167,7 +170,7 @@ export function ChallengeWorkbench({ challenge, mode, className, children }: Cha
 						}),
 						"提交 flag",
 					)
-				: call(
+				: callVoid(
 						client.service.submit.submit({
 							instance_id: input.instanceId,
 							flag: input.flag,

@@ -74,6 +74,7 @@ import {
 	runRuntimeTone,
 	sourceRunGate,
 	testCheckRunGate,
+	runRoundStatusLabel,
 } from "./domain";
 
 /** 阶段步进条（pending → Break → 准备 Fix → Fix → 已结束）。 */
@@ -514,20 +515,43 @@ export function TrainingActionPanel({
 		onError: (error) => toast.apiError(t("training.actions.allCheck.toast.error"), error),
 	});
 
+	const sourceWindowRef = useRef<Window | null>(null);
 	const sourceMutation = useMutation({
 		mutationFn: () =>
 			call<string>(client.awdp.runs.sourceUrl(runId, gameboxId), "获取源码地址"),
 		onSuccess: (url) => {
+			const opened = sourceWindowRef.current;
+			sourceWindowRef.current = null;
 			if (!url) {
+				opened?.close();
 				toast.error(t("training.actions.source.missingUrl"));
 				return;
 			}
-			// presigned URL 直接交给浏览器，不 fetch 到内存。
-			window.open(url, "_blank", "noopener,noreferrer");
+			// 窗口已在点击时同步打开：异步回调里只做导航，避免被弹窗拦截。
+			if (!opened || opened.closed) {
+				toast.error(t("common.popupBlocked"));
+				return;
+			}
+			opened.location.href = url;
 			toast.success(t("training.actions.source.opened"));
 		},
-		onError: (error) => toast.apiError(t("training.actions.source.failed"), error),
+		onError: (error) => {
+			sourceWindowRef.current?.close();
+			sourceWindowRef.current = null;
+			toast.apiError(t("training.actions.source.failed"), error);
+		},
 	});
+
+	function openSource() {
+		const opened = window.open("about:blank", "_blank");
+		if (!opened) {
+			toast.error(t("common.popupBlocked"));
+			return;
+		}
+		opened.opener = null;
+		sourceWindowRef.current = opened;
+		sourceMutation.mutate();
+	}
 
 	return (
 		<div className="space-y-5">
@@ -597,11 +621,13 @@ export function TrainingActionPanel({
 								? t("training.actions.break.scored")
 								: t("training.actions.break.notScored")}
 						</TonePill>
-						<TonePill tone={breakResult.already_broken ? "warning" : "muted"}>
-							{breakResult.already_broken
-								? t("training.actions.break.alreadyBroken")
-								: t("training.actions.break.firstBroken")}
-						</TonePill>
+						{breakResult.accepted ? (
+							<TonePill tone={breakResult.already_broken ? "warning" : "muted"}>
+								{breakResult.already_broken
+									? t("training.actions.break.alreadyBroken")
+									: t("training.actions.break.firstBroken")}
+							</TonePill>
+						) : null}
 					</div>
 				) : null}
 			</SectionCard>
@@ -717,7 +743,7 @@ export function TrainingActionPanel({
 									? t("training.actions.source.title")
 									: sourceGate.reason
 							}
-							onClick={() => sourceMutation.mutate()}
+							onClick={openSource}
 						>
 							{sourceMutation.isPending ? (
 								<Loader2 className="animate-spin" aria-hidden="true" />
@@ -950,7 +976,9 @@ export function RunRoundsEvaluationsPanel({ runId }: { runId: string }): ReactNo
 								id: "status",
 								header: t("training.rounds.columns.status"),
 								sortValue: (row) => row.status,
-								cell: (row) => <MonoText>{row.status}</MonoText>,
+								cell: (row) => (
+									<MonoText>{runRoundStatusLabel(row.status, t)}</MonoText>
+								),
 							},
 						]}
 					/>

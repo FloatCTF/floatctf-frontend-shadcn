@@ -693,6 +693,7 @@ export default {
 			teams: {
 				label: "战队数",
 				hint: "个人赛恒为 0",
+				hintTeam: "战队赛为参赛战队数",
 			},
 			challenges: {
 				label: "挂题数",

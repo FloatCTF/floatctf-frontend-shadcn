@@ -173,6 +173,7 @@ export default {
 		columnCutoff: "Cutoff",
 		columnStatus: "Status",
 		statusPending: "Awaiting check",
+		statusEvaluating: "Evaluating",
 		statusCompleted: "Checked",
 		evaluationsTitle: "My evaluations",
 		evaluationsDescription:
@@ -286,6 +287,7 @@ export default {
 			"You are not a participant of this event (or have left the team), so you cannot open the AWDP workspace.",
 	},
 	calls: {
+		event: "Event details",
 		overview: "AWDP overview",
 		instance: "instance details",
 		startInstance: "start instance",

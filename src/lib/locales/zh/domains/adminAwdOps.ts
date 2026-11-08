@@ -32,6 +32,7 @@ export default {
 
 	validation: {
 		integer: "必须是整数",
+		cannotClear: "该字段不支持清空（后端只接受新值）：请填写数值",
 		range: "需在 {{min}} – {{max}} 之间",
 		cidr: "需要形如 {{example}} 的 CIDR",
 		portInteger: "必须是整数端口号",

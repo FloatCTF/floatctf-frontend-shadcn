@@ -121,6 +121,12 @@ export interface EventCapabilities {
  * 由赛事本身推导能力位（与后端 `EventCapabilities::for_mode` 同构）。
  * 不使用 `GET /events/{id}/capabilities` 逃生舱：`family` / `participant_mode` 已在
  * `EventInfo.event` 里，语义完全一致。
+ *
+ * 注意 `challenges` / `instances` / `scoreboard` / `trend` 描述的是**赛事工作区标签**
+ * 是否可用，不是「这个赛制有没有类似概念」：AWD/AWDP 的积分榜、趋势与实例在各自的
+ * 驾驶舱 / 工作台里（`awd.player.*` / `awdp.player.*`），而 `/events/{id}/scoreboard`
+ * 等通用端点在后端会因 `require_jeopardy_family` 返回 400。把它们标成 true 会渲染出
+ * 一点开必失败的标签。
  */
 export function eventCapabilities(event: Events): EventCapabilities {
 	const team = event.participant_mode === "team";
@@ -130,8 +136,9 @@ export function eventCapabilities(event: Events): EventCapabilities {
 			instances: false,
 			arena: true,
 			lab: false,
-			scoreboard: true,
-			trend: true,
+			// AWD 的实时积分榜在驾驶舱里；通用 Jeopardy 端点不适用。
+			scoreboard: false,
+			trend: false,
 			wireguard: true,
 			gameboxes: true,
 			rounds: true,
@@ -142,12 +149,13 @@ export function eventCapabilities(event: Events): EventCapabilities {
 	}
 	if (event.family === "awdp") {
 		return {
-			challenges: true,
-			instances: true,
+			// AWDP 的靶机、积分与趋势都在 `/lab/:eventId`（`awdp.player.*`）。
+			challenges: false,
+			instances: false,
 			arena: false,
 			lab: true,
-			scoreboard: true,
-			trend: true,
+			scoreboard: false,
+			trend: false,
 			wireguard: false,
 			gameboxes: true,
 			rounds: true,

@@ -62,21 +62,22 @@ export function DashboardPage(): ReactNode {
 	const now = useNow(30_000);
 
 	const events = useQuery({
-		queryKey: qk.events.list({ limit: 50 }),
-		queryFn: () => callList(client.service.events.fetch({ limit: 50 })),
+		// 后端 paginate_query 只在 limit 与 page 同时存在时分页；只传 limit 会返回全量。
+		queryKey: qk.events.list({ page: 1, limit: 50 }),
+		queryFn: () => callList(client.service.events.fetch({ page: 1, limit: 50 })),
 		enabled: userToken !== null,
 	});
 
 	const announcements = useQuery({
-		queryKey: qk.announcements.list({ limit: 5 }),
-		queryFn: () => callList(client.service.announcements.fetch({ limit: 5 })),
+		queryKey: qk.announcements.list({ page: 1, limit: 5 }),
+		queryFn: () => callList(client.service.announcements.fetch({ page: 1, limit: 5 })),
 		refetchInterval: 60_000,
 		refetchIntervalInBackground: false,
 	});
 
 	const solves = useQuery({
-		queryKey: qk.solves.list({ limit: 8 }),
-		queryFn: () => callList(client.service.solves.fetch({ limit: 8 })),
+		queryKey: qk.solves.list({ page: 1, limit: 8 }),
+		queryFn: () => callList(client.service.solves.fetch({ page: 1, limit: 8 })),
 		refetchInterval: 30_000,
 		refetchIntervalInBackground: false,
 	});

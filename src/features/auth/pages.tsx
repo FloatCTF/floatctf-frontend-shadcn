@@ -22,10 +22,10 @@ import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { useDocumentTitle } from "~/lib/hooks";
+import { safeNextPath } from "~/lib/safe-next";
 
 function nextTarget(raw: string | null, fallback: string): string {
-	if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
-	return fallback;
+	return safeNextPath(raw, fallback);
 }
 
 export function LoginPage() {

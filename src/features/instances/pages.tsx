@@ -25,7 +25,7 @@ import {
 	Trash2,
 } from "lucide-react";
 
-import { callList, callVoid } from "~/api/call";
+import { call, callList, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { useConfirm } from "~/components/app/confirm";
@@ -83,19 +83,23 @@ export function InstancesPage() {
 	const [detailId, setDetailId] = useState<string | null>(null);
 
 	const query = useQuery({
-		queryKey: qk.instances.list({ limit: 200 }),
-		queryFn: () => callList<InstanceDto>(client.service.instances.fetch({ limit: 200 })),
+		queryKey: qk.instances.list({ page: 1, limit: 200 }),
+		queryFn: () => callList<InstanceDto>(client.service.instances.fetch({ page: 1, limit: 200 })),
 		refetchInterval: 30_000,
 		refetchIntervalInBackground: false,
 	});
 
 	const destroy = useMutation({
-		mutationFn: (id: string) =>
-			callVoid(client.service.instances.destroy(id), t("instances.confirm.confirmDestroy")),
-		onSuccess: (_data, id) => {
+		mutationFn: (row: InstanceDto) =>
+			// 单条 DELETE /instances/{id} 在后端只解析 challenge 实例；AWDP 练习实例
+			// （kind=gamebox）必须走批量接口，否则必然 404。
+			instanceKindOf(row) === "gamebox"
+				? callVoid(client.service.instances.bulkDelete([row.id]), t("instances.confirm.confirmDestroy"))
+				: callVoid(client.service.instances.destroy(row.id), t("instances.confirm.confirmDestroy")),
+		onSuccess: (_data, row) => {
 			toast.success(t("instances.toast.destroyed"));
-			setSelected((current) => current.filter((item) => item !== id));
-			setDetailId((current) => (current === id ? null : current));
+			setSelected((current) => current.filter((item) => item !== row.id));
+			setDetailId((current) => (current === row.id ? null : current));
 			void queryClient.invalidateQueries({ queryKey: qk.instances.all });
 		},
 		onError: (error) => toast.apiError(t("instances.toast.destroyFailed"), error),
@@ -103,14 +107,18 @@ export function InstancesPage() {
 
 	const bulkDestroy = useMutation({
 		mutationFn: (ids: string[]) =>
-			callVoid(client.service.instances.bulkDelete(ids), t("instances.confirm.confirmBulk")),
-		onSuccess: (_data, ids) => {
-			toast.success(t("instances.toast.bulkDestroyed", { count: ids.length }));
+			call<number>(client.service.instances.bulkDelete(ids), t("instances.confirm.confirmBulk")),
+		onSuccess: (deleted, ids) => {
+			// 后端返回实际删除数量（可能因部分行已消失而小于 ids.length）。
+			toast.success(t("instances.toast.bulkDestroyed", { count: deleted }));
 			setSelected([]);
 			setDetailId((current) => (current && ids.includes(current) ? null : current));
 			void queryClient.invalidateQueries({ queryKey: qk.instances.all });
 		},
 		onError: (error) => toast.apiError(t("instances.toast.bulkDestroyFailed"), error),
+		onSettled: () => {
+			void queryClient.invalidateQueries({ queryKey: qk.instances.all });
+		},
 	});
 
 	const items = query.data?.items ?? [];
@@ -185,7 +193,7 @@ export function InstancesPage() {
 			tone: "danger",
 			confirmText: t("instances.confirm.confirmDestroy"),
 		});
-		if (ok) destroy.mutate(row.id);
+		if (ok) destroy.mutate(row);
 	};
 
 	const askBulkDestroy = async () => {

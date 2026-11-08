@@ -45,6 +45,8 @@ export default {
 		},
 		actions: {
 			continue: "Continue training",
+			enter: "Enter training",
+			viewRun: "View record",
 			start: "Start training",
 		},
 		toast: {
@@ -426,6 +428,11 @@ export default {
 			round: "Round",
 			cutoff: "Cutoff",
 			status: "Status",
+		},
+		status: {
+			pending: "Awaiting check",
+			evaluating: "Evaluating",
+			completed: "Checked",
 		},
 	},
 	evaluations: {

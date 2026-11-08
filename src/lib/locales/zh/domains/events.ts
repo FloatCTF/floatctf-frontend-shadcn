@@ -137,6 +137,9 @@ export default {
 		success: "writeup 已提交",
 		failed: "提交失败",
 		ownAction: "我的 writeup",
+		lockedTitle: "加入赛事后可提交 writeup",
+		lockedDescription: "赛后材料只对参赛者开放。",
+		lockedHint: "请先在赛事工作区加入赛事；加入后即可提交或覆盖 PDF。",
 	},
 	gate: {
 		endedTitle: "赛事已结束",

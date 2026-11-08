@@ -8,7 +8,7 @@
  * 文案全部走 `events` 命名空间（docs/theme.md §8.4）；状态判定仍由 `~/lib/event-status.ts` 提供。
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileUp, Loader2, LogIn, LogOut, ShieldAlert, Users } from "lucide-react";
@@ -311,12 +311,22 @@ export function TeamPanel({ info }: { info: EventInfo }) {
 
 	const team = info.team_result;
 
-	if (!info.joined) {
+	// 已加入但战队关系缺失（历史半加入数据）同样需要给出加入 / 建队入口，
+	// 否则会卡在一个只有说明文字、没有任何操作的死胡同里。
+	if (!info.joined || !team) {
 		if (!canChange) {
 			return (
 				<EmptyBlock
-					title={t("events.team.notJoinedTitle")}
-					description={t("events.team.notJoinedDescription")}
+					title={
+						info.joined
+							? t("events.team.noTeamTitle")
+							: t("events.team.notJoinedTitle")
+					}
+					description={
+						info.joined
+							? t("events.team.noTeamLockedDescription")
+							: t("events.team.notJoinedDescription")
+					}
 					icon={<ShieldAlert className="size-5" aria-hidden="true" />}
 				/>
 			);
@@ -367,19 +377,6 @@ export function TeamPanel({ info }: { info: EventInfo }) {
 				{createTeam.isError ? <InlineError error={createTeam.error} /> : null}
 				{joinTeam.isError ? <InlineError error={joinTeam.error} /> : null}
 			</div>
-		);
-	}
-
-	if (!team) {
-		return (
-			<EmptyBlock
-				title={t("events.team.noTeamTitle")}
-				description={
-					canChange
-						? t("events.team.noTeamDescription")
-						: t("events.team.noTeamLockedDescription")
-				}
-			/>
 		);
 	}
 
@@ -470,6 +467,7 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const [file, setFile] = useState<File | null>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const own = useQuery({
 		queryKey: qk.events.ownWriteup(info.event.id),
@@ -509,6 +507,16 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 	});
 
 	if (own.isPending) return <LoadingBlock label={t("events.writeup.loading")} />;
+	if (own.isError) {
+		return (
+			<div className="space-y-2">
+				<InlineError error={own.error} />
+				<Button variant="outline" size="sm" onClick={() => void own.refetch()}>
+					{t("common.retry")}
+				</Button>
+			</div>
+		);
+	}
 
 	// 防御：真实后端返回 string | null；非字符串（契约漂移）按「未提交」处理，绝不崩页。
 	const submitted = typeof own.data === "string" && own.data.trim().length > 0;
@@ -524,35 +532,38 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 				<p className="text-sm text-muted-foreground">{t("events.writeup.notSubmitted")}</p>
 			)}
 			<div className="flex flex-wrap items-center gap-2">
-				<label className="inline-flex cursor-pointer">
-					<input
-						type="file"
-						accept="application/pdf"
-						aria-label={t("events.writeup.fileLabel")}
-						className="hidden"
-						onChange={(event) => {
-							const picked = event.target.files?.[0] ?? null;
-							// `accept` 只是选择器过滤，用户可切到「所有文件」：这里先挡一次非 PDF。
-							if (
-								picked &&
-								picked.type !== "application/pdf" &&
-								!picked.name.toLowerCase().endsWith(".pdf")
-							) {
-								toast.warning(t("events.writeup.notPdf"));
-								setFile(null);
-								event.target.value = "";
-								return;
-							}
-							setFile(picked);
-						}}
-					/>
-					<Button type="button" variant="outline" asChild>
-						<span>
-							<FileUp aria-hidden="true" />
-							{t("events.writeup.choose")}
-						</span>
-					</Button>
-				</label>
+				<input
+					ref={fileInputRef}
+					type="file"
+					accept="application/pdf"
+					aria-label={t("events.writeup.fileLabel")}
+					className="sr-only"
+					onChange={(event) => {
+						const picked = event.target.files?.[0] ?? null;
+						// `accept` 只是选择器过滤，用户可切到「所有文件」：这里先挡一次非 PDF。
+						if (
+							picked &&
+							picked.type !== "application/pdf" &&
+							!picked.name.toLowerCase().endsWith(".pdf")
+						) {
+							toast.warning(t("events.writeup.notPdf"));
+							setFile(null);
+							event.target.value = "";
+							return;
+						}
+						setFile(picked);
+						// 清空 input.value 才能再次选择同一个文件（失败后重试的常见路径）。
+						event.target.value = "";
+					}}
+				/>
+				<Button
+					type="button"
+					variant="outline"
+					onClick={() => fileInputRef.current?.click()}
+				>
+					<FileUp aria-hidden="true" />
+					{t("events.writeup.choose")}
+				</Button>
 				{file ? (
 					<span className="max-w-48 truncate text-xs text-muted-foreground" title={file.name}>
 						{file.name}

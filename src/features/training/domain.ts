@@ -102,6 +102,21 @@ export function runEvaluationLabel(
 	return key ? t(key) : status;
 }
 
+/** Fix 回合状态：pending / evaluating / completed（其它未知值原样展示）。 */
+export function runRoundStatusLabel(
+	status: string | null | undefined,
+	t: TFunction,
+): string {
+	if (!status) return "—";
+	const key: Record<string, string> = {
+		pending: "training.rounds.status.pending",
+		evaluating: "training.rounds.status.evaluating",
+		completed: "training.rounds.status.completed",
+	};
+	const mapped = key[status];
+	return mapped ? t(mapped) : status;
+}
+
 export function runEvaluationTone(status: string | null | undefined): PillTone {
 	if (!status) return "muted";
 	return EVAL_STATUS_TONE[status] ?? "neutral";

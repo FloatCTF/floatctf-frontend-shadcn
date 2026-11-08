@@ -7,7 +7,7 @@
  * 所有用户可见文案走 `adminCore.users.*`。
  */
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
@@ -52,6 +52,9 @@ type UserFormErrors = Partial<Record<keyof UserFormState, string>>;
 
 const EMPTY_FORM: UserFormState = { username: "", nickname: "", email: "", password: "" };
 
+/** 与后端 `is_valid_email` 同口径：local@domain.tld（不是简单的 includes("@")）。 */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function validate(form: UserFormState, mode: "create" | "edit", t: TFunction): UserFormErrors {
 	const errors: UserFormErrors = {};
 	const username = form.username.trim();
@@ -61,7 +64,9 @@ function validate(form: UserFormState, mode: "create" | "edit", t: TFunction): U
 	if (!form.nickname.trim()) errors.nickname = t("adminCore.users.validation.nicknameRequired");
 
 	const email = form.email.trim();
-	if (email && !email.includes("@")) errors.email = t("adminCore.users.validation.emailInvalid");
+	if (email && !EMAIL_PATTERN.test(email)) {
+		errors.email = t("adminCore.users.validation.emailInvalid");
+	}
 
 	if (mode === "create") {
 		if (!form.password) errors.password = t("adminCore.users.validation.passwordRequired");
@@ -83,6 +88,11 @@ export function AdminUsersPage(): ReactNode {
 	const list = useAdminListState(SEARCH_KEYS);
 
 	const [selectedIds, setSelectedIds] = useState<string[]>([]);
+	// 筛选条件变化后，已选中但被筛掉的行不能再进入批量删除：
+	// 用户看不到它们，却会在确认框里删掉。
+	useEffect(() => {
+		setSelectedIds([]);
+	}, [list.filter]);
 	const [editing, setEditing] = useState<{ mode: "create" | "edit"; user?: Users } | null>(null);
 	const [form, setForm] = useState<UserFormState>(EMPTY_FORM);
 	const [errors, setErrors] = useState<UserFormErrors>({});

@@ -32,6 +32,7 @@ export default {
 
 	validation: {
 		integer: "Must be an integer",
+		cannotClear: "This field cannot be cleared (the API only accepts a new value); enter a number",
 		range: "Must be between {{min}} and {{max}}",
 		cidr: "Must be a CIDR such as {{example}}",
 		portInteger: "Must be an integer port number",

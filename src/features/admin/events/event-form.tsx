@@ -338,6 +338,7 @@ export function EventFormSheet({
 						<Input
 							id={`${formId}-start`}
 							type="datetime-local"
+							step={1}
 							value={form.start_time}
 							onChange={(changeEvent) => setForm({ ...form, start_time: changeEvent.target.value })}
 						/>
@@ -354,6 +355,7 @@ export function EventFormSheet({
 						<Input
 							id={`${formId}-end`}
 							type="datetime-local"
+							step={1}
 							value={form.end_time}
 							onChange={(changeEvent) => setForm({ ...form, end_time: changeEvent.target.value })}
 						/>

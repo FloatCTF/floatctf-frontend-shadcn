@@ -139,6 +139,9 @@ export default {
 		success: "Write-up submitted",
 		failed: "Submission failed",
 		ownAction: "My write-up",
+		lockedTitle: "Join the event to submit a write-up",
+		lockedDescription: "Write-ups are only available to participants.",
+		lockedHint: "Join the event from its workspace first; after that you can upload or replace the PDF.",
 	},
 	gate: {
 		endedTitle: "This event has ended",

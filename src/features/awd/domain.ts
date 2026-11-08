@@ -155,14 +155,31 @@ export function awdPhaseTone(phase: string | null | undefined): PillTone {
 	return PHASE_TONES[phase as AwdPhase] ?? "neutral";
 }
 
+/**
+ * 后端选手端把 `GameboxStatus` 序列化成 `format!("{:?}").to_lowercase()`，
+ * 于是 `StartFailed` 变成 `startfailed`（与枚举的 `start_failed` 不一致）。
+ * 这里做一次兼容归一化，避免最关键的失败态被显示成「未知 / 中性」。
+ */
+function normalizeGameboxStatus(status: string | null | undefined): GameboxStatus | null {
+	if (!status) return null;
+	const raw = status.trim().toLowerCase();
+	const alias: Record<string, GameboxStatus> = {
+		startfailed: GameboxStatus.StartFailed,
+		resetfailed: GameboxStatus.ResetFailed,
+	};
+	return alias[raw] ?? (raw as GameboxStatus);
+}
+
 export function gameboxStatusKey(status: string | null | undefined): string {
-	if (!status) return "awd.state.unknown";
-	return GAMEBOX_STATUS_KEYS[status as GameboxStatus] ?? "awd.state.unknown";
+	const normalized = normalizeGameboxStatus(status);
+	if (!normalized) return "awd.state.unknown";
+	return GAMEBOX_STATUS_KEYS[normalized] ?? "awd.state.unknown";
 }
 
 export function gameboxStatusTone(status: string | null | undefined): PillTone {
-	if (!status) return "muted";
-	return GAMEBOX_STATUS_TONES[status as GameboxStatus] ?? "neutral";
+	const normalized = normalizeGameboxStatus(status);
+	if (!normalized) return "muted";
+	return GAMEBOX_STATUS_TONES[normalized] ?? "neutral";
 }
 
 export function eventFamilyKey(family: string | null | undefined): string {

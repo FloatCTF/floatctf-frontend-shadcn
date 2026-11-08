@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, MoreHorizontal, ShieldCheck, Trash2, Users } from "lucide-react";
 
-import { call, callList } from "~/api/call";
+import { call, callList, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { BooleanPill, TonePill } from "~/components/app/badges";
@@ -97,7 +97,7 @@ export function EventTeamsTab({
 	const ban = useMutation({
 		mutationFn: async (teamIds: string[]) => {
 			for (const teamId of teamIds) {
-				await call(
+				await callVoid(
 					client.admin.event_teams.banned({ event_id: eventId, team_id: teamId }),
 					t("adminEvents.actions.banTeam"),
 				);
@@ -114,7 +114,7 @@ export function EventTeamsTab({
 	const unban = useMutation({
 		mutationFn: async (teamIds: string[]) => {
 			for (const teamId of teamIds) {
-				await call(
+				await callVoid(
 					client.admin.event_teams.unbanned({ event_id: eventId, team_id: teamId }),
 					t("adminEvents.actions.unbanTeam"),
 				);

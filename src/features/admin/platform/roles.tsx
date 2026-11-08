@@ -63,6 +63,8 @@ interface RoleFormState {
 	name: string;
 	description: string;
 	permissions: Set<string>;
+	/** 内置角色：后端只允许改 name / description，传 permissions 会 409。 */
+	protected?: boolean;
 }
 
 export function AdminRolesPage(): ReactNode {
@@ -113,7 +115,8 @@ export function AdminRolesPage(): ReactNode {
 				client.admin.roles.patch(input.id!, {
 					name: input.name.trim(),
 					description: input.description.trim() || undefined,
-					permissions: [...input.permissions],
+					// 内置角色的权限集是引导不变式：只提交名称 / 描述，避免必然 409。
+					permissions: input.protected ? undefined : [...input.permissions],
 				}),
 				t("adminPlatform.roles.requests.update"),
 			),
@@ -220,6 +223,7 @@ export function AdminRolesPage(): ReactNode {
 								name: row.name,
 								description: row.description,
 								permissions: new Set(row.grants_all ? [] : row.permissions),
+								protected: row.protected,
 							})
 						}
 					>

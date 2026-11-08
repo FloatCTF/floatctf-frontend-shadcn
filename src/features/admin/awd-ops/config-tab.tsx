@@ -94,11 +94,22 @@ function formFromStatus(status: AwdEventStatus): ConfigFormState {
 
 type FormErrors = Partial<Record<NumericKey | "planned_start_at", string>>;
 
-function validateForm(form: ConfigFormState, t: TFunction): FormErrors {
+function validateForm(
+	form: ConfigFormState,
+	t: TFunction,
+	status?: AwdEventStatus,
+): FormErrors {
 	const errors: FormErrors = {};
 	for (const field of NUMERIC_FIELDS) {
 		const raw = form[field.key].trim();
-		if (raw === "") continue;
+		if (raw === "") {
+			// 后端 PATCH 的数值字段是 Option<T>（None = 不修改，没有「清空」语义）。
+			// 编辑时把已有值清空必须当场报错，否则保存会静默丢字段。
+			if (status && status[field.key] !== null && status[field.key] !== undefined) {
+				errors[field.key] = t("adminAwdOps.validation.cannotClear");
+			}
+			continue;
+		}
 		if (!/^-?\d+$/.test(raw)) {
 			errors[field.key] = t("adminAwdOps.validation.integer");
 			continue;
@@ -338,7 +349,7 @@ function EditAwdSheet({
 
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
-		const nextErrors = validateForm(form, t);
+		const nextErrors = validateForm(form, t, status);
 		setErrors(nextErrors);
 		if (Object.keys(nextErrors).length > 0) return;
 		const patch = buildPatch(status, form);

@@ -165,6 +165,7 @@ export default {
 		columnCutoff: "截止",
 		columnStatus: "状态",
 		statusPending: "待判定",
+		statusEvaluating: "判定中",
 		statusCompleted: "已判定",
 		evaluationsTitle: "我的评测",
 		evaluationsDescription: "manual = Test Check 自检；official = 每回合官方判定。",
@@ -268,6 +269,7 @@ export default {
 			"你不是本赛事的参赛成员（或已离队），无法进入 AWDP 工作台。",
 	},
 	calls: {
+		event: "赛事详情",
 		overview: "AWDP 总览",
 		instance: "实例详情",
 		startInstance: "启动实例",

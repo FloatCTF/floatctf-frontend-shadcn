@@ -272,8 +272,8 @@ export function SolvesPage(): ReactNode {
 	// 过滤选项：后端 `/solves` 只支持 id / challenge_id / event_id 三个键，
 	// 因此用「自己解题记录里出现过的题目」构造题目下拉（真实数据，不是枚举题库）。
 	const optionsQuery = useQuery({
-		queryKey: qk.solves.list({ limit: 200, purpose: "filter-options" }),
-		queryFn: () => callList<SolveResult>(client.service.solves.fetch({ limit: 200 })),
+		queryKey: qk.solves.list({ page: 1, limit: 200, purpose: "filter-options" }),
+		queryFn: () => callList<SolveResult>(client.service.solves.fetch({ page: 1, limit: 200 })),
 	});
 
 	const filter = challengeId === "all" ? undefined : `challenge_id:${challengeId}`;

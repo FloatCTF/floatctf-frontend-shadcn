@@ -132,7 +132,11 @@ export function TrainingCatalogPage(): ReactNode {
 			<Button size="sm" asChild>
 				<Link to={`/training/runs/${row.active_training.run_id}`}>
 					<Play aria-hidden="true" />
-					{t("training.catalog.actions.continue")}
+					{row.active_training.phase === "ended"
+						? t("training.catalog.actions.viewRun")
+						: row.active_training.phase === "pending"
+							? t("training.catalog.actions.enter")
+							: t("training.catalog.actions.continue")}
 				</Link>
 			</Button>
 		) : (
@@ -318,7 +322,9 @@ export function TrainingCatalogPage(): ReactNode {
 																	row.active_training.score,
 																),
 															})
-														: t("training.catalog.state.active", {
+														: row.active_training.phase === "pending"
+															? t("training.catalog.state.notStarted")
+															: t("training.catalog.state.active", {
 																phase: runPhaseLabel(
 																	row.active_training.phase,
 																	t,
@@ -361,19 +367,31 @@ export function TrainingCatalogPage(): ReactNode {
 										<TonePill
 											tone={
 												row.active_training
-													? "info"
+													? row.active_training.phase === "ended"
+														? "muted"
+														: row.active_training.phase === "pending"
+															? "warning"
+															: "info"
 													: row.solved
 														? "success"
 														: "muted"
 											}
 										>
 											{row.active_training
-												? t("training.catalog.state.activeShort", {
-														phase: runPhaseLabel(
-															row.active_training.phase,
-															t,
-														),
-													})
+												? row.active_training.phase === "ended"
+													? t("training.catalog.state.ended", {
+															score: formatPoints(
+																row.active_training.score,
+															),
+														})
+													: row.active_training.phase === "pending"
+														? t("training.catalog.state.notStarted")
+														: t("training.catalog.state.activeShort", {
+																phase: runPhaseLabel(
+																	row.active_training.phase,
+																	t,
+																),
+															})
 												: row.solved
 													? t("training.catalog.state.trained")
 													: t("training.catalog.state.notStarted")}
@@ -946,18 +964,17 @@ export function TrainingRunPage(): ReactNode {
 										)}
 										{t("training.run.lifecycle.restart")}
 									</Button>
-									{endGate.allowed ? (
-										<Button
-											variant="ghost"
-											size="sm"
-											asChild
-											title={t("training.run.lifecycle.backTitle")}
-										>
-											<Link to="/training">
-												{t("training.run.lifecycle.back")}
-											</Link>
-										</Button>
-									) : null}
+									{/* 返回训练场不是破坏性动作：任何阶段（含已结束）都应可用。 */}
+									<Button
+										variant="ghost"
+										size="sm"
+										asChild
+										title={t("training.run.lifecycle.backTitle")}
+									>
+										<Link to="/training">
+											{t("training.run.lifecycle.back")}
+										</Link>
+									</Button>
 								</div>
 
 								{!startGate.allowed ||

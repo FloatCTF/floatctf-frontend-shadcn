@@ -43,6 +43,7 @@ import {
 	PageHeader,
 	PaginationBar,
 	SectionCard,
+	SecretValue,
 	Toolbar,
 } from "~/components/app/page";
 import {
@@ -84,6 +85,13 @@ import {
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 /** 平台关键设置：切换生效前端（只读提示 + 跳转选择器）。 */
+const SENSITIVE_KEY_PATTERN =
+	/(SECRET|PASSWORD|PASSWD|TOKEN|PRIVATE_KEY|API_KEY|PROXY|SMTP_URI|DATABASE_URL|REDIS_URL)/i;
+
+function isSensitiveKey(key: string): boolean {
+	return SENSITIVE_KEY_PATTERN.test(key);
+}
+
 const FRONTEND_ACTIVE_KEY = "FRONTEND_ACTIVE";
 
 /** 覆盖受保护设置值所需的确认词。 */
@@ -207,17 +215,25 @@ export function AdminSettingsPage(): ReactNode {
 		{
 			id: "value",
 			header: t("adminPlatform.settings.columns.value"),
-			cell: (row) => <MonoText>{truncate(row.value, 40) || "—"}</MonoText>,
+			cell: (row) =>
+				isSensitiveKey(row.key) ? (
+					<SecretValue value={row.value} label={row.key} />
+				) : (
+					<MonoText>{truncate(row.value, 40) || "—"}</MonoText>
+				),
 		},
 		{
 			id: "resolved_value",
 			header: t("adminPlatform.settings.columns.resolved"),
 			hideBelow: "lg",
-			cell: (row) => (
-				<MonoText className="text-muted-foreground">
-					{truncate(row.resolved_value ?? "", 40) || "—"}
-				</MonoText>
-			),
+			cell: (row) =>
+				isSensitiveKey(row.key) ? (
+					<SecretValue value={row.resolved_value ?? ""} label={row.key} />
+				) : (
+					<MonoText className="text-muted-foreground">
+						{truncate(row.resolved_value ?? "", 40) || "—"}
+					</MonoText>
+				),
 		},
 		{
 			id: "type",

@@ -152,6 +152,7 @@ export function AwdScoresTab({ eventId }: { eventId: string }) {
 	const canSubmit =
 		!statusQuery.isPending &&
 		!statusError &&
+		status !== null &&
 		!locked &&
 		teamId !== "" &&
 		deltaValid &&

@@ -125,9 +125,11 @@ export function TrendChart({
 				onMouseLeave={() => setHoverX(null)}
 				onMouseMove={(event) => {
 					const rect = event.currentTarget.getBoundingClientRect();
-					const ratio = (event.clientX - rect.left) / rect.width;
-					const x = minX + ratio * (maxX - minX);
-					setHoverX(x);
+					// 先把屏幕坐标换算到 viewBox，再扣除左右 padding；
+					// 直接按整幅宽度取比例会让参考线最多偏移 52px，边缘取点也会错。
+					const svgX = ((event.clientX - rect.left) / rect.width) * width;
+					const ratio = Math.min(1, Math.max(0, (svgX - padding.left) / innerWidth));
+					setHoverX(minX + ratio * (maxX - minX));
 				}}
 			>
 				{yTicks.map((tick) => (

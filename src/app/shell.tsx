@@ -180,7 +180,7 @@ export function AppShell({ navGroups, mobileNav, scope }: AppShellProps) {
 						<span className="truncate text-xs text-muted-foreground">{identity}</span>
 					</div>
 				</SidebarFooter>
-				<SidebarRail />
+				<SidebarRail label={t("shell.toggleNav")} />
 			</Sidebar>
 
 			<SidebarInset className="min-w-0">

@@ -565,15 +565,18 @@ const PRECHECK_STATUS_KEYS: Record<string, string> = {
 /** 预检结果：已知状态走 i18n，未知值原样透传。 */
 export function precheckStatusLabel(status: string | null | undefined, t: TFunction): string {
 	if (!status) return "—";
-	const key = PRECHECK_STATUS_KEYS[status];
+	// 后端历史记录用 `format!("{:?}")`（"Passed"），POST 响应却是小写 —— 统一归一化。
+	const normalized = status.trim().toLowerCase();
+	const key = PRECHECK_STATUS_KEYS[normalized];
 	return key ? t(key) : status;
 }
 
 export function precheckStatusTone(status: string | null | undefined): PillTone {
 	if (!status) return "muted";
-	if (status === "passed") return "success";
-	if (status === "failed" || status === "error") return "danger";
-	if (status === "running") return "info";
+	const normalized = status.trim().toLowerCase();
+	if (normalized === "passed") return "success";
+	if (normalized === "failed" || normalized === "error") return "danger";
+	if (normalized === "running") return "info";
 	return "neutral";
 }
 

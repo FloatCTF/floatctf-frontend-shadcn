@@ -185,7 +185,11 @@ function DataPresentView({ data, now }: { data: DataPresent; now: Date }): React
 				<StatCard
 					label={t("adminEvents.data.stats.teams.label")}
 					value={data.team_count ?? 0}
-					hint={t("adminEvents.data.stats.teams.hint")}
+					hint={
+						data.event.participant_mode === "team"
+							? t("adminEvents.data.stats.teams.hintTeam")
+							: t("adminEvents.data.stats.teams.hint")
+					}
 					icon={<Users className="size-4" />}
 					tone="success"
 				/>

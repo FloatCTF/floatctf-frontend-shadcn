@@ -14,7 +14,8 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Download, FileText, RefreshCw } from "lucide-react";
 
-import { call, callList, callMaybe } from "~/api/call";
+import { callList, callMaybe } from "~/api/call";
+import { useAuthStore, useMe } from "~/auth/store";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { TonePill, type PillTone } from "~/components/app/badges";
@@ -23,8 +24,9 @@ import { MonoText, SectionCard, Toolbar } from "~/components/app/page";
 import { EmptyBlock } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
-import type { EventLogs, EventWriteup, Users } from "@floatctf/sdk/entity";
+import type { EventLogs, EventWriteup } from "@floatctf/sdk/entity";
 import { formatDateTime } from "~/lib/format";
+import { jwtSubject } from "~/lib/jwt";
 
 import { MobileFacts, PagedTable } from "./shared";
 
@@ -60,11 +62,11 @@ export function EventLogsTab({ eventId }: { eventId: string }): ReactNode {
 	});
 
 	// 操作者列：把当前账号显示成「本人」，其它 UUID 截断显示（title 保留完整值）。
-	const authQuery = useQuery({
-		queryKey: qk.auth.me(),
-		queryFn: () => call<Users>(client.service.users.getMe(), t("adminEvents.actions.loadEventInstances")),
-	});
-	const meId = authQuery.data?.id ?? "";
+	// 不能在这里调用选手端 `/users/me`：管理会话独立，缺少选手 token 时会 401 并清掉
+	// 选手端 token。优先用选手资料（如果确实登录了），否则从管理 token 的 sub 读取。
+	const me = useMe();
+	const adminToken = useAuthStore((state) => state.adminToken);
+	const meId = me?.id ?? jwtSubject(adminToken) ?? "";
 
 	const columns: DataTableColumn<EventLogs>[] = [
 		{
