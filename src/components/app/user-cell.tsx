@@ -90,6 +90,8 @@ export function AbsoluteTime({
 function formatDateTimeLocal(value: string, seconds: boolean): string {
 	const date = new Date(value);
 	if (Number.isNaN(date.getTime())) return value;
+	// 开发注册表 / 早期待迁移数据用 0 表示「未知」；渲染成 1970 会让人误以为真实安装时间。
+	if (date.getTime() === 0) return "—";
 	return date.toLocaleString(i18n.language === "en" ? "en-US" : "zh-CN", {
 		year: "numeric",
 		month: "2-digit",
