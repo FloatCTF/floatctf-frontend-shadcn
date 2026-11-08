@@ -55,6 +55,10 @@ export default {
 		breadcrumbCatalog: "题库",
 		writeupsTitle: "公开题解",
 		writeupsDescription: "其他选手分享的解题思路。",
+		tabs: {
+			challenge: "题目",
+			writeup: "WriteUp",
+		},
 	},
 	sets: {
 		documentTitle: "题集 · FloatCTF",

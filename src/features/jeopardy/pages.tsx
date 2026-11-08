@@ -49,6 +49,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "~/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import type { ChallengesListItem } from "@floatctf/sdk";
 import type { ChallengeSets } from "@floatctf/sdk/entity";
 import { formatRelative } from "~/lib/format";
@@ -441,18 +442,31 @@ export function ChallengeDetailPage() {
 								) : null
 							}
 						/>
-						<ChallengeWorkbench
-							challenge={challenge}
-							mode={{ kind: "practice" }}
-							className="lg:min-h-0 lg:flex-1"
-						>
-							<SectionCard
-								title={t("jeopardy.detail.writeupsTitle")}
-								description={t("jeopardy.detail.writeupsDescription")}
-							>
-								<ChallengeWriteups challengeId={challengeId} />
-							</SectionCard>
-						</ChallengeWorkbench>
+						<Tabs defaultValue="challenge" className="flex min-h-0 flex-1 flex-col gap-3">
+							<TabsList className="w-fit">
+								<TabsTrigger value="challenge">
+									{t("jeopardy.detail.tabs.challenge")}
+								</TabsTrigger>
+								<TabsTrigger value="writeup">
+									{t("jeopardy.detail.tabs.writeup")}
+								</TabsTrigger>
+							</TabsList>
+							<TabsContent value="challenge" className="min-h-0 flex-1">
+								<ChallengeWorkbench
+									challenge={challenge}
+									mode={{ kind: "practice" }}
+									className="lg:min-h-0 lg:flex-1"
+								/>
+							</TabsContent>
+							<TabsContent value="writeup" className="min-h-0 flex-1 overflow-y-auto">
+								<SectionCard
+									title={t("jeopardy.detail.writeupsTitle")}
+									description={t("jeopardy.detail.writeupsDescription")}
+								>
+									<ChallengeWriteups challengeId={challengeId} />
+								</SectionCard>
+							</TabsContent>
+						</Tabs>
 					</>
 				)}
 			</QueryState>

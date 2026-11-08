@@ -56,6 +56,10 @@ export default {
 		breadcrumbCatalog: "Challenges",
 		writeupsTitle: "Public writeups",
 		writeupsDescription: "Approaches shared by other players.",
+		tabs: {
+			challenge: "Challenge",
+			writeup: "WriteUp",
+		},
 	},
 	sets: {
 		documentTitle: "Challenge sets · FloatCTF",

@@ -119,3 +119,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
   积分榜 / 趋势 / 公告；赛事事实与参赛控制收进总览右侧，移除跨 Tab 常驻侧栏。
 
 - 2026-11-08：题库列表列顺序改为 Default：名称 / 分类 / 已解出 / 作者 / 版本 / 更新时间。
+
+- 2026-11-08：题目详情增加 Default 的 Challenge / WriteUp 两个子页；公开题解独立成 Tab。
