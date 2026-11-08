@@ -10,12 +10,12 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Check, MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 
 import { call, callList } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
-import { BooleanPill, TonePill } from "~/components/app/badges";
+import { BooleanPill } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import type { DataTableColumn } from "~/components/app/data-table";
 import { PageBody, PageHeader, SectionCard, Toolbar } from "~/components/app/page";
@@ -40,7 +40,7 @@ import {
 } from "~/components/ui/select";
 import { EventFamily } from "@floatctf/sdk/entity";
 import type { Events } from "@floatctf/sdk/entity";
-import { formatRange } from "~/lib/format";
+import { formatDateTime, formatRange } from "~/lib/format";
 import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
 
 import { EventFormSheet } from "./event-form";
@@ -124,31 +124,15 @@ export function EventsListPage(): ReactNode {
 
 	const columns: DataTableColumn<Events>[] = [
 		{
-			id: "title",
-			header: t("adminEvents.list.columns.title"),
+			id: "id",
+			header: t("adminEvents.list.columns.id"),
+			sortValue: (row) => row.id,
 			cell: (row) => (
-				<div className="min-w-0">
-					<Link
-						to={`/admin/events/${row.id}`}
-						className="font-medium underline-offset-4 hover:underline"
-					>
-						{row.title}
-					</Link>
-					<div className="mt-1 flex flex-wrap items-center gap-1">
-						{row.hidden ? (
-							<TonePill tone="muted" title={t("adminEvents.list.visibility.hidden")}>
-								{t("adminEvents.list.visibility.hidden")}
-							</TonePill>
-						) : null}
-						{row.system_key ? (
-							<TonePill tone="warning" title={t("adminEvents.list.badgeSystem")}>
-								{t("adminEvents.list.badgeSystem")}
-							</TonePill>
-						) : null}
-					</div>
-				</div>
+				<Link to={`/admin/events/${row.id}`} className="font-mono text-xs hover:underline">
+					{row.id}
+				</Link>
 			),
-			sortValue: (row) => row.title,
+			hideBelow: "md",
 		},
 		{
 			id: "family",
@@ -163,15 +147,17 @@ export function EventsListPage(): ReactNode {
 			sortValue: (row) => row.participant_mode,
 		},
 		{
-			id: "window",
-			header: t("adminEvents.list.columns.window"),
+			id: "title",
+			header: t("adminEvents.list.columns.title"),
 			cell: (row) => (
-				<span className="tnum text-xs whitespace-nowrap">
-					{formatRange(row.start_time, row.end_time ?? null)}
-				</span>
+				<Link
+					to={`/admin/events/${row.id}`}
+					className="font-medium underline-offset-4 hover:underline"
+				>
+					{row.title}
+				</Link>
 			),
-			sortValue: (row) => Date.parse(row.start_time),
-			hideBelow: "lg",
+			sortValue: (row) => row.title,
 		},
 		{
 			id: "status",
@@ -195,10 +181,31 @@ export function EventsListPage(): ReactNode {
 			hideBelow: "md",
 		},
 		{
-			id: "purpose",
-			header: t("adminEvents.list.columns.purpose"),
-			cell: (row) => <EventPurposePills event={row} />,
-			sortValue: (row) => `${row.purpose}-${row.is_virtual ? "v" : "n"}`,
+			id: "allow_join",
+			header: t("adminEvents.list.columns.canJoin"),
+			cell: (row) =>
+				row.allow_join ? (
+					<Check className="size-4 text-emerald-600 dark:text-emerald-400" aria-label={t("common.yes")} />
+				) : null,
+			sortValue: (row) => (row.allow_join ? 1 : 0),
+			hideBelow: "md",
+		},
+		{
+			id: "start_time",
+			header: t("adminEvents.list.columns.startsAt"),
+			cell: (row) => <span className="tnum text-xs">{formatDateTime(row.start_time)}</span>,
+			sortValue: (row) => Date.parse(row.start_time),
+			hideBelow: "lg",
+		},
+		{
+			id: "end_time",
+			header: t("adminEvents.list.columns.endsAt"),
+			cell: (row) => (
+				<span className="tnum text-xs">
+					{row.end_time ? formatDateTime(row.end_time) : "—"}
+				</span>
+			),
+			sortValue: (row) => (row.end_time ? Date.parse(row.end_time) : 0),
 			hideBelow: "lg",
 		},
 	];
