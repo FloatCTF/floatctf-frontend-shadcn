@@ -242,6 +242,25 @@ export function AdminChallengeSetDetailPage(): ReactNode {
 		</Link>
 	);
 
+	// 过滤条件已经确认没有这个题集：只显示不存在，不再渲染空题目列表和「添加题目」按钮。
+	if (setMeta.isSuccess && meta === null) {
+		return (
+			<PageBody>
+				<NotFoundBlock
+					title={t("adminCore.challengeSetDetail.notFound.title")}
+					description={t("adminCore.challengeSetDetail.notFound.description", { id: setId })}
+					action={
+						<Button asChild size="sm">
+							<Link to="/admin/challenge-sets">
+								{t("adminCore.challengeSetDetail.back")}
+							</Link>
+						</Button>
+					}
+				/>
+			</PageBody>
+		);
+	}
+
 	return (
 		<PageBody>
 			<PageHeader
@@ -412,20 +431,6 @@ export function AdminChallengeSetDetailPage(): ReactNode {
 					)}
 				</QueryState>
 			</SectionCard>
-
-			{setMeta.isSuccess && setMeta.data.items.length === 0 ? (
-				<NotFoundBlock
-					title={t("adminCore.challengeSetDetail.notFound.title")}
-					description={t("adminCore.challengeSetDetail.notFound.description", { id: setId })}
-					action={
-						<Button asChild size="sm">
-							<Link to="/admin/challenge-sets">
-								{t("adminCore.challengeSetDetail.back")}
-							</Link>
-						</Button>
-					}
-				/>
-			) : null}
 
 			<FormSheet
 				open={pickerOpen}
