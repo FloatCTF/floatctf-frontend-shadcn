@@ -21,7 +21,14 @@ export function isForbidden(error: unknown): boolean {
 }
 
 export function isNotFound(error: unknown): boolean {
-	return isFloatCTFError(error) && error.httpStatus === 404;
+	if (!isFloatCTFError(error)) return false;
+	if (error.httpStatus === 404) return true;
+	// 路由里的 UUID 格式非法时后端返回 400「路径参数格式错误」；对用户来说
+	// 这等价于“这个资源不存在”，不应展示技术错误 + 重试。
+	return (
+		error.httpStatus === 400 &&
+		/路径参数|path parameter/i.test(error.platformMessage ?? "")
+	);
 }
 
 export function isNetworkError(error: unknown): boolean {

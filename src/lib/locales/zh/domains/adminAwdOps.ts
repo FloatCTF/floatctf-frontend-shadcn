@@ -46,6 +46,8 @@ export default {
 		loadingEvent: "加载赛事信息…",
 		loadFailed: "加载赛事失败",
 		backToList: "返回赛事列表",
+		notFoundTitle: "赛事不存在",
+		notFoundDescription: "该赛事可能已被删除，或 ID 不正确。",
 		backToConsole: "赛事控制台",
 		gameboxLibrary: "GameBox 库",
 	},

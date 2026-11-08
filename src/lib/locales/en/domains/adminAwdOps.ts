@@ -47,6 +47,8 @@ export default {
 		loadingEvent: "Loading event information…",
 		loadFailed: "Failed to load event",
 		backToList: "Back to events",
+		notFoundTitle: "Event not found",
+		notFoundDescription: "The event may have been deleted, or the ID is invalid.",
 		backToConsole: "Event console",
 		gameboxLibrary: "GameBox library",
 	},

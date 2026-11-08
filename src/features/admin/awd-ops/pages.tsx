@@ -20,7 +20,7 @@ import { ArrowLeft, Boxes, RefreshCw } from "lucide-react";
 import type { AwdEventStatus } from "@floatctf/sdk";
 
 import { useBindings, useClient } from "~/api/client";
-import { errorText } from "~/api/errors";
+import { errorText, isNotFound } from "~/api/errors";
 import { qk } from "~/api/keys";
 import { RealtimePill, TonePill } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
@@ -30,7 +30,7 @@ import {
 	PageHeader,
 	SectionCard,
 } from "~/components/app/page";
-import { EmptyBlock, ErrorBlock, LoadingBlock } from "~/components/app/states";
+import { EmptyBlock, ErrorBlock, LoadingBlock, NotFoundBlock } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -146,6 +146,25 @@ export function AwdOpsPage() {
 					description={t("adminAwdOps.page.loadingEvent")}
 				/>
 				<LoadingBlock label={t("adminAwdOps.page.loadingLabel")} />
+			</PageBody>
+		);
+	}
+
+	if (eventQuery.isError && isNotFound(eventQuery.error)) {
+		return (
+			<PageBody>
+				<NotFoundBlock
+					title={t("adminAwdOps.page.notFoundTitle")}
+					description={t("adminAwdOps.page.notFoundDescription")}
+					action={
+						<Button variant="outline" asChild>
+							<Link to="/admin/events">
+								<ArrowLeft data-icon="inline-start" />
+								{t("adminAwdOps.page.backToList")}
+							</Link>
+						</Button>
+					}
+				/>
 			</PageBody>
 		);
 	}
