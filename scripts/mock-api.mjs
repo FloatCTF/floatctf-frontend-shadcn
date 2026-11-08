@@ -1213,7 +1213,18 @@ const mockTeamResult = (event) => {
 };
 
 /** 附件下载（mock）：/public/<key> 返回一个可下载的占位文件，并累加武器下载计数。 */
+const MOCK_PNG = Buffer.from(
+	"iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFElEQVR4nGP8z8DAwMDAxMDAwMAAAAwAAf8CB0kAAAAASUVORK5CYII=",
+	"base64",
+);
+
 const handlePublicFile = (key, res) => {
+	if (key.includes("avatar")) {
+		// 头像必须是可解码的图片，否则前端会回退到首字母占位。
+		res.writeHead(200, { "content-type": "image/png", "content-length": MOCK_PNG.length });
+		res.end(MOCK_PNG);
+		return;
+	}
 	const weapon = weapons.find((item) => item.file_url.replace(/^\/+/, "") === key);
 	if (weapon) weapon.download_count = (weapon.download_count ?? 0) + 1;
 	const filename = key.split("/").pop() || "attachment.txt";
@@ -1798,6 +1809,14 @@ const routes = [
 	// 认证 / 账号
 	["POST", /^\/api\/session$/, (_m, res) => ok(res, "mock-token-0001")],
 	["POST", /^\/api\/users$/, (_m, res) => ok(res, "mock-token-0001")],
+	["PATCH", /^\/api\/uploads\/avatar$/, (_m, res, req) => {
+		// multipart：mock 不解析内容，只更新当前账号头像并返回 URL。
+		req.resume();
+		req.on("end", () => {
+			me.avatar = "/public/avatars/mock-avatar.png";
+			return ok(res, me.avatar);
+		});
+	}],
 	["POST", /^\/api\/users\/reset_password$/, (_m, res) => ok(res, "ok")],
 	["POST", /^\/api\/users\/reset$/, (_m, res) => ok(res, "ok")],
 	["GET", /^\/api\/users\/me$/, (_m, res) => ok(res, me)],

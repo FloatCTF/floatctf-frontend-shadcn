@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T03:01:32.162Z",
+	"generatedAt": "2026-11-08T03:13:18.331Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -516,6 +516,10 @@
 		{
 			"method": "PATCH",
 			"pattern": "\\/api\\/discussions\\/([^/]+)\\/comments\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/uploads\\/avatar"
 		},
 		{
 			"method": "PATCH",
