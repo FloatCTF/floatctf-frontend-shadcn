@@ -51,6 +51,7 @@ export default {
 		updated: "头像已更新",
 		invalidType: "仅支持 PNG / JPEG / WebP / GIF 图片。",
 		tooLarge: "图片不能超过 50MB。",
+		invalidImage: "图片无法解码，请更换有效的 PNG / JPEG / WebP / GIF 文件。",
 		uploadFailed: "头像上传失败",
 		hint: "先选择图片，再点「上传头像」；上传过程会显示进度。",
 	},

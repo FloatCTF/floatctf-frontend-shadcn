@@ -337,8 +337,19 @@ export function ProfilePage(): ReactNode {
 												toast.error(t("profile.avatar.tooLarge"));
 												return;
 											}
-											setAvatarFile(selected);
-											setPreviewUrl(URL.createObjectURL(selected));
+											// MIME/大小正确不代表图片可解码；先让浏览器解码一次，
+											// 避免把坏文件传到后端后才显示“头像已更新”但页面仍是占位符。
+											const url = URL.createObjectURL(selected);
+											const probe = new Image();
+											probe.onload = () => {
+												setAvatarFile(selected);
+												setPreviewUrl(url);
+											};
+											probe.onerror = () => {
+												URL.revokeObjectURL(url);
+												toast.error(t("profile.avatar.invalidImage"));
+											};
+											probe.src = url;
 										}}
 									/>
 									<Button
