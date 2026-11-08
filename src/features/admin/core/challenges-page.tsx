@@ -45,7 +45,6 @@ import {
 	PageBody,
 	PageHeader,
 	PaginationBar,
-	SecretValue,
 	SectionCard,
 	Toolbar,
 } from "~/components/app/page";
@@ -57,7 +56,7 @@ import { Input } from "~/components/ui/input";
 import { Progress } from "~/components/ui/progress";
 import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
-import { formatBytes, formatDateTime } from "~/lib/format";
+import { formatBytes } from "~/lib/format";
 import { useDocumentTitle } from "~/lib/hooks";
 import type {
 	BuildChallengeResult,
@@ -481,18 +480,30 @@ export function AdminChallengesPage(): ReactNode {
 
 	const columns: DataTableColumn<ChallengesListItem>[] = [
 		{
+			id: "id",
+			header: t("adminCore.challenges.columns.id"),
+			sortValue: (row) => row.id,
+			cell: (row) => <MonoText className="text-muted-foreground">{row.id}</MonoText>,
+			hideBelow: "md",
+		},
+		{
 			id: "name",
 			header: t("adminCore.challenges.columns.challenge"),
-			cell: (row) => (
-				<div className="min-w-0">
-					<p className="truncate text-sm font-medium">{row.name}</p>
-					<div className="flex flex-wrap items-center gap-1.5">
-						<MonoText className="text-muted-foreground">{row.safe_name}</MonoText>
-						<span className="text-xs text-muted-foreground">· {row.category}</span>
-					</div>
-				</div>
-			),
+			cell: (row) => <span className="text-sm font-medium">{row.name}</span>,
 			sortValue: (row) => row.name,
+		},
+		{
+			id: "safe_name",
+			header: t("adminCore.challenges.columns.safeName"),
+			cell: (row) => <MonoText>{row.safe_name}</MonoText>,
+			sortValue: (row) => row.safe_name,
+			hideBelow: "md",
+		},
+		{
+			id: "category",
+			header: t("adminCore.challenges.columns.category"),
+			cell: (row) => <span className="text-sm">{row.category || "—"}</span>,
+			sortValue: (row) => row.category,
 		},
 		{
 			id: "version",
@@ -531,65 +542,6 @@ export function AdminChallengesPage(): ReactNode {
 			hideBelow: "lg",
 		},
 		{
-			id: "runtime",
-			header: t("adminCore.challenges.columns.runtime"),
-			cell: (row) => (
-				<div className="space-y-0.5">
-					<div className="text-xs">
-						{row.container_port === null || row.container_port === undefined ? (
-							<span className="text-muted-foreground">
-								{t("adminCore.common.noContainerPort")}
-							</span>
-						) : (
-							<MonoText>
-								{t("adminCore.challenges.port", { port: row.container_port })}
-							</MonoText>
-						)}
-					</div>
-					<div className="tnum font-mono text-xs text-muted-foreground">
-						{t("adminCore.common.runtimeValue", {
-							cpu: row.recommended_cpu_millis ? `${row.recommended_cpu_millis}m` : "—",
-							memory: row.recommended_memory_bytes
-								? formatBytes(row.recommended_memory_bytes)
-								: "—",
-							pids: row.recommended_pids_limit ?? "—",
-						})}
-					</div>
-					{row.attachment ? (
-						<div
-							className="max-w-48 truncate text-xs text-muted-foreground"
-							title={row.attachment.path}
-						>
-							{row.attachment.size
-								? t("adminCore.challenges.attachmentWithSize", {
-										name: row.attachment.name,
-										size: formatBytes(row.attachment.size),
-									})
-								: t("adminCore.challenges.attachment", {
-										name: row.attachment.name,
-									})}
-						</div>
-					) : null}
-				</div>
-			),
-			hideBelow: "xl",
-		},
-		{
-			id: "flag",
-			header: t("adminCore.challenges.columns.staticFlag"),
-			cell: (row) =>
-				row.static_flag_value ? (
-					<SecretValue
-						value={row.static_flag_value}
-						label={t("adminCore.challenges.staticFlagValue")}
-					/>
-				) : (
-					<span className="text-xs text-muted-foreground">
-						{row.flag_type ? row.flag_type : "—"}
-					</span>
-				),
-		},
-		{
 			id: "hidden",
 			header: t("adminCore.challenges.columns.visibility"),
 			cell: (row) => (
@@ -601,17 +553,6 @@ export function AdminChallengesPage(): ReactNode {
 			),
 			sortValue: (row) => (row.hidden ? 1 : 0),
 			hideBelow: "sm",
-		},
-		{
-			id: "updated_at",
-			header: t("adminCore.challenges.columns.updatedAt"),
-			cell: (row) => (
-				<span className="tnum text-xs text-muted-foreground">
-					{formatDateTime(row.updated_at)}
-				</span>
-			),
-			sortValue: (row) => Date.parse(row.updated_at),
-			hideBelow: "lg",
 		},
 	];
 

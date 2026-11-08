@@ -144,3 +144,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：管理端题集列表列改为 Default 的 ID/名称/描述/创建时间。
 
 - 2026-11-08：管理端赛事列表列改为 Default 的 ID/赛制/参赛者/标题/状态/隐藏/可加入/开始/结束，并修正列名。
+
+- 2026-11-08：管理端题库列改为 Default 的 ID/题目/安全名/分类/版本构建/镜像/可见性。

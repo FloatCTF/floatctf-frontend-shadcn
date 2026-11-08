@@ -267,6 +267,9 @@ export default {
 			description: "No challenge matches “{{query}}” on name / safe_name / category.",
 		},
 		columns: {
+			id: "ID",
+			safeName: "Safe name",
+			category: "Category",
 			challenge: "Challenge",
 			versionBuild: "Version / build",
 			image: "Image",

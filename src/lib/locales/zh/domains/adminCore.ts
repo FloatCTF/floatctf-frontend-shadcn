@@ -264,6 +264,9 @@ export default {
 			description: "没有名称 / safe_name / 分类匹配「{{query}}」的题目。",
 		},
 		columns: {
+			id: "ID",
+			safeName: "安全名",
+			category: "分类",
 			challenge: "题目",
 			versionBuild: "版本 / 构建",
 			image: "镜像",
