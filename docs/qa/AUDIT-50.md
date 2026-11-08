@@ -414,3 +414,26 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
   “当前阶段不可提交/上传”提示属于预期 gate 文案。
 
 验证：`vite build` / i18n / theme 全绿。
+
+## 第 21 轮补充（AWD 状态机守卫对齐）
+
+真实 AWD 状态机与 `is_configurable()` 并不等价，前端此前把两者当成同一集合：
+
+- `deploy` 之前只要求状态属于 `is_configurable()`，但后端唯一允许进入 `Deploying` 的
+  状态是 `Configuring`；`Draft / Deployed / DeployFailed / VerificationFailed` 直接部署
+  都会收到 `Invalid transition`。
+- `precheck` 之前只要求 `is_configurable()`，但 `Draft` 和 `DeployFailed` 也不能直接进入
+  `Prechecking`（合法入口是 `Configuring`；`VerificationFailed` 可以重检）。
+
+现在：
+
+- `DEPLOYABLE_STATUSES` 收紧为仅 `Configuring`；
+- 新增 `PRECHECKABLE_STATUSES`，与 `precheck_service` 的真实转移一致；
+- 为 `draft / deployed / deployFailed / verificationFailed` 补了可直接展示的禁用原因，
+  例如「已部署：修改配置回到配置中后才可重新部署」「部署失败：先修改配置保存回到配置中」；
+- 保留上一轮的失败后 `refreshAll`，保证状态变化后按钮不会继续按旧状态可用。
+
+这是对后端 `is_configurable()` 与状态机不一致的前端侧防御；后端最好也在 deploy/precheck
+入口自动做 `DeployFailed -> Configuring` 的恢复转移，避免要求用户改一个无关字段。
+
+验证：`vite build` / i18n（5023 keys）/ theme 全绿。
