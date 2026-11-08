@@ -98,6 +98,7 @@ export function EventConsolePage(): ReactNode {
 	// 家族专属标签：其它家族下如果 URL 带着这些 tab，回退到「配置」。
 	// 「题目 / 数据大屏」是 Jeopardy 语义；AWD/AWDP 用各自运维页的 GameBox/数据标签，
 	// 否则 AWD 页面会出现「挂题数 0、累计解出 0」但积分榜有分的矛盾。
+	const hasTabParam = searchParams.get("tab") !== null;
 	const rawTab = normalizeTab(searchParams.get("tab"));
 	const isOfficial = event?.purpose === EventPurpose.Competition;
 	const familyMismatch =
@@ -110,9 +111,18 @@ export function EventConsolePage(): ReactNode {
 				event.family !== "jeopardy") ||
 			(rawTab === "data" && (event.family !== "jeopardy" || !isOfficial)) ||
 			(rawTab === "teams" && event.participant_mode !== "team"));
-	const fallbackTab: TabKey = event?.family === "jeopardy" ? "challenges" : "config";
+	const fallbackTab: TabKey =
+		event?.family === "jeopardy"
+			? "challenges"
+			: event?.family === "awd"
+				? "awd"
+				: event?.family === "awdp"
+					? "awdp"
+					: "config";
 	const tab: TabKey =
-		familyMismatch || (event?.family === "jeopardy" && rawTab === "config")
+		familyMismatch ||
+		!hasTabParam ||
+		(event?.family === "jeopardy" && rawTab === "config")
 			? fallbackTab
 			: rawTab;
 
