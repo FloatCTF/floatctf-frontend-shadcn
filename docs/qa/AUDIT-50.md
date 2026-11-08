@@ -765,3 +765,16 @@ SQL 控制台的 int2/int4 后端映射 bug 仍待后端修复。
 - 所有路由 `scrollWidth - innerWidth = 0`，console error 为空。
 
 本轮未发现新的前端逻辑错误。
+
+## 第 47 轮补充（题目包导入 E2E）
+
+用真实 `test-c.zip` 走完整导入：
+
+- 选包后识别 `test-c.zip`，点击「开始导入」；
+- 上传进度 100%，同步构建期间按钮显示「导入中…」；
+- 构建完成后列表出现 `test-c`：`v1.0.0 就绪`、镜像
+  `floatctf/test-c:challenge-v1.0.0`、`port 80`、附件 `note.txt · 20 B`；
+- 无 toast，但列表内明确显示「导入成功：test-c」，属可见成功反馈；
+- 测试题目已删除。
+
+本轮未发现新的前端逻辑错误。
