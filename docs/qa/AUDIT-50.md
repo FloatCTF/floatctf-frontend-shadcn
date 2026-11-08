@@ -580,3 +580,16 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 实测：8 字节坏 PNG 被拦截，合法 tiny PNG 正常进入待上传。
 
 验证：`vite build` / i18n（5028 keys）/ theme 全绿。
+
+## 第 33 轮补充（Markdown 插图可解码性）
+
+头像修完后，MarkdownEditor 的插图仍是 `accept=image/*` + 直接上传：坏 PNG 会拿到
+`/public/images/...` URL，正文里留下一个永远裂开的图片。
+
+- 上传前先校验 `file.type.startsWith("image/")`；
+- 用 `new Image()` 真实解码一次，失败 toast 且不插入 Markdown；
+- 讨论区、Writeup 等所有 MarkdownEditor 共用该逻辑。
+
+实测：8 字节坏 PNG 被拦截且 textarea 保持空；合法 tiny PNG 正常插入 `![...](/public/images/...)`。
+
+验证：`vite build` / i18n（5029 keys）/ theme 全绿。
