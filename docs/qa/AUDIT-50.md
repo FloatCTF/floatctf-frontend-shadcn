@@ -254,3 +254,16 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 复测：`/training/runs/run-1`、`/arena/<真实赛事>`、`/lab/<真实赛事>` 正常。
 
 验证：`vite build` / i18n / theme / mock-check 全绿。
+
+## 第 12 轮补充（无效讨论深链接）
+
+已完成：
+
+- **选手端无效讨论显示 not-found**：`/community/discussions/does-not-exist` 原先显示
+  「加载讨论失败 + 重试」；现在显示「讨论不存在 + 返回讨论区」，不再提供无效重试。
+- 补中英文 `community.discussions.detail.notFound*` / `backToDiscussions` 文案。
+- 实现时先放在 `useDocumentTitle` 后，触发 React「Rendered fewer hooks than expected」；
+  已把早退移到全部 hooks/回调之后，并复测无效/有效讨论均正常。
+- 复测：`d-2` 正常显示正文/点赞/评论；无效 ID 只有 not-found 块。
+
+验证：`vite build` / i18n / theme / mock-check 全绿。
