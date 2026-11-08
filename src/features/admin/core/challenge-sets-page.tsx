@@ -94,7 +94,7 @@ export function AdminChallengeSetsPage(): ReactNode {
 				t("adminCore.actions.updateChallengeSet"),
 			);
 		},
-		onSuccess: (_data, input) => {
+		onSuccess: async (_data, input) => {
 			toast.success(
 				input.mode === "create"
 					? t("adminCore.challengeSets.toasts.created")
@@ -103,6 +103,22 @@ export function AdminChallengeSetsPage(): ReactNode {
 			invalidate();
 			setEditing(null);
 			setNameError(undefined);
+			if (input.mode === "create") {
+				// create 不返回新行；按名称回查最新一条后进入详情页（页面文案承诺创建后进入详情）。
+				try {
+					const { items } = await callList<ChallengeSets>(
+						client.admin.challenges.getChallengeSets({
+							filter: `name:${input.body.name.trim()}`,
+							page: 1,
+							limit: 1,
+						}),
+					);
+					const created = items[0];
+					if (created) void navigate(`/admin/challenge-sets/${created.id}`);
+				} catch {
+					// 回查失败不覆盖已成功的创建；用户仍可在列表点开题集。
+				}
+			}
 		},
 		onError: (error) => toast.apiError(t("adminCore.challengeSets.toasts.saveFailed"), error),
 	});
