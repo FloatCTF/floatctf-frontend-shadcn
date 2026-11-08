@@ -82,8 +82,9 @@ export function useCopyToClipboard(): {
 				area.style.opacity = "0";
 				document.body.appendChild(area);
 				area.select();
-				document.execCommand("copy");
+				const ok = document.execCommand("copy");
 				area.remove();
+				if (!ok) return false;
 			}
 			setCopied(true);
 			if (timer.current) clearTimeout(timer.current);

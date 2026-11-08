@@ -3,36 +3,29 @@
  * 后端时间是 RFC3339（带 `Z`，UTC）；展示统一走本地时区。
  */
 
-const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
-	year: "numeric",
-	month: "2-digit",
-	day: "2-digit",
-	hour: "2-digit",
-	minute: "2-digit",
-	hour12: false,
-});
+import i18n from "~/lib/i18n";
 
-const dateTimeSecondsFormatter = new Intl.DateTimeFormat("zh-CN", {
-	year: "numeric",
-	month: "2-digit",
-	day: "2-digit",
-	hour: "2-digit",
-	minute: "2-digit",
-	second: "2-digit",
-	hour12: false,
-});
+/** 展示格式跟随当前语言（中英双语，theme.md §8.4）。 */
+function locale(): string {
+	return i18n.language === "en" ? "en-US" : "zh-CN";
+}
 
-const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
-	year: "numeric",
-	month: "2-digit",
-	day: "2-digit",
-});
 
-const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
-	hour: "2-digit",
-	minute: "2-digit",
-	hour12: false,
-});
+
+
+
+// 缓存按语言构建的 Intl 实例，避免每条记录都重复构造。
+const cache = new Map<string, Intl.DateTimeFormat | Intl.RelativeTimeFormat | Intl.NumberFormat>();
+
+function dt(opts: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+	const key = `dt:${locale()}:${JSON.stringify(opts)}`;
+	let f = cache.get(key) as Intl.DateTimeFormat | undefined;
+	if (!f) {
+		f = new Intl.DateTimeFormat(locale(), opts);
+		cache.set(key, f);
+	}
+	return f;
+}
 
 export type DateInput = string | number | Date | null | undefined;
 
@@ -45,27 +38,44 @@ export function parseDate(value: DateInput): Date | null {
 export function formatDateTime(value: DateInput, opts?: { seconds?: boolean }): string {
 	const date = parseDate(value);
 	if (!date) return "—";
-	return opts?.seconds
-		? dateTimeSecondsFormatter.format(date)
-		: dateTimeFormatter.format(date);
+	return dt(
+		opts?.seconds
+			? {
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit",
+					hour: "2-digit",
+					minute: "2-digit",
+					second: "2-digit",
+					hour12: false,
+				}
+			: {
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit",
+					hour: "2-digit",
+					minute: "2-digit",
+					hour12: false,
+				},
+	).format(date);
 }
 
 export function formatDate(value: DateInput): string {
 	const date = parseDate(value);
-	return date ? dateFormatter.format(date) : "—";
+	return date ? dt({ year: "numeric", month: "2-digit", day: "2-digit" }).format(date) : "—";
 }
 
 export function formatTime(value: DateInput): string {
 	const date = parseDate(value);
-	return date ? timeFormatter.format(date) : "—";
+	return date ? dt({ hour: "2-digit", minute: "2-digit", hour12: false }).format(date) : "—";
 }
 
 export function formatRange(start: DateInput, end: DateInput): string {
 	const from = parseDate(start);
 	const to = parseDate(end);
 	if (!from && !to) return "—";
-	if (from && !to) return `${formatDateTime(from)} 起`;
-	if (!from && to) return `截至 ${formatDateTime(to)}`;
+	if (from && !to) return `${formatDateTime(from)} ${i18n.t("common.rangeSince")}`;
+	if (!from && to) return `${i18n.t("common.rangeUntil")} ${formatDateTime(to)}`;
 	return `${formatDateTime(from)} → ${formatDateTime(to)}`;
 }
 
@@ -83,12 +93,17 @@ export function formatRelative(value: DateInput, now: Date = new Date()): string
 		["month", 30 * 24 * 60 * 60 * 1000],
 		["year", 365 * 24 * 60 * 60 * 1000],
 	];
-	const formatter = new Intl.RelativeTimeFormat("zh-CN", { numeric: "auto" });
+	const key = `rtf:${locale()}`;
+	let formatter = cache.get(key) as Intl.RelativeTimeFormat | undefined;
+	if (!formatter) {
+		formatter = new Intl.RelativeTimeFormat(locale(), { numeric: "auto" });
+		cache.set(key, formatter);
+	}
 	let chosen: [Intl.RelativeTimeFormatUnit, number] = units[0];
 	for (const unit of units) {
 		if (abs >= unit[1]) chosen = unit;
 	}
-	if (abs < 45 * 1000) return "刚刚";
+	if (abs < 45 * 1000) return i18n.t("common.time.justNow");
 	const amount = Math.round(diffMs / chosen[1]);
 	return formatter.format(amount, chosen[0]);
 }
@@ -118,6 +133,15 @@ export function formatScore(value: number | null | undefined, digits = 2): strin
 	return value.toFixed(digits);
 }
 
+/**
+ * 积分展示：整数不补小数位（AWD 攻防分就是整数），小数保留 2 位（Jeopardy 动态分值）。
+ * 与 `formatScore` 的区别只在于「不必强行凑两位」，避免 1240.00 这种噪声。
+ */
+export function formatPoints(value: number | null | undefined, digits = 2): string {
+	if (value === null || value === undefined || Number.isNaN(value)) return "—";
+	return Number.isInteger(value) ? String(value) : value.toFixed(digits);
+}
+
 /** 带正负号的分数变动（管理员调分 / 罚分展示）。 */
 export function formatDelta(value: number | null | undefined, digits = 2): string {
 	if (value === null || value === undefined || Number.isNaN(value)) return "—";
@@ -127,7 +151,13 @@ export function formatDelta(value: number | null | undefined, digits = 2): strin
 
 export function formatInt(value: number | null | undefined): string {
 	if (value === null || value === undefined || Number.isNaN(value)) return "—";
-	return new Intl.NumberFormat("zh-CN").format(value);
+	const key = `nf:${locale()}`;
+	let numberFormatter = cache.get(key) as Intl.NumberFormat | undefined;
+	if (!numberFormatter) {
+		numberFormatter = new Intl.NumberFormat(locale());
+		cache.set(key, numberFormatter);
+	}
+	return numberFormatter.format(value);
 }
 
 export function formatBytes(bytes: number | null | undefined): string {
@@ -158,7 +188,9 @@ export function toDatetimeLocalValue(value: DateInput): string {
 	const date = parseDate(value);
 	if (!date) return "";
 	const pad = (n: number) => String(n).padStart(2, "0");
-	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+	// 必须保留秒：否则「打开编辑 → 不改时间 → 保存」会把 start/end 截断到分钟，
+	// 最多产生 59 秒的静默漂移。
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 export function fromDatetimeLocalValue(value: string): string | null {
@@ -172,9 +204,16 @@ export function countdownText(target: DateInput, now: Date = new Date()): string
 	const date = parseDate(target);
 	if (!date) return "—";
 	const diff = Math.floor((date.getTime() - now.getTime()) / 1000);
-	if (diff <= 0) return "已到时间";
-	if (diff < 60) return `${diff} 秒`;
-	if (diff < 3600) return `${Math.floor(diff / 60)} 分钟`;
-	if (diff < 86400) return `${Math.floor(diff / 3600)} 小时 ${Math.floor((diff % 3600) / 60)} 分`;
-	return `${Math.floor(diff / 86400)} 天 ${Math.floor((diff % 86400) / 3600)} 小时`;
+	if (diff <= 0) return i18n.t("common.duration.reached");
+	if (diff < 60) return i18n.t("common.duration.seconds", { count: diff });
+	if (diff < 3600) return i18n.t("common.duration.minutes", { count: Math.floor(diff / 60) });
+	if (diff < 86400)
+		return i18n.t("common.duration.hoursMinutes", {
+			hours: Math.floor(diff / 3600),
+			minutes: Math.floor((diff % 3600) / 60),
+		});
+	return i18n.t("common.duration.daysHours", {
+		days: Math.floor(diff / 86400),
+		hours: Math.floor((diff % 86400) / 3600),
+	});
 }

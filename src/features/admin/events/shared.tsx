@@ -2,11 +2,13 @@
  * 赛事管理共享件 —— 状态标签、分页表格壳、移动端卡片行。
  *
  * 状态语义全部来自 `~/lib/event-status.ts` 与 SDK 枚举（**不自造状态**）；
+ * 文案统一走 `adminEvents` / `common` 命名空间（theme.md §8.4）。
  * 表格统一走「服务端 `meta.total` + `PaginationBar`」，或由调用方传入本页总数（后端
  * 不接收分页参数的接口 = 客户端分页，见 `total` 说明）。
  */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import type { QueryParams } from "@floatctf/sdk";
 import { EventPurpose } from "@floatctf/sdk/entity";
@@ -17,37 +19,93 @@ import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import { PaginationBar } from "~/components/app/page";
 import { EmptyBlock, QueryState, TableSkeleton } from "~/components/app/states";
 import {
-	EVENT_FAMILY_LABEL,
-	EVENT_PURPOSE_LABEL,
-	EVENT_STATUS_LABEL,
+	EVENT_FAMILY_KEY,
+	EVENT_PURPOSE_KEY,
+	EVENT_STATUS_KEY,
 	EVENT_STATUS_TONE,
-	PARTICIPANT_MODE_LABEL,
+	PARTICIPANT_MODE_KEY,
 	computeEventStatus,
+	type EventStatus,
 } from "~/lib/event-status";
+
+/* ── 本地化标签 ─────────────────────────────────────────────────────────── */
+
+/**
+ * 状态 / 赛制 / 参赛模式 / 目的 → 本地化文案。
+ *
+ * 使用共享层的 `EVENT_*_KEY`（`~/lib/event-status.ts`）+ `t()`，语言切换后即时更新；
+ * 技术标识（未知枚举值）原样返回，不臆造文案。
+ */
+export function useEventLabels() {
+	const { t } = useTranslation();
+	return {
+		status: (status: EventStatus): string => t(EVENT_STATUS_KEY[status]),
+		family: (family: string): string => {
+			const key = EVENT_FAMILY_KEY[family];
+			return key ? t(key) : family;
+		},
+		mode: (mode: string): string => {
+			const key = PARTICIPANT_MODE_KEY[mode];
+			return key ? t(key) : mode;
+		},
+		purpose: (purpose: string): string => {
+			const key = EVENT_PURPOSE_KEY[purpose];
+			return key ? t(key) : purpose;
+		},
+	};
+}
 
 /* ── 状态标签 ───────────────────────────────────────────────────────────── */
 
 export function EventStatusPill({ event }: { event: Events }): ReactNode {
+	const labels = useEventLabels();
 	const status = computeEventStatus(event.start_time, event.end_time ?? null);
-	return <TonePill tone={EVENT_STATUS_TONE[status]}>{EVENT_STATUS_LABEL[status]}</TonePill>;
+	const label = labels.status(status);
+	return (
+		<TonePill tone={EVENT_STATUS_TONE[status]} title={label}>
+			{label}
+		</TonePill>
+	);
 }
 
 export function EventFamilyPill({ family }: { family: string }): ReactNode {
-	return <TonePill tone="neutral">{EVENT_FAMILY_LABEL[family] ?? family}</TonePill>;
+	const labels = useEventLabels();
+	const label = labels.family(family);
+	return (
+		<TonePill tone="neutral" title={label}>
+			{label}
+		</TonePill>
+	);
 }
 
 export function ParticipantModePill({ mode }: { mode: string }): ReactNode {
-	return <TonePill tone="info">{PARTICIPANT_MODE_LABEL[mode] ?? mode}</TonePill>;
+	const labels = useEventLabels();
+	const label = labels.mode(mode);
+	return (
+		<TonePill tone="info" title={label}>
+			{label}
+		</TonePill>
+	);
 }
 
 /** 用途 + 虚拟赛事位（`is_virtual` 由后端按 `purpose=practice` 派生）。 */
 export function EventPurposePills({ event }: { event: Events }): ReactNode {
+	const { t } = useTranslation();
+	const labels = useEventLabels();
+	const purpose = labels.purpose(event.purpose);
 	return (
 		<span className="inline-flex flex-wrap items-center gap-1">
-			<TonePill tone={event.purpose === EventPurpose.Practice ? "warning" : "muted"}>
-				{EVENT_PURPOSE_LABEL[event.purpose] ?? event.purpose}
+			<TonePill
+				tone={event.purpose === EventPurpose.Practice ? "warning" : "muted"}
+				title={purpose}
+			>
+				{purpose}
 			</TonePill>
-			{event.is_virtual ? <TonePill tone="muted">虚拟赛事</TonePill> : null}
+			{event.is_virtual ? (
+				<TonePill tone="muted" title={t("adminEvents.shared.virtual")}>
+					{t("adminEvents.shared.virtual")}
+				</TonePill>
+			) : null}
 		</span>
 	);
 }
@@ -107,6 +165,7 @@ export function PagedTable<T>({
 	empty,
 	errorTitle,
 }: PagedTableProps<T>): ReactNode {
+	const { t } = useTranslation();
 	const resolvedTotal = total ?? query.data?.meta?.total ?? query.data?.items.length ?? 0;
 	return (
 		<QueryState<PagedResult<T>>
@@ -114,7 +173,14 @@ export function PagedTable<T>({
 			errorTitle={errorTitle}
 			skeleton={<TableSkeleton rows={5} columns={Math.min(Math.max(columns.length, 3), 6)} />}
 			isEmpty={(result) => result.items.length === 0}
-			empty={empty ?? <EmptyBlock title="暂无数据" description="后端未返回任何条目。" />}
+			empty={
+				empty ?? (
+					<EmptyBlock
+						title={t("common.table.emptyTitle")}
+						description={t("adminEvents.shared.emptyDescription")}
+					/>
+				)
+			}
 		>
 			{(result) => (
 				<div className="space-y-3">
@@ -175,13 +241,13 @@ export function MobileFacts({
 	items: Array<{ k: string; v: ReactNode }>;
 }): ReactNode {
 	return (
-		<div className="space-y-1.5">
+		<dl className="space-y-1.5">
 			{items.map((item) => (
 				<div key={item.k} className="flex items-start justify-between gap-3">
-					<span className="shrink-0 text-xs text-muted-foreground">{item.k}</span>
-					<span className="min-w-0 text-right text-sm break-words">{item.v}</span>
+					<dt className="shrink-0 text-xs text-muted-foreground">{item.k}</dt>
+					<dd className="min-w-0 text-right text-sm break-words">{item.v}</dd>
 				</div>
 			))}
-		</div>
+		</dl>
 	);
 }

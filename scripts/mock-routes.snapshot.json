@@ -1,0 +1,945 @@
+{
+	"generatedAt": "2026-11-08T07:04:31.446Z",
+	"routes": [
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/announcements"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/challenge_sets"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/challenge_sets\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/challenges"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/discussions"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/discussions\\/([^/]+)\\/comments\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/docker\\/containers\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/docker\\/images\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/docker\\/networks\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/announcements"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/teams\\/([^/]+)\\/ban"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/teams"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/users"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/roles\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/scheduled_tasks"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/settings"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/users"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/weapons"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/discussions\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/discussions\\/([^/]+)\\/comments\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/discussions\\/([^/]+)\\/like"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/leave"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/team\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/instances"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/instances\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/__floatctf\\/frontends\\/registry\\.json"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/(?:admin\\/)?events\\/[^/]+\\/awd\\/stream"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/announcements"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/awd\\/network"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/awd\\/network\\/allocations"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/awd\\/network\\/health"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/challenge_sets"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/challenge_sets\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/challenges"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/dashboard\\/summary"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/discussions"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/discussions\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/discussions\\/([^/]+)\\/comments"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/docker\\/containers"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/docker\\/images"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/docker\\/networks"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/download"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/announcements"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/gameboxes"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/instances"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/network"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/prechecks"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/scores"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/data"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/gameboxes"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/instances"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/scores"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/data"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/instances"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/logs"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/report"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/teams"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/users"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/writeups"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/logs"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/permissions"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/permissions\\/domains"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/roles"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/roles\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/scheduled_tasks"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/settings"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/system\\/monitor"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/system\\/version"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/users"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/users\\/([^/]+)\\/roles"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/weapons"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/announcements"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/challenge_sets"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/challenge_sets\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/challenges"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/challenges\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/challenges\\/([^/]+)\\/instance"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/challenges\\/([^/]+)\\/my_writeup"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/challenges\\/([^/]+)\\/writeups"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/discussions"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/discussions\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/discussions\\/([^/]+)\\/comments"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/announcements"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awd\\/gameboxes"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awd\\/scores"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awd\\/ssh-config"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awd\\/status"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awd\\/wireguard\\/config"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/evaluations"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)\\/instance"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)\\/source"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/rounds"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/scoreboard"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/scores"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/trend"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/challenges\\/([^/]+)\\/instance"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/instances"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/own_wp"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/scoreboard"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/trend"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/[^/]+\\/awdp\\/stream"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/instances"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/evaluations"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/gameboxes\\/([^/]+)\\/instance"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/gameboxes\\/([^/]+)\\/source"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/rounds"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/scores"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/writeup"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/[^/]+\\/stream"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/service\\/gameboxes"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/solves"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/solves\\/top15users"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/users\\/me"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/weapons"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/writeups"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/writeups\\/([^/]+)"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/public\\/(.+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/announcements\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/awd\\/network"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/challenge_sets\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/challenges\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/announcements\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/roles\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/scheduled_tasks\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/settings\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/users\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/weapons\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/discussions\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/discussions\\/([^/]+)\\/comments\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/uploads\\/avatar"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/users\\/me"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/__sse\\/close"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/announcements"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/([^/]+)\\/hide"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/build"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/check"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/scan"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/challenge_sets"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/challenge_sets\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/challenges"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/database\\/exec_sql"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/docker\\/containers\\/([^/]+)\\/start"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/docker\\/containers\\/([^/]+)\\/stop"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/docker\\/networks"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/announcements"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/(deploy|start|pause|resume|finish|archive)"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/gameboxes"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/network\\/reallocate"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/precheck"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/score\\/adjust"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/teams\\/([^/]+)\\/ban"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/tokens\\/rotate"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/break-to-fix"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/finish"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/gameboxes"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/start"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/challenges\\/(open|hidden)"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/teams\\/([^/]+)\\/banned"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/teams\\/([^/]+)\\/unbanned"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/users"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/users\\/([^/]+)\\/banned"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/users\\/([^/]+)\\/unbanned"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/roles"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/scheduled_tasks"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/scheduled_tasks\\/([^/]+)\\/run"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/settings"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/terminal\\/session"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/users"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/weapons"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/weapons\\/([^/]+)\\/upload"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/challenges\\/([^/]+)\\/my_writeup"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/challenges\\/([^/]+)\\/submit"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/discussions"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/discussions\\/([^/]+)\\/comments"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/discussions\\/([^/]+)\\/like"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awd\\/gameboxes\\/([^/]+)\\/reset"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awd\\/submissions"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)\\/break"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)\\/instance"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)\\/instance\\/reset"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)\\/instance\\/stop"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)\\/patch"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)\\/test-check"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/join"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/team"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/team\\/([^/]+)\\/join"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/instances\\/launch"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/end"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/gameboxes\\/([^/]+)\\/all-check"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/gameboxes\\/([^/]+)\\/break"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/gameboxes\\/([^/]+)\\/instance"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/gameboxes\\/([^/]+)\\/instance\\/reset"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/gameboxes\\/([^/]+)\\/instance\\/start"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/gameboxes\\/([^/]+)\\/instance\\/stop"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/gameboxes\\/([^/]+)\\/patch"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/gameboxes\\/([^/]+)\\/test-check"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/phase"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/reset"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/restart-training"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/start"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/stop"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/service\\/gameboxes\\/([^/]+)\\/awdp\\/runs"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/session"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/submit\\/flag"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/submit\\/writeup"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/users"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/users\\/reset"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/users\\/reset_password"
+		},
+		{
+			"method": "PUT",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/network"
+		},
+		{
+			"method": "PUT",
+			"pattern": "\\/api\\/admin\\/users\\/([^/]+)\\/roles"
+		},
+		{
+			"method": "PUT",
+			"pattern": "\\/api\\/service\\/awdp\\/runs\\/([^/]+)\\/writeup"
+		}
+	]
+}

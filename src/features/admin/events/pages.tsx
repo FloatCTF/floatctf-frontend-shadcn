@@ -3,12 +3,14 @@
  *
  * 数据全部来自 `client.admin.events.*`；`filter` 用后端 `apply_filters` 的
  * `key:value` 语法（`title` / `family` / `is_virtual` 均为后端已声明的过滤键）。
+ * 文案全部走 `adminEvents` 命名空间；状态 / 赛制由 `~/lib/event-status.ts` 提供。
  */
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 
 import { call, callList } from "~/api/call";
 import { useClient } from "~/api/client";
@@ -39,7 +41,6 @@ import {
 import { EventFamily } from "@floatctf/sdk/entity";
 import type { Events } from "@floatctf/sdk/entity";
 import { formatRange } from "~/lib/format";
-import { EVENT_FAMILY_LABEL } from "~/lib/event-status";
 import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
 
 import { EventFormSheet } from "./event-form";
@@ -50,12 +51,15 @@ import {
 	MobileFacts,
 	PagedTable,
 	ParticipantModePill,
+	useEventLabels,
 } from "./shared";
 
 type Scope = "normal" | "virtual";
 
 export function EventsListPage(): ReactNode {
-	useDocumentTitle("赛事管理 · FloatCTF");
+	const { t } = useTranslation();
+	const labels = useEventLabels();
+	useDocumentTitle(t("adminEvents.list.documentTitle"));
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -85,31 +89,34 @@ export function EventsListPage(): ReactNode {
 	});
 
 	const removeEvents = useMutation({
-		mutationFn: (ids: string[]) => call<number>(client.admin.events.remove(ids), "删除赛事"),
+		mutationFn: (ids: string[]) =>
+			call<number>(client.admin.events.remove(ids), t("adminEvents.actions.deleteEvent")),
 		onSuccess: (count) => {
-			toast.success(`已删除 ${count} 个赛事`);
+			toast.success(t("adminEvents.list.delete.success", { count }));
 			setSelectedIds([]);
 			void queryClient.invalidateQueries({ queryKey: qk.admin.events() });
 			void queryClient.invalidateQueries({ queryKey: qk.admin.dashboard() });
 		},
-		onError: (error) => toast.apiError("删除赛事失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.list.delete.failed"), error),
 	});
 
 	async function confirmRemove(targets: Events[]) {
 		if (targets.length === 0) return;
 		const single = targets.length === 1 ? targets[0] : null;
 		const ok = await confirm({
-			title: single ? `删除赛事「${single.title}」？` : `删除所选 ${targets.length} 个赛事？`,
-			description: "赛事删除不可恢复，后端会同时拆除对应的运行时资源。",
+			title: single
+				? t("adminEvents.list.delete.singleTitle", { title: single.title })
+				: t("adminEvents.list.delete.bulkTitle", { count: targets.length }),
+			description: t("adminEvents.list.delete.description"),
 			consequences: [
-				"赛事行被删除：参赛选手 / 战队、赛事挂题、公告、日志、Write-up 与实例记录随外键级联删除",
-				"解题记录（jeopardy_challenge_solves）随赛事级联删除，赛事积分与排行不再可查",
-				"AWD / AWDP 运行时被拆除：容器、赛事专属 Docker 网络、WireGuard 接口与 nftables 规则一并回收",
-				"系统托管赛事（system_key 非空）会被后端拒绝删除，不会被误删",
+				t("adminEvents.list.delete.consequence1"),
+				t("adminEvents.list.delete.consequence2"),
+				t("adminEvents.list.delete.consequence3"),
+				t("adminEvents.list.delete.consequence4"),
 			],
 			tone: "danger",
-			confirmText: "删除赛事",
-			confirmPhrase: single ? single.title : "delete",
+			confirmText: t("adminEvents.list.delete.confirm"),
+			confirmPhrase: single ? single.title : t("adminEvents.list.delete.phraseBulk"),
 		});
 		if (!ok) return;
 		removeEvents.mutate(targets.map((item) => item.id));
@@ -118,7 +125,7 @@ export function EventsListPage(): ReactNode {
 	const columns: DataTableColumn<Events>[] = [
 		{
 			id: "title",
-			header: "标题",
+			header: t("adminEvents.list.columns.title"),
 			cell: (row) => (
 				<div className="min-w-0">
 					<Link
@@ -127,9 +134,17 @@ export function EventsListPage(): ReactNode {
 					>
 						{row.title}
 					</Link>
-					<div className="mt-0.5 flex flex-wrap items-center gap-1">
-						{row.hidden ? <TonePill tone="muted">隐藏</TonePill> : null}
-						{row.system_key ? <TonePill tone="warning">系统托管</TonePill> : null}
+					<div className="mt-1 flex flex-wrap items-center gap-1">
+						{row.hidden ? (
+							<TonePill tone="muted" title={t("adminEvents.list.visibility.hidden")}>
+								{t("adminEvents.list.visibility.hidden")}
+							</TonePill>
+						) : null}
+						{row.system_key ? (
+							<TonePill tone="warning" title={t("adminEvents.list.badgeSystem")}>
+								{t("adminEvents.list.badgeSystem")}
+							</TonePill>
+						) : null}
 					</div>
 				</div>
 			),
@@ -137,39 +152,41 @@ export function EventsListPage(): ReactNode {
 		},
 		{
 			id: "family",
-			header: "家族",
+			header: t("adminEvents.list.columns.family"),
 			cell: (row) => <EventFamilyPill family={row.family} />,
-			sortValue: (row) => EVENT_FAMILY_LABEL[row.family] ?? row.family,
+			sortValue: (row) => labels.family(row.family),
 		},
 		{
 			id: "participant_mode",
-			header: "赛制",
+			header: t("adminEvents.list.columns.participantMode"),
 			cell: (row) => <ParticipantModePill mode={row.participant_mode} />,
 			sortValue: (row) => row.participant_mode,
 		},
 		{
 			id: "window",
-			header: "时间窗",
+			header: t("adminEvents.list.columns.window"),
 			cell: (row) => (
-				<span className="tnum text-xs">{formatRange(row.start_time, row.end_time ?? null)}</span>
+				<span className="tnum text-xs whitespace-nowrap">
+					{formatRange(row.start_time, row.end_time ?? null)}
+				</span>
 			),
 			sortValue: (row) => Date.parse(row.start_time),
 			hideBelow: "lg",
 		},
 		{
 			id: "status",
-			header: "状态",
+			header: t("adminEvents.list.columns.status"),
 			cell: (row) => <EventStatusPill event={row} />,
 			sortValue: (row) => row.start_time,
 		},
 		{
 			id: "hidden",
-			header: "可见性",
+			header: t("adminEvents.list.columns.visibility"),
 			cell: (row) => (
 				<BooleanPill
 					value={row.hidden}
-					trueText="已隐藏"
-					falseText="公开"
+					trueText={t("adminEvents.list.visibility.hidden")}
+					falseText={t("adminEvents.list.visibility.public")}
 					trueTone="muted"
 					falseTone="success"
 				/>
@@ -179,40 +196,54 @@ export function EventsListPage(): ReactNode {
 		},
 		{
 			id: "purpose",
-			header: "用途 / 虚拟",
+			header: t("adminEvents.list.columns.purpose"),
 			cell: (row) => <EventPurposePills event={row} />,
 			sortValue: (row) => `${row.purpose}-${row.is_virtual ? "v" : "n"}`,
 			hideBelow: "lg",
 		},
 	];
 
-	const rowActions = (row: Events): ReactNode => (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" size="icon-sm" aria-label={`${row.title} 的操作`}>
-					<MoreHorizontal />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end">
-				<DropdownMenuLabel className="max-w-56 truncate">{row.title}</DropdownMenuLabel>
-				<DropdownMenuItem onSelect={() => void navigate(`/admin/events/${row.id}`)}>
-					打开控制台
-				</DropdownMenuItem>
-				<DropdownMenuItem onSelect={() => setSheet({ event: row })}>编辑赛事</DropdownMenuItem>
-				<DropdownMenuSeparator />
-				<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove([row])}>
-					<Trash2 /> 删除赛事
-				</DropdownMenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
+	const rowActions = (row: Events): ReactNode => {
+		const actionsLabel = t("adminEvents.list.row.actions", { name: row.title });
+		return (
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button variant="ghost" size="icon-sm" aria-label={actionsLabel} title={actionsLabel}>
+						<MoreHorizontal />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuLabel className="max-w-56 truncate">{row.title}</DropdownMenuLabel>
+					<DropdownMenuItem onSelect={() => void navigate(`/admin/events/${row.id}`)}>
+						{t("adminEvents.list.row.openConsole")}
+					</DropdownMenuItem>
+					<DropdownMenuItem onSelect={() => setSheet({ event: row })}>
+						{t("adminEvents.list.row.edit")}
+					</DropdownMenuItem>
+					<DropdownMenuSeparator />
+					{row.system_key ? (
+						<DropdownMenuItem
+							disabled
+							title={t("adminEvents.config.hints.systemManaged")}
+						>
+							<Trash2 /> {t("adminEvents.list.row.delete")}
+						</DropdownMenuItem>
+					) : (
+						<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove([row])}>
+							<Trash2 /> {t("adminEvents.list.row.delete")}
+						</DropdownMenuItem>
+					)}
+				</DropdownMenuContent>
+			</DropdownMenu>
+		);
+	};
 
 	const mobileCard = (row: Events): ReactNode => (
 		<div className="space-y-2">
 			<MobileFacts
 				items={[
 					{
-						k: "标题",
+						k: t("adminEvents.list.mobile.title"),
 						v: (
 							<Link
 								to={`/admin/events/${row.id}`}
@@ -222,25 +253,28 @@ export function EventsListPage(): ReactNode {
 							</Link>
 						),
 					},
-					{ k: "家族", v: <EventFamilyPill family={row.family} /> },
-					{ k: "赛制", v: <ParticipantModePill mode={row.participant_mode} /> },
-					{ k: "状态", v: <EventStatusPill event={row} /> },
+					{ k: t("adminEvents.list.mobile.family"), v: <EventFamilyPill family={row.family} /> },
 					{
-						k: "时间窗",
+						k: t("adminEvents.list.mobile.participantMode"),
+						v: <ParticipantModePill mode={row.participant_mode} />,
+					},
+					{ k: t("adminEvents.list.mobile.status"), v: <EventStatusPill event={row} /> },
+					{
+						k: t("adminEvents.list.mobile.window"),
 						v: (
 							<span className="tnum text-xs">
 								{formatRange(row.start_time, row.end_time ?? null)}
 							</span>
 						),
 					},
-					{ k: "用途", v: <EventPurposePills event={row} /> },
+					{ k: t("adminEvents.list.mobile.purpose"), v: <EventPurposePills event={row} /> },
 					{
-						k: "可见性",
+						k: t("adminEvents.list.mobile.visibility"),
 						v: (
 							<BooleanPill
 								value={row.hidden}
-								trueText="已隐藏"
-								falseText="公开"
+								trueText={t("adminEvents.list.visibility.hidden")}
+								falseText={t("adminEvents.list.visibility.public")}
 								trueTone="muted"
 								falseTone="success"
 							/>
@@ -248,10 +282,11 @@ export function EventsListPage(): ReactNode {
 					},
 				]}
 			/>
-			<div className="flex justify-end">
+			<div className="flex items-center justify-between gap-2">
 				<Button variant="outline" size="xs" asChild>
-					<Link to={`/admin/events/${row.id}`}>打开控制台</Link>
+					<Link to={`/admin/events/${row.id}`}>{t("adminEvents.list.row.openConsole")}</Link>
 				</Button>
+				{rowActions(row)}
 			</div>
 		</div>
 	);
@@ -259,8 +294,8 @@ export function EventsListPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="赛事管理"
-				description="一个赛事 = 一个控制台：配置、题目、成员、战队、公告、实例、日志与运行时概览都在同一工作区。"
+				title={t("adminEvents.list.title")}
+				description={t("adminEvents.list.description")}
 				actions={
 					<Toolbar>
 						<Button
@@ -270,42 +305,46 @@ export function EventsListPage(): ReactNode {
 							}}
 							disabled={query.isFetching}
 						>
-							<RefreshCw className={query.isFetching ? "animate-spin" : undefined} /> 刷新
+							<RefreshCw className={query.isFetching ? "animate-spin" : undefined} />{" "}
+							{t("common.refresh")}
 						</Button>
 						<Button
 							onClick={() => setSheet({ event: null })}
 							disabled={scope === "virtual"}
-							title={
-								scope === "virtual"
-									? "虚拟（练习）赛事由平台 / AWDP 流程创建，不能在管理端手动新建"
-									: undefined
-							}
+							title={scope === "virtual" ? t("adminEvents.list.createDisabledHint") : undefined}
 						>
-							<Plus /> 新建赛事
+							<Plus /> {t("adminEvents.list.create")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
 			<SectionCard
-				title={scope === "virtual" ? "虚拟（练习）赛事" : "正式赛事"}
+				title={
+					scope === "virtual"
+						? t("adminEvents.list.sectionTitleVirtual")
+						: t("adminEvents.list.sectionTitleCompetition")
+				}
 				description={
 					scope === "virtual"
-						? "purpose=practice / is_virtual=true 的赛事，由平台或 AWDP 流程创建。"
-						: "purpose=competition / is_virtual=false 的赛事。"
+						? t("adminEvents.list.sectionDescriptionVirtual")
+						: t("adminEvents.list.sectionDescriptionCompetition")
 				}
 				actions={
 					<Toolbar>
-						<Input
-							value={search}
-							onChange={(changeEvent) => {
-								setSearch(changeEvent.target.value);
-								setPage(1);
-							}}
-							placeholder="搜索标题…"
-							className="w-48"
-							aria-label="搜索赛事标题"
-						/>
+						<div className="relative w-48">
+							<Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+							<Input
+								value={search}
+								onChange={(changeEvent) => {
+									setSearch(changeEvent.target.value);
+									setPage(1);
+								}}
+								placeholder={t("adminEvents.list.searchPlaceholder")}
+								className="pl-8"
+								aria-label={t("adminEvents.list.searchAria")}
+							/>
+						</div>
 						<Select
 							value={family}
 							onValueChange={(value) => {
@@ -313,20 +352,20 @@ export function EventsListPage(): ReactNode {
 								setPage(1);
 							}}
 						>
-							<SelectTrigger size="sm" className="w-40" aria-label="按家族筛选">
+							<SelectTrigger
+								size="sm"
+								className="w-40"
+								aria-label={t("adminEvents.list.familyFilterAria")}
+							>
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="all">全部家族</SelectItem>
+								<SelectItem value="all">{t("adminEvents.list.familyAll")}</SelectItem>
 								<SelectItem value={EventFamily.Jeopardy}>
-									{EVENT_FAMILY_LABEL[EventFamily.Jeopardy]}
+									{labels.family(EventFamily.Jeopardy)}
 								</SelectItem>
-								<SelectItem value={EventFamily.Awd}>
-									{EVENT_FAMILY_LABEL[EventFamily.Awd]}
-								</SelectItem>
-								<SelectItem value={EventFamily.Awdp}>
-									{EVENT_FAMILY_LABEL[EventFamily.Awdp]}
-								</SelectItem>
+								<SelectItem value={EventFamily.Awd}>{labels.family(EventFamily.Awd)}</SelectItem>
+								<SelectItem value={EventFamily.Awdp}>{labels.family(EventFamily.Awdp)}</SelectItem>
 							</SelectContent>
 						</Select>
 						<Select
@@ -337,12 +376,18 @@ export function EventsListPage(): ReactNode {
 								setSelectedIds([]);
 							}}
 						>
-							<SelectTrigger size="sm" className="w-36" aria-label="赛事类型">
+							<SelectTrigger
+								size="sm"
+								className="w-36"
+								aria-label={t("adminEvents.list.scopeFilterAria")}
+							>
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="normal">正式赛事</SelectItem>
-								<SelectItem value="virtual">虚拟赛事</SelectItem>
+								<SelectItem value="normal">
+									{t("adminEvents.list.scopeCompetition")}
+								</SelectItem>
+								<SelectItem value="virtual">{t("adminEvents.list.scopeVirtual")}</SelectItem>
 							</SelectContent>
 						</Select>
 						{selectedIds.length > 0 ? (
@@ -356,7 +401,7 @@ export function EventsListPage(): ReactNode {
 									void confirmRemove(targets);
 								}}
 							>
-								<Trash2 /> 删除所选（{selectedIds.length}）
+								<Trash2 /> {t("adminEvents.list.deleteSelected", { count: selectedIds.length })}
 							</Button>
 						) : null}
 					</Toolbar>
@@ -378,14 +423,22 @@ export function EventsListPage(): ReactNode {
 					selectedIds={selectedIds}
 					onSelectionChange={setSelectedIds}
 					mobileCard={mobileCard}
-					errorTitle="加载赛事列表失败"
+					errorTitle={t("adminEvents.list.loadError")}
 					empty={
 						<EmptyBlock
-							title="没有匹配的赛事"
+							title={
+								search.trim() === "" && family === "all"
+									? t("adminEvents.list.empty.title")
+									: t("adminEvents.list.empty.filteredTitle")
+							}
 							description={
-								scope === "virtual"
-									? "当前没有虚拟（练习）赛事。"
-									: "还没有正式赛事，点右上角「新建赛事」创建第一场。"
+								search.trim() === "" && family === "all"
+									? scope === "virtual"
+										? t("adminEvents.list.empty.descriptionVirtual")
+										: t("adminEvents.list.empty.descriptionCompetition")
+									: t("adminEvents.list.empty.filteredDescription", {
+											query: search.trim() || family,
+										})
 							}
 							variant={search.trim() === "" && family === "all" ? "empty" : "filtered"}
 						/>
@@ -403,9 +456,7 @@ export function EventsListPage(): ReactNode {
 				/>
 			) : null}
 
-			<p className="text-xs text-muted-foreground">
-				列表按后端 updated_at 倒序返回；时间窗与状态由 start_time / end_time 推导。
-			</p>
+			<p className="text-xs text-muted-foreground">{t("adminEvents.list.footnote")}</p>
 		</PageBody>
 	);
 }

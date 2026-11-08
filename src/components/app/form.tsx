@@ -4,8 +4,18 @@
  * 让简单 CRUD 与复杂表单共享同一套版式。使用 react-hook-form 时可直接把 `FormItem` 放进 `Field`。
  */
 
-import type { ReactNode } from "react";
+import {
+	cloneElement,
+	isValidElement,
+	useEffect,
+	useId,
+	type ReactElement,
+	type ReactNode,
+} from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
+
+import { restoreFocusAfterLayer } from "~/lib/focus";
 
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
@@ -38,34 +48,50 @@ export function Field({
 	className?: string;
 	actions?: ReactNode;
 }) {
+	const errorId = useId();
+	const hintId = useId();
+	// 把 aria-invalid / aria-describedby 挂到真正的控件上：
+	// 只把错误写成红字，屏幕阅读器读不出来（theme.md §9 可访问性）。
+	const describedBy = error ? errorId : hint ? hintId : undefined;
+	const control = isValidElement(children)
+		? cloneElement(children as ReactElement<Record<string, unknown>>, {
+				"aria-invalid": error ? true : undefined,
+				"aria-describedby": describedBy,
+			})
+		: children;
+
 	return (
 		<div className={cn("space-y-1.5", className)}>
 			{label ? (
 				<div className="flex items-center justify-between gap-2">
-					<Label htmlFor={htmlFor} className="text-xs">
+					<Label htmlFor={htmlFor} className="text-sm font-medium">
 						{label}
 						{required ? <span className="ml-0.5 text-destructive">*</span> : null}
 					</Label>
 					{actions}
 				</div>
 			) : null}
-			{children}
-			{hint && !error ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
-			{error ? <FieldError error={error} /> : null}
+			{control}
+			{hint && !error ? (
+				<p id={hintId} className="text-xs text-muted-foreground">
+					{hint}
+				</p>
+			) : null}
+			{error ? <FieldError error={error} id={errorId} /> : null}
 		</div>
 	);
 }
 
 /** 表单错误：字符串数组（zod flatten）与普通字符串都支持。 */
-export function FieldError({ error }: { error: unknown }) {
+export function FieldError({ error, id }: { error: unknown; id?: string }) {
 	if (!error) return null;
 	const messages = Array.isArray(error)
 		? error.map((item) => String(item))
 		: [typeof error === "string" ? error : String((error as { message?: string })?.message ?? error)];
 	return (
-		<ul className="space-y-0.5">
+		<ul id={id} className="space-y-0.5" role="alert">
 			{messages.map((message) => (
-				<li key={message} className="text-xs text-destructive">
+				<li key={message} className="text-sm text-destructive">
 					{message}
 				</li>
 			))}
@@ -95,6 +121,14 @@ export function FormGrid({
 	);
 }
 
+/** 受控 Sheet 关闭/卸载后把焦点还给触发控件（见 ~/lib/focus）。 */
+function useRestoreFocus(open: boolean): void {
+	useEffect(() => {
+		if (!open) return;
+		return () => restoreFocusAfterLayer();
+	}, [open]);
+}
+
 export function FormSheet({
 	open,
 	onOpenChange,
@@ -113,6 +147,7 @@ export function FormSheet({
 	/** md = 更窄（默认 28rem+）；lg / xl 用于字段较多的表单。 */
 	width?: "md" | "lg" | "xl";
 }) {
+	useRestoreFocus(open);
 	const widthClass =
 		width === "xl"
 			? "sm:max-w-3xl"
@@ -135,8 +170,8 @@ export function FormSheet({
 
 export function FormFooter({
 	onCancel,
-	submitLabel = "保存",
-	cancelLabel = "取消",
+	submitLabel,
+	cancelLabel,
 	isPending = false,
 	disabled = false,
 	formId,
@@ -151,21 +186,32 @@ export function FormFooter({
 	formId?: string;
 	hint?: ReactNode;
 }) {
+	const { t } = useTranslation();
 	return (
 		<div className="flex w-full flex-wrap items-center justify-between gap-2">
 			<span className="text-xs text-muted-foreground">{hint}</span>
 			<div className="flex items-center gap-2">
 				{onCancel ? (
 					<Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
-						{cancelLabel}
+						{cancelLabel ?? t("common.cancel")}
 					</Button>
 				) : null}
 				<Button type="submit" form={formId} disabled={isPending || disabled}>
 					{isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-					{submitLabel}
+					{submitLabel ?? t("common.save")}
 				</Button>
 			</div>
 		</div>
+	);
+}
+
+/** datetime-local 输入的时区提示：值按浏览器本地时区填写，提交时转 ISO/UTC。 */
+export function LocalTimeHint({ className }: { className?: string }) {
+	const { t } = useTranslation();
+	return (
+		<p className={cn("text-xs text-muted-foreground", className)}>
+			{t("common.form.localTimeHint")}
+		</p>
 	);
 }
 

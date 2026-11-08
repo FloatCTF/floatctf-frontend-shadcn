@@ -5,8 +5,12 @@
  * 含 `runtime_state`、`runtime_generation`、容器名与公开端点；DTO **不含 flag**。
  * 后端还返回 `reset_count`（玩家手动重置次数），但公共 SDK 类型未声明该字段，
  * 因此这里做一次带类型保护的可选读取（见交付报告的 PUBLIC SDK GAP）。
+ *
+ * 文案全部走 i18n（`adminAwdpOps.instances.*`）；未知运行态保持后端原文。
  */
 
+import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { RefreshCw } from "lucide-react";
 
 import type { AwdpAdminInstanceDto } from "@floatctf/sdk";
@@ -16,8 +20,10 @@ import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import { MonoText, SectionCard } from "~/components/app/page";
 import { EmptyBlock, QueryState, TableSkeleton } from "~/components/app/states";
 import { Button } from "~/components/ui/button";
+import { formatInt } from "~/lib/format";
 
 import { useAwdpInstances } from "./queries";
+import { awdpRuntimeLabel, awdpRuntimeTone } from "./shared";
 
 /** 后端返回但 SDK 未声明的字段：带类型保护地读取，拿不到就显示「—」。 */
 function readResetCount(row: AwdpAdminInstanceDto): number | null {
@@ -25,64 +31,77 @@ function readResetCount(row: AwdpAdminInstanceDto): number | null {
 	return typeof value === "number" ? value : null;
 }
 
-function runtimeTone(state: string) {
-	if (state === "running") return "success" as const;
-	if (state === "resetting" || state === "pending") return "warning" as const;
-	if (state === "stopped" || state === "exited") return "muted" as const;
-	return "neutral" as const;
-}
-
-export function AwdpInstancesTab({ eventId }: { eventId: string }) {
+export function AwdpInstancesTab({ eventId }: { eventId: string }): ReactNode {
+	const { t } = useTranslation();
 	const instancesQuery = useAwdpInstances(eventId);
+
+	const subjectLabel = (row: AwdpAdminInstanceDto): string => {
+		if (row.owner_team_id) return t("adminAwdpOps.instances.subjectTeam");
+		if (row.owner_user_id) return t("adminAwdpOps.instances.subjectUser");
+		return t("adminAwdpOps.instances.subjectUnbound");
+	};
+
+	const runtimePill = (row: AwdpAdminInstanceDto) => (
+		<TonePill tone={awdpRuntimeTone(row.runtime_state)} title={row.runtime_state}>
+			{awdpRuntimeLabel(row.runtime_state, t)}
+		</TonePill>
+	);
 
 	const columns: DataTableColumn<AwdpAdminInstanceDto>[] = [
 		{
 			id: "gamebox_name",
-			header: "GameBox",
+			header: t("adminAwdpOps.instances.columns.gamebox"),
 			sortValue: (row) => row.gamebox_name,
 			cell: (row) => (
 				<div className="min-w-0">
 					<p className="truncate font-medium">{row.gamebox_name}</p>
-					<p className="text-xs text-muted-foreground">
-						{row.owner_team_id ? "战队主体" : row.owner_user_id ? "个人主体" : "未绑定主体"}
-					</p>
+					<p className="truncate text-xs text-muted-foreground">{subjectLabel(row)}</p>
 				</div>
 			),
 		},
 		{
 			id: "runtime_state",
-			header: "运行时状态",
-			cell: (row) => <TonePill tone={runtimeTone(row.runtime_state)}>{row.runtime_state}</TonePill>,
+			header: t("adminAwdpOps.instances.columns.runtimeState"),
+			cell: runtimePill,
 			sortValue: (row) => row.runtime_state,
 		},
 		{
 			id: "runtime_generation",
-			header: "代际",
+			header: t("adminAwdpOps.instances.columns.generation"),
 			align: "right",
-			cell: (row) => row.runtime_generation,
+			cell: (row) => <span className="tnum">{formatInt(row.runtime_generation)}</span>,
 			sortValue: (row) => row.runtime_generation,
 		},
 		{
 			id: "reset_count",
-			header: "重置次数",
+			header: t("adminAwdpOps.instances.columns.resetCount"),
 			align: "right",
 			hideBelow: "md",
-			cell: (row) => readResetCount(row) ?? "—",
+			cell: (row) => {
+				const count = readResetCount(row);
+				return <span className="tnum">{count === null ? t("common.empty") : formatInt(count)}</span>;
+			},
 			sortValue: (row) => readResetCount(row) ?? -1,
 		},
 		{
 			id: "endpoints",
-			header: "端点",
+			header: t("adminAwdpOps.instances.columns.endpoints"),
 			hideBelow: "lg",
 			cell: (row) =>
 				row.endpoints.length === 0 ? (
-					<span className="text-muted-foreground">—</span>
+					<span className="text-muted-foreground">{t("common.empty")}</span>
 				) : (
 					<div className="space-y-0.5">
 						{row.endpoints.map((endpoint) => (
-							<MonoText key={`${endpoint.protocol}-${endpoint.public_port}-${endpoint.container_port}`}>
-								{endpoint.protocol}://{endpoint.public_host}:{endpoint.public_port} →{" "}
-								{endpoint.container_port}
+							<MonoText
+								key={`${endpoint.protocol}-${endpoint.public_port}-${endpoint.container_port}`}
+							>
+								{t("adminAwdpOps.instances.endpoint", {
+									protocol: endpoint.protocol,
+									host: endpoint.public_host,
+									port: endpoint.public_port,
+									containerPort: endpoint.container_port,
+								})}
 							</MonoText>
 						))}
 					</div>
@@ -90,13 +109,13 @@ export function AwdpInstancesTab({ eventId }: { eventId: string }) {
 		},
 		{
 			id: "container_name",
-			header: "容器名",
+			header: t("adminAwdpOps.instances.columns.containerName"),
 			hideBelow: "xl",
 			cell: (row) => <MonoText>{row.container_name}</MonoText>,
 		},
 		{
 			id: "instance_id",
-			header: "实例 ID",
+			header: t("adminAwdpOps.instances.columns.instanceId"),
 			hideBelow: "xl",
 			cell: (row) => <MonoText>{row.instance_id}</MonoText>,
 		},
@@ -104,16 +123,20 @@ export function AwdpInstancesTab({ eventId }: { eventId: string }) {
 
 	return (
 		<SectionCard
-			title="赛事实例"
-			description="全部参与者在本赛事的 AWDP 实例（含运行时状态与公开端点）。"
+			title={t("adminAwdpOps.instances.sectionTitle")}
+			description={t("adminAwdpOps.instances.sectionDescription")}
 			actions={
 				<Button
-					variant="ghost"
+					variant="outline"
 					size="sm"
 					disabled={instancesQuery.isFetching}
 					onClick={() => void instancesQuery.refetch()}
 				>
-					<RefreshCw /> 刷新
+					<RefreshCw
+						className={instancesQuery.isFetching ? "animate-spin" : undefined}
+						aria-hidden="true"
+					/>
+					{t("adminAwdpOps.instances.refresh")}
 				</Button>
 			}
 		>
@@ -121,10 +144,11 @@ export function AwdpInstancesTab({ eventId }: { eventId: string }) {
 				query={instancesQuery}
 				skeleton={<TableSkeleton rows={5} columns={6} />}
 				isEmpty={(rows) => rows.length === 0}
+				errorTitle={t("adminAwdpOps.instances.loadError")}
 				empty={
 					<EmptyBlock
-						title="还没有实例"
-						description="比赛开始后平台会为参与者启动已挂载 GameBox 的实例。"
+						title={t("adminAwdpOps.instances.emptyTitle")}
+						description={t("adminAwdpOps.instances.emptyDescription")}
 					/>
 				}
 			>
@@ -134,11 +158,39 @@ export function AwdpInstancesTab({ eventId }: { eventId: string }) {
 						getRowId={(row) => row.instance_id}
 						columns={columns}
 						mobileCard={(row) => (
-							<div className="space-y-1">
-								<p className="text-sm font-medium">{row.gamebox_name}</p>
-								<p className="text-xs text-muted-foreground">
-									{row.runtime_state} · 代际 {row.runtime_generation}
-								</p>
+							<div className="space-y-1.5">
+								<div className="flex items-start justify-between gap-2">
+									<div className="min-w-0">
+										<p className="truncate text-sm font-medium">{row.gamebox_name}</p>
+										<p className="truncate text-xs text-muted-foreground">
+											{t("adminAwdpOps.instances.mobileMeta", {
+												subject: subjectLabel(row),
+												generation: formatInt(row.runtime_generation),
+												resetCount:
+													readResetCount(row) === null
+														? t("common.empty")
+														: formatInt(readResetCount(row)),
+											})}
+										</p>
+									</div>
+									{runtimePill(row)}
+								</div>
+								{row.endpoints.length > 0 ? (
+									<div className="space-y-0.5">
+										{row.endpoints.map((endpoint) => (
+											<MonoText
+												key={`${endpoint.protocol}-${endpoint.public_port}-${endpoint.container_port}`}
+											>
+												{t("adminAwdpOps.instances.endpoint", {
+													protocol: endpoint.protocol,
+													host: endpoint.public_host,
+													port: endpoint.public_port,
+													containerPort: endpoint.container_port,
+												})}
+											</MonoText>
+										))}
+									</div>
+								) : null}
 							</div>
 						)}
 					/>

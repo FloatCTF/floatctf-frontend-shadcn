@@ -8,7 +8,12 @@
  * - `set_phase`：仅 practice，且只支持 break↔fix；
  * - `break_service::submit_flag`：仅 Break 阶段；`patch_service`：仅 Fix 阶段 + 实例 running；
  * - `download_source`：仅 Fix 阶段；`manual_test_check`：需要运行中的实例。
+ *
+ * 本模块只做**展示语义**（label / tone / 门禁原因），不做数据获取；所有文案由调用方传入的
+ * `t`（training 命名空间）解析，阶段判定仍以 SDK 的 `AwdpPhase` 为准。
  */
+
+import type { TFunction } from "i18next";
 
 import type { AwdpInstance, AwdpPhase } from "@floatctf/sdk";
 
@@ -29,12 +34,12 @@ export const RUN_PHASE_ORDER: readonly AwdpPhase[] = [
 	"ended",
 ];
 
-const PHASE_LABEL: Record<AwdpPhase, string> = {
-	pending: "待开始",
-	break: "Break 破题",
-	preparing_fix: "准备 Fix（过渡）",
-	fix: "Fix 修复",
-	ended: "已结束",
+const PHASE_LABEL_KEY: Record<AwdpPhase, string> = {
+	pending: "training.phase.pending",
+	break: "training.phase.break",
+	preparing_fix: "training.phase.preparingFix",
+	fix: "training.phase.fix",
+	ended: "training.phase.ended",
 };
 
 const PHASE_TONE: Record<AwdpPhase, PillTone> = {
@@ -45,9 +50,10 @@ const PHASE_TONE: Record<AwdpPhase, PillTone> = {
 	ended: "muted",
 };
 
-export function runPhaseLabel(phase: AwdpPhase | null | undefined): string {
-	if (!phase) return "未知";
-	return PHASE_LABEL[phase] ?? phase;
+export function runPhaseLabel(phase: AwdpPhase | null | undefined, t: TFunction): string {
+	if (!phase) return t("training.phase.unknown");
+	const key = PHASE_LABEL_KEY[phase];
+	return key ? t(key) : phase;
 }
 
 export function runPhaseTone(phase: AwdpPhase | null | undefined): PillTone {
@@ -60,18 +66,15 @@ export function runPhaseIndex(phase: AwdpPhase | null | undefined): number {
 	return RUN_PHASE_ORDER.indexOf(phase);
 }
 
-export const RUN_PREPARING_FIX_NOTE =
-	"Break 已结束，后端正在准备 Fix 环境（实例重置为原始状态、物化回合时间线）；过渡态下不可提交 flag 或补丁。";
-
-const EVAL_STATUS_LABEL: Record<string, string> = {
-	pending: "待评测",
-	running: "评测中",
-	no_patch: "未提交补丁（+0）",
-	service_down: "服务不可用（+0）",
-	functional_broken: "功能被破坏（+0）",
-	vulnerable: "漏洞仍可利用（+0）",
-	patched: "已修复（计分）",
-	platform_error: "平台错误",
+const EVAL_STATUS_LABEL_KEY: Record<string, string> = {
+	pending: "training.evaluation.pending",
+	running: "training.evaluation.running",
+	no_patch: "training.evaluation.noPatch",
+	service_down: "training.evaluation.serviceDown",
+	functional_broken: "training.evaluation.functionalBroken",
+	vulnerable: "training.evaluation.vulnerable",
+	patched: "training.evaluation.patched",
+	platform_error: "training.evaluation.platformError",
 };
 
 const EVAL_STATUS_TONE: Record<string, PillTone> = {
@@ -85,9 +88,33 @@ const EVAL_STATUS_TONE: Record<string, PillTone> = {
 	platform_error: "danger",
 };
 
-export function runEvaluationLabel(status: string | null | undefined): string {
+export function runEvaluationLabel(
+	status: string | null | undefined,
+	t: TFunction,
+	kind?: "manual" | "official",
+): string {
 	if (!status) return "—";
-	return EVAL_STATUS_LABEL[status] ?? status;
+	// 自检（manual）不计分：同一个 patched 不能对两种情况都说「（计分）」。
+	if (status === "patched" && kind === "manual") {
+		return t("training.evaluation.patchedManual");
+	}
+	const key = EVAL_STATUS_LABEL_KEY[status];
+	return key ? t(key) : status;
+}
+
+/** Fix 回合状态：pending / evaluating / completed（其它未知值原样展示）。 */
+export function runRoundStatusLabel(
+	status: string | null | undefined,
+	t: TFunction,
+): string {
+	if (!status) return "—";
+	const key: Record<string, string> = {
+		pending: "training.rounds.status.pending",
+		evaluating: "training.rounds.status.evaluating",
+		completed: "training.rounds.status.completed",
+	};
+	const mapped = key[status];
+	return mapped ? t(mapped) : status;
 }
 
 export function runEvaluationTone(status: string | null | undefined): PillTone {
@@ -95,16 +122,16 @@ export function runEvaluationTone(status: string | null | undefined): PillTone {
 	return EVAL_STATUS_TONE[status] ?? "neutral";
 }
 
-export function runRuntimeLabel(state: string | null | undefined): string {
+export function runRuntimeLabel(state: string | null | undefined, t: TFunction): string {
 	switch (state) {
 		case "running":
-			return "运行中";
+			return t("training.runtime.running");
 		case "stopped":
-			return "已停止";
+			return t("training.runtime.stopped");
 		case null:
 		case undefined:
 		case "":
-			return "未启动";
+			return t("training.runtime.notStarted");
 		default:
 			return state;
 	}
@@ -126,52 +153,101 @@ export function isRunInstanceRunning(instance: AwdpInstance | null | undefined):
 }
 
 /** 「开始训练（Launch）」：pending / break / fix 可启动或继续；ended 终态拒绝。 */
-export function startRunGate(phase: AwdpPhase): TrainingGate {
+export function startRunGate(
+	phase: AwdpPhase,
+	t: TFunction,
+	instanceRunning = false,
+): TrainingGate {
 	if (phase === "ended") {
-		return { allowed: false, reason: "run 已结束：请使用「再次训练」新建 run。" };
+		return { allowed: false, reason: t("training.gates.startEnded") };
+	}
+	// Break/Fix 阶段「开始」等价于「启动实例」：实例已在跑就没有可做的事，
+	// 否则会出现「实例运行中却还能点开始训练」的错觉。
+	if (phase !== "pending" && instanceRunning) {
+		return { allowed: false, reason: t("training.gates.startRunning") };
 	}
 	return ALLOWED;
 }
 
 /** 「结束训练」：仅 Break / Fix 阶段（pending / ended 后端拒绝）。 */
-export function endRunGate(phase: AwdpPhase): TrainingGate {
+export function endRunGate(phase: AwdpPhase, t: TFunction): TrainingGate {
 	if (phase === "break" || phase === "fix") return ALLOWED;
 	return {
 		allowed: false,
-		reason: `只有 Break / Fix 阶段的 run 可以结束（当前：${runPhaseLabel(phase)}）。`,
+		reason: t("training.gates.end", { phase: runPhaseLabel(phase, t) }),
 	};
 }
 
+/** 「停止训练」：只在还有实例在跑时有意义；已结束的 run 不再提供。 */
+export function stopRunGate(
+	phase: AwdpPhase,
+	instanceRunning: boolean,
+	t: TFunction,
+): TrainingGate {
+	if (phase === "ended") {
+		return { allowed: false, reason: t("training.gates.stopEnded") };
+	}
+	if (!instanceRunning) {
+		return { allowed: false, reason: t("training.gates.stopIdle") };
+	}
+	return ALLOWED;
+}
+
+/** 「重置 run」：会销毁实例并回卷，已结束的 run 不允许。 */
+export function resetRunGate(phase: AwdpPhase, t: TFunction): TrainingGate {
+	if (phase === "ended") {
+		return { allowed: false, reason: t("training.gates.resetEnded") };
+	}
+	return ALLOWED;
+}
+
 /** 「再次训练」：仅 ended run（后端新建一个从 0 计分的 run）。 */
-export function restartTrainingGate(phase: AwdpPhase): TrainingGate {
+export function restartTrainingGate(phase: AwdpPhase, t: TFunction): TrainingGate {
 	if (phase === "ended") return ALLOWED;
 	return {
 		allowed: false,
-		reason: `只有已结束的 run 可以再次训练（当前：${runPhaseLabel(phase)}）；如需重来请先结束训练。`,
+		reason: t("training.gates.restart", { phase: runPhaseLabel(phase, t) }),
 	};
 }
 
 /** 手动切阶段：仅 break ↔ fix。 */
-export function setPhaseGate(phase: AwdpPhase, target: "break" | "fix"): TrainingGate {
+export function setPhaseGate(
+	phase: AwdpPhase,
+	target: "break" | "fix",
+	t: TFunction,
+): TrainingGate {
 	if (phase === "break" && target === "fix") return ALLOWED;
 	if (phase === "fix" && target === "break") return ALLOWED;
 	return {
 		allowed: false,
-		reason: `当前阶段（${runPhaseLabel(phase)}）不能切换到 ${target === "fix" ? "Fix" : "Break"}。`,
+		reason: t("training.gates.setPhase", {
+			phase: runPhaseLabel(phase, t),
+			target: target === "fix" ? "Fix" : "Break",
+		}),
 	};
 }
 
-export function breakRunGate(phase: AwdpPhase): TrainingGate {
+export function breakRunGate(phase: AwdpPhase, t: TFunction): TrainingGate {
 	if (phase === "break") return ALLOWED;
-	return { allowed: false, reason: `只有 Break 阶段可以提交 flag（当前：${runPhaseLabel(phase)}）。` };
+	return {
+		allowed: false,
+		reason: t("training.gates.break", { phase: runPhaseLabel(phase, t) }),
+	};
 }
 
-export function patchRunGate(phase: AwdpPhase, instance: AwdpInstance | null): TrainingGate {
+export function patchRunGate(
+	phase: AwdpPhase,
+	instance: AwdpInstance | null,
+	t: TFunction,
+): TrainingGate {
 	if (phase !== "fix") {
-		return { allowed: false, reason: `只有 Fix 阶段可以上传补丁（当前：${runPhaseLabel(phase)}）。` };
+		return {
+			allowed: false,
+			reason: t("training.gates.patchPhase", { phase: runPhaseLabel(phase, t) }),
+		};
 	}
 	if (!isRunInstanceRunning(instance)) {
-		return { allowed: false, reason: "实例未运行，补丁无法应用；请先启动实例。" };
+		return { allowed: false, reason: t("training.gates.patchNotRunning") };
 	}
 	return ALLOWED;
 }
@@ -181,82 +257,131 @@ export function patchRunGate(phase: AwdpPhase, instance: AwdpInstance | null): T
  * 后端 `service/runtime.rs::start_instance` 要求 `phase ∈ {Break, Fix}`（练习与比赛同一实现）：
  * pending 阶段要先用「开始训练」Launch，ended 阶段要「再次训练」。
  */
-export function runInstanceControlGate(phase: AwdpPhase): TrainingGate {
+export function runInstanceControlGate(phase: AwdpPhase, t: TFunction): TrainingGate {
 	if (phase === "break" || phase === "fix") return ALLOWED;
 	if (phase === "pending") {
-		return { allowed: false, reason: "run 尚未开始：请先点「开始训练」（Launch）。" };
+		return { allowed: false, reason: t("training.gates.instancePending") };
 	}
 	if (phase === "preparing_fix") {
-		return { allowed: false, reason: "准备 Fix 过渡态：实例操作暂不可用。" };
+		return { allowed: false, reason: t("training.gates.instancePreparingFix") };
 	}
-	return { allowed: false, reason: "run 已结束：请使用「再次训练」新建 run。" };
+	return { allowed: false, reason: t("training.gates.instanceEnded") };
 }
 
-export function testCheckRunGate(instance: AwdpInstance | null): TrainingGate {
+export function testCheckRunGate(
+	instance: AwdpInstance | null,
+	t: TFunction,
+): TrainingGate {
 	if (!isRunInstanceRunning(instance)) {
-		return { allowed: false, reason: "Test Check 需要运行中的实例：请先启动实例。" };
+		return { allowed: false, reason: t("training.gates.testCheck") };
 	}
 	return ALLOWED;
 }
 
 /** ALL Check：需要运行中的实例；成功即结束本 run。 */
-export function allCheckRunGate(phase: AwdpPhase, instance: AwdpInstance | null): TrainingGate {
+export function allCheckRunGate(
+	phase: AwdpPhase,
+	instance: AwdpInstance | null,
+	t: TFunction,
+): TrainingGate {
 	if (phase !== "fix") {
-		return { allowed: false, reason: `ALL Check 只在 Fix 阶段可用（当前：${runPhaseLabel(phase)}）。` };
+		return {
+			allowed: false,
+			reason: t("training.gates.allCheckPhase", { phase: runPhaseLabel(phase, t) }),
+		};
 	}
 	if (!isRunInstanceRunning(instance)) {
-		return { allowed: false, reason: "ALL Check 需要运行中的实例：请先启动实例。" };
+		return { allowed: false, reason: t("training.gates.allCheckNotRunning") };
 	}
 	return ALLOWED;
 }
 
-export function sourceRunGate(phase: AwdpPhase): TrainingGate {
+export function sourceRunGate(phase: AwdpPhase, t: TFunction): TrainingGate {
 	if (phase === "fix") return ALLOWED;
-	return { allowed: false, reason: `源码压缩包仅在 Fix 阶段可下载（当前：${runPhaseLabel(phase)}）。` };
+	return {
+		allowed: false,
+		reason: t("training.gates.source", { phase: runPhaseLabel(phase, t) }),
+	};
 }
 
-export const RUN_STOP_CONSEQUENCES = [
-	"run 内全部实例容器会被停止，暴露的服务端点不再可用。",
-	"run 本身、端点、Break 得分与历史都保留；可以在「开始训练」里继续会话。",
-	"停止期间官方回合判定无法执行（需要运行中的实例）。",
-];
+const RUN_STOP_CONSEQUENCE_KEYS = [
+	"training.confirm.consequences.stopRun.c1",
+	"training.confirm.consequences.stopRun.c2",
+	"training.confirm.consequences.stopRun.c3",
+] as const;
 
-export const RUN_RESET_CONSEQUENCES = [
-	"run 内全部实例会被重置为原始状态（容器销毁重建，补丁与容器内修改全部丢失）。",
-	"run、端点与计分账本不变；需要重新上传补丁并重新自检。",
-	"重建期间服务短暂不可用，正在进行的自检 / 评测会失败。",
-];
+const RUN_RESET_CONSEQUENCE_KEYS = [
+	"training.confirm.consequences.resetRun.c1",
+	"training.confirm.consequences.resetRun.c2",
+	"training.confirm.consequences.resetRun.c3",
+] as const;
 
-export const RUN_END_CONSEQUENCES = [
-	"run 内全部实例会被停止，训练会话结束。",
-	"本次 run 的 Break 得分与评测历史**保留**（End 不删除账本）。",
-	"结束后只能「再次训练」：基于同一 GameBox 新建一个从 0 计分的 run。",
-];
+const RUN_END_CONSEQUENCE_KEYS = [
+	"training.confirm.consequences.endRun.c1",
+	"training.confirm.consequences.endRun.c2",
+	"training.confirm.consequences.endRun.c3",
+] as const;
 
-export const RUN_INSTANCE_RESET_CONSEQUENCES = [
-	"实例容器会被销毁并按原始镜像重建（pristine）：容器内修改与已上传补丁全部丢失。",
-	"已入账的得分与评测历史不受影响。",
-	"重建期间服务端点短暂不可用。",
-];
+const RUN_RESTART_CONSEQUENCE_KEYS = [
+	"training.confirm.consequences.restart.c1",
+	"training.confirm.consequences.restart.c2",
+] as const;
 
-export const RUN_RESTART_CONSEQUENCES = [
-	"当前 run 已结束，会新建一个 run（新的 run 页面地址）。",
-	"新 run 从 0 计分；旧 run 的得分与历史仍然保留，可在积分明细里查看。",
-];
+const RUN_INSTANCE_RESET_CONSEQUENCE_KEYS = [
+	"training.confirm.consequences.instanceReset.c1",
+	"training.confirm.consequences.instanceReset.c2",
+	"training.confirm.consequences.instanceReset.c3",
+] as const;
 
-export const RUN_SET_PHASE_FIX_CONSEQUENCES = [
-	"立即进入 Fix 阶段：实例会被重置为原始状态（pristine），Break 阶段的容器内修改丢失。",
-	"后端开始物化 Fix 回合时间线，之后按回合做官方判定。",
-];
+const RUN_SET_PHASE_FIX_CONSEQUENCE_KEYS = [
+	"training.confirm.consequences.toFix.c1",
+	"training.confirm.consequences.toFix.c2",
+] as const;
 
-export const RUN_SET_PHASE_BREAK_CONSEQUENCES = [
-	"回到 Break 阶段会**撤销整个 Fix 会话**：已物化的回合、手动/官方评估与 Fix 计分全部清零，并重新物化全新时间线。",
-	"Break 阶段已入账的得分不受影响。",
-	"需要重新进入 Fix 阶段并重新提交补丁。",
-];
+const RUN_SET_PHASE_BREAK_CONSEQUENCE_KEYS = [
+	"training.confirm.consequences.toBreak.c1",
+	"training.confirm.consequences.toBreak.c2",
+	"training.confirm.consequences.toBreak.c3",
+] as const;
 
-export const RUN_ALL_CHECK_CONSEQUENCES = [
-	"ALL Check 会立即用官方流程判定当前补丁（healthcheck → judge → exploit），不做二次确认。",
-	"一旦通过（patched）：剩余回合全部按 Fix 计分，实例被停止，本 run 直接结束。",
-	"未通过则不落账、不扣分，等本轮 cutoff 的官方 check 照常判定。",
-];
+const RUN_ALL_CHECK_CONSEQUENCE_KEYS = [
+	"training.confirm.consequences.allCheck.c1",
+	"training.confirm.consequences.allCheck.c2",
+	"training.confirm.consequences.allCheck.c3",
+] as const;
+
+function translateAll(keys: readonly string[], t: TFunction): string[] {
+	return keys.map((key) => t(key));
+}
+
+export function runStopConsequences(t: TFunction): string[] {
+	return translateAll(RUN_STOP_CONSEQUENCE_KEYS, t);
+}
+
+export function runResetConsequences(t: TFunction): string[] {
+	return translateAll(RUN_RESET_CONSEQUENCE_KEYS, t);
+}
+
+export function runEndConsequences(t: TFunction): string[] {
+	return translateAll(RUN_END_CONSEQUENCE_KEYS, t);
+}
+
+export function runRestartConsequences(t: TFunction): string[] {
+	return translateAll(RUN_RESTART_CONSEQUENCE_KEYS, t);
+}
+
+export function runInstanceResetConsequences(t: TFunction): string[] {
+	return translateAll(RUN_INSTANCE_RESET_CONSEQUENCE_KEYS, t);
+}
+
+export function runSetPhaseFixConsequences(t: TFunction): string[] {
+	return translateAll(RUN_SET_PHASE_FIX_CONSEQUENCE_KEYS, t);
+}
+
+export function runSetPhaseBreakConsequences(t: TFunction): string[] {
+	return translateAll(RUN_SET_PHASE_BREAK_CONSEQUENCE_KEYS, t);
+}
+
+export function runAllCheckConsequences(t: TFunction): string[] {
+	return translateAll(RUN_ALL_CHECK_CONSEQUENCE_KEYS, t);
+}

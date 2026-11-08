@@ -2,13 +2,15 @@
  * 命令面板 —— 键盘优先入口（⌘K / Ctrl-K）。
  *
  * 命令来源：
- * 1. 导航命令（由 `nav.ts` 的信息架构自动派生）；
+ * 1. 导航命令（由 `nav.ts` 的信息架构自动派生，文案走 `nav.items.*`）；
  * 2. 页面通过 `useCommands([...])` 注册的**上下文命令**（提交 flag / 启动实例 / 新建赛事…）。
- *    卸载时自动撤销，不会在别的页面里残留。
+ *    卸载时自动撤销，不会在别的页面里残留；调用方负责把文案本地化后再注册。
  */
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocation, useNavigate } from "react-router";
+import { Search } from "lucide-react";
 import { create } from "zustand";
 
 import {
@@ -24,8 +26,19 @@ import {
 import { useIsAdminAuthenticated } from "~/auth/store";
 import { adminNav, flatNav, playerNav } from "./nav";
 
+const RECENT_KEY = "shadcn.recent-pages";
+
+/** 顶栏触发器与面板提示必须一致：Mac 用 ⌘K，其余用 Ctrl K。 */
+function platformShortcutHint(): string {
+	if (typeof navigator !== "undefined" && !/Mac|iPhone|iPad/.test(navigator.platform)) {
+		return "Ctrl K";
+	}
+	return "⌘K";
+}
+
 export interface AppCommand {
 	id: string;
+	/** 已本地化的文案（调用方用 `t()` 生成）。 */
 	label: string;
 	group?: string;
 	keywords?: string;
@@ -52,6 +65,7 @@ const useCommandStore = create<CommandStore>((set) => ({
 
 /** 页面注册上下文命令；`deps` 变化会重新注册。 */
 export function useCommands(commands: AppCommand[], deps: unknown[] = []): void {
+	const { i18n } = useTranslation();
 	const register = useCommandStore((state) => state.register);
 	const unregister = useCommandStore((state) => state.unregister);
 	const ids = useMemo(() => commands.map((command) => command.id), [commands]);
@@ -59,7 +73,7 @@ export function useCommands(commands: AppCommand[], deps: unknown[] = []): void 
 		register(commands);
 		return () => unregister(ids);
 		// biome-ignore lint/correctness/useExhaustiveDependencies: 由调用方通过 deps 控制
-	}, [register, unregister, ids.join("|"), ...deps]);
+	}, [register, unregister, ids.join("|"), i18n.language, ...deps]);
 }
 
 interface PaletteState {
@@ -80,6 +94,7 @@ export function useCommandPalette(): PaletteState {
 
 /** 全局快捷键：⌘K / Ctrl-K 打开命令面板。 */
 export function CommandPalette(): ReactNode {
+	const { t } = useTranslation();
 	const { open, setOpen, toggle } = usePaletteStore();
 	const contextual = useCommandStore((state) => state.contextual);
 	const navigate = useNavigate();
@@ -111,32 +126,91 @@ export function CommandPalette(): ReactNode {
 
 	const navigationGroups = useMemo(() => {
 		const sortNav = (items: ReturnType<typeof flatNav>) =>
-			[...items].sort((a, b) => a.label.localeCompare(b.label, "zh-CN"));
+			[...items].sort((a, b) => t(a.labelKey).localeCompare(t(b.labelKey)));
 		if (isAdmin) {
 			return [
-				{ label: "管理端导航", items: sortNav(flatNav(adminNav)) },
-				{ label: "选手端导航", items: sortNav(flatNav(playerNav)) },
+				{ key: "admin", label: t("shell.command.adminNav"), items: sortNav(flatNav(adminNav)) },
+				{ key: "player", label: t("shell.command.playerNav"), items: sortNav(flatNav(playerNav)) },
 			];
 		}
-		return [{ label: "导航", items: sortNav(flatNav(playerNav)) }];
-	}, [isAdmin]);
+		return [{ key: "player", label: t("shell.command.nav"), items: sortNav(flatNav(playerNav)) }];
+	}, [isAdmin, t]);
 
-	const [shortcutHint, setShortcutHint] = useState("⌘K");
+	// 最近访问：只在命中导航项时记录（子页面归并到所属一级页面）。
+	const allNavItems = useMemo(() => [...flatNav(playerNav), ...flatNav(adminNav)], []);
+	const openedOnce = useRef(false);
+	const previouslyFocused = useRef<HTMLElement | null>(null);
 	useEffect(() => {
-		if (typeof navigator !== "undefined" && !/Mac|iPhone|iPad/.test(navigator.platform)) {
-			setShortcutHint("Ctrl K");
+		if (open) {
+			openedOnce.current = true;
+			previouslyFocused.current =
+				document.activeElement instanceof HTMLElement ? document.activeElement : null;
+			return;
 		}
-	}, []);
+		if (!openedOnce.current) return;
+		// Radix 关闭时会自己处理一次焦点；延后一拍再覆盖，避免被还原成 body。
+		window.setTimeout(() => {
+			const previous = previouslyFocused.current;
+			if (previous && document.contains(previous)) {
+				previous.focus();
+				return;
+			}
+			document.getElementById("global-search-trigger")?.focus();
+		}, 0);
+	}, [open]);
+
+	const [recent, setRecent] = useState<string[]>(() => {
+		try {
+			const raw = window.localStorage.getItem(RECENT_KEY);
+			const parsed: unknown = raw ? JSON.parse(raw) : [];
+			return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string").slice(0, 5) : [];
+		} catch {
+			return [];
+		}
+	});
+	const location = useLocation();
+	useEffect(() => {
+		const hit = allNavItems.find((item) =>
+			item.end
+				? location.pathname === item.to
+				: location.pathname === item.to || location.pathname.startsWith(`${item.to}/`),
+		);
+		if (!hit) return;
+		setRecent((prev) => {
+			if (prev[0] === hit.to) return prev;
+			const next = [hit.to, ...prev.filter((path) => path !== hit.to)].slice(0, 5);
+			try {
+				window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+			} catch {
+				/* 隐私模式：仅内存 */
+			}
+			return next;
+		});
+	}, [location.pathname, allNavItems]);
+	const recentItems = useMemo(
+		() =>
+			recent
+				.map((path) => allNavItems.find((item) => item.to === path))
+				.filter((item): item is NonNullable<typeof item> => Boolean(item) && item!.to !== location.pathname),
+		[recent, allNavItems, location.pathname],
+	);
+
+	const shortcutHint = platformShortcutHint();
 
 	return (
-		<CommandDialog open={open} onOpenChange={setOpen} title="命令面板" description="搜索页面与操作">
-			<CommandInput placeholder="搜索页面、赛事、题目或操作…" />
+		<CommandDialog
+			open={open}
+			onOpenChange={setOpen}
+			title={t("shell.commandPanel")}
+			description={t("shell.command.description")}
+		>
+			<CommandInput placeholder={t("shell.command.searchPlaceholder")} />
 			<CommandList>
-				<CommandEmpty>没有匹配结果。</CommandEmpty>
+				<CommandEmpty>{t("shell.command.empty")}</CommandEmpty>
 
 				{contextual.length > 0 ? (
 					<>
-						<CommandGroup heading="当前页面操作">
+						<CommandGroup heading={t("shell.command.contextual")}>
 							{contextual.map((command) => (
 								<CommandItem
 									key={command.id}
@@ -156,18 +230,37 @@ export function CommandPalette(): ReactNode {
 					</>
 				) : null}
 
+				{recentItems.length > 0 ? (
+					<CommandGroup heading={t("shell.command.recent")}>
+						{recentItems.map((item) => {
+							const Icon = item.icon;
+							return (
+								<CommandItem
+									key={`recent-${item.to}`}
+									value={`${t(item.labelKey)} ${item.to} recent`}
+									onSelect={() => go(item.to, item.reloadDocument)}
+								>
+									<Icon className="size-4" aria-hidden="true" />
+									<span>{t(item.labelKey)}</span>
+									<CommandShortcut>{item.to}</CommandShortcut>
+								</CommandItem>
+							);
+						})}
+					</CommandGroup>
+				) : null}
+
 				{navigationGroups.map((group) => (
-					<CommandGroup key={group.label} heading={group.label}>
+					<CommandGroup key={group.key} heading={group.label}>
 						{group.items.map((item) => {
 							const Icon = item.icon;
 							return (
 								<CommandItem
 									key={item.to}
-									value={`${item.label} ${item.to} ${item.description ?? ""}`}
+									value={`${t(item.labelKey)} ${item.to} ${item.descriptionKey ? t(item.descriptionKey) : ""}`}
 									onSelect={() => go(item.to, item.reloadDocument)}
 								>
-									<Icon className="size-4" />
-									<span>{item.label}</span>
+									<Icon className="size-4" aria-hidden="true" />
+									<span>{t(item.labelKey)}</span>
 									<CommandShortcut>{item.to}</CommandShortcut>
 								</CommandItem>
 							);
@@ -176,9 +269,9 @@ export function CommandPalette(): ReactNode {
 				))}
 
 				<CommandSeparator />
-				<CommandGroup heading="提示">
-					<CommandItem value="快捷键 keyboard" onSelect={() => setOpen(false)}>
-						<span>打开命令面板</span>
+				<CommandGroup heading={t("shell.command.hints")}>
+					<CommandItem value="shortcuts keyboard" onSelect={() => setOpen(false)}>
+						<span>{t("shell.command.openPalette")}</span>
 						<CommandShortcut>{shortcutHint}</CommandShortcut>
 					</CommandItem>
 				</CommandGroup>
@@ -189,40 +282,25 @@ export function CommandPalette(): ReactNode {
 
 /** 顶栏里的「搜索 / 命令」触发器。 */
 export function CommandTrigger({ className }: { className?: string }) {
+	const { t } = useTranslation();
 	const { setOpen } = usePaletteStore();
+	const shortcutHint = platformShortcutHint();
 	return (
 		<button
 			type="button"
+			id="global-search-trigger"
 			onClick={() => setOpen(true)}
 			className={className}
-			aria-label="打开命令面板"
+			aria-label={t("shell.command.openPalette")}
+			title={t("shell.command.openPalette")}
 		>
-			<span className="inline-flex items-center gap-2">
-				<SearchIcon />
-				<span className="hidden sm:inline">搜索 / 命令</span>
+			<span className="inline-flex items-center gap-2 whitespace-nowrap">
+				<Search className="size-4" aria-hidden="true" />
+				<span className="hidden sm:inline">{t("shell.command.trigger")}</span>
 			</span>
-			<kbd className="hidden items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] text-muted-foreground sm:inline-flex">
-				⌘K
+			<kbd className="hidden items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] whitespace-nowrap text-muted-foreground sm:inline-flex">
+				{shortcutHint}
 			</kbd>
 		</button>
-	);
-}
-
-function SearchIcon() {
-	return (
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinecap="round"
-			strokeLinejoin="round"
-			className="size-4"
-			aria-hidden="true"
-		>
-			<circle cx="11" cy="11" r="8" />
-			<path d="m21 21-4.3-4.3" />
-		</svg>
 	);
 }

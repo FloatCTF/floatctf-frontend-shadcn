@@ -4,11 +4,14 @@
  * 参赛语义（与后端守卫及 Default 行为一致）：
  * - 仅在赛事**未开始**时可以加入/退出（个人赛走 `events.join/leave`，战队赛走 `createTeam/joinTeam/quitTeam`）；
  * - 非「未开始」且未加入 → 不展示赛事工作区内容（后端也会拒绝受保护接口）。
+ *
+ * 文案全部走 `events` 命名空间（docs/theme.md §8.4）；状态判定仍由 `~/lib/event-status.ts` 提供。
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileUp, LogIn, LogOut, ShieldAlert, Upload, Users } from "lucide-react";
+import { FileUp, Loader2, LogIn, LogOut, ShieldAlert, Users } from "lucide-react";
 
 import { call, callMaybe, callVoid, uploadFile } from "~/api/call";
 import { useClient } from "~/api/client";
@@ -22,7 +25,7 @@ import {
 	SectionCard,
 } from "~/components/app/page";
 import { EmptyBlock, InlineError, LoadingBlock } from "~/components/app/states";
-import { TonePill } from "~/components/app/badges";
+import { BooleanPill, TonePill } from "~/components/app/badges";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -32,14 +35,49 @@ import type { EventInfo } from "@floatctf/sdk";
 import type { Events } from "@floatctf/sdk/entity";
 import { formatRange, formatRelative } from "~/lib/format";
 import {
-	EVENT_FAMILY_LABEL,
-	EVENT_PURPOSE_LABEL,
-	EVENT_STATUS_LABEL,
 	EVENT_STATUS_TONE,
-	PARTICIPANT_MODE_LABEL,
 	computeEventStatus,
+	eventStatusOf,
+	participationGate,
+	type EventStatus,
 } from "~/lib/event-status";
 import { useNow } from "~/lib/hooks";
+
+const STATUS_KEYS: Record<EventStatus, string> = {
+	upcoming: "events.status.upcoming",
+	ongoing: "events.status.ongoing",
+	ended: "events.status.ended",
+	unknown: "events.status.unknown",
+};
+
+const FAMILY_KEYS: Record<string, string> = {
+	jeopardy: "events.family.jeopardy",
+	awd: "events.family.awd",
+	awdp: "events.family.awdp",
+};
+
+const MODE_KEYS: Record<string, string> = {
+	individual: "events.participantMode.individual",
+	team: "events.participantMode.team",
+};
+
+const PURPOSE_KEYS: Record<string, string> = {
+	competition: "events.purpose.competition",
+	practice: "events.purpose.practice",
+};
+
+/** 赛事状态 / 赛制 / 模式 / 类型的本地化文案（值本身仍来自后端与 event-status）。 */
+export function useEventLabels() {
+	const { t } = useTranslation();
+	return {
+		status: (status: EventStatus): string => t(STATUS_KEYS[status]),
+		family: (family: string): string =>
+			FAMILY_KEYS[family] ? t(FAMILY_KEYS[family]) : family,
+		mode: (mode: string): string => (MODE_KEYS[mode] ? t(MODE_KEYS[mode]) : mode),
+		purpose: (purpose: string): string =>
+			PURPOSE_KEYS[purpose] ? t(PURPOSE_KEYS[purpose]) : purpose,
+	};
+}
 
 export function EventStatusPill({
 	event,
@@ -48,57 +86,83 @@ export function EventStatusPill({
 	event: Events;
 	className?: string;
 }) {
+	const labels = useEventLabels();
 	const now = useNow(30_000);
 	const status = computeEventStatus(event.start_time, event.end_time ?? null, now.getTime());
+	const label = labels.status(status);
 	return (
-		<TonePill tone={EVENT_STATUS_TONE[status]} className={className}>
-			{EVENT_STATUS_LABEL[status]}
+		<TonePill tone={EVENT_STATUS_TONE[status]} className={className} title={label}>
+			{label}
 		</TonePill>
 	);
 }
 
 export function EventFactsCard({ event }: { event: Events }) {
+	const { t } = useTranslation();
+	const labels = useEventLabels();
 	const now = useNow(30_000);
 	return (
-		<SectionCard title="赛事信息">
+		<SectionCard title={t("events.facts.title")}>
 			<KeyValueList
 				items={[
-					{ key: "赛制家族", value: EVENT_FAMILY_LABEL[event.family] ?? event.family },
-					{ key: "参与模式", value: PARTICIPANT_MODE_LABEL[event.participant_mode] ?? event.participant_mode },
-					{ key: "赛事类型", value: EVENT_PURPOSE_LABEL[event.purpose] ?? event.purpose },
-					{ key: "时间窗", value: formatRange(event.start_time, event.end_time ?? null) },
-					{ key: "允许加入", value: event.allow_join ? "允许" : "不允许自助加入" },
+					{ key: t("events.facts.family"), value: labels.family(event.family) },
+					{ key: t("events.facts.participantMode"), value: labels.mode(event.participant_mode) },
+					{ key: t("events.facts.purpose"), value: labels.purpose(event.purpose) },
+					{ key: t("events.facts.window"), value: formatRange(event.start_time, event.end_time ?? null) },
 					{
-						key: "Flag 前缀",
+						key: t("events.facts.allowJoin"),
+						// 对齐后端：练习赛/系统赛事不支持自助报名；正式赛开赛后也会锁定。
+						value:
+							participationGate(event).kind === "open"
+								? t("events.facts.joinAllowed")
+								: participationGate(event).kind === "started"
+									? t("events.facts.joinLocked")
+									: participationGate(event).kind === "closed"
+										? t("events.facts.joinDisallowed")
+										: "—",
+					},
+					{
+						key: t("events.facts.flagPrefix"),
 						value: event.flag_prefix ? <MonoText>{event.flag_prefix}</MonoText> : "—",
 					},
 					{
-						key: "隐藏状态",
-						value: event.hidden ? (
-							<TonePill tone="muted">已隐藏</TonePill>
-						) : (
-							<TonePill tone="success">公开</TonePill>
+						key: t("events.facts.visibility"),
+						value: (
+							<BooleanPill
+								value={!event.hidden}
+								trueText={t("events.facts.public")}
+								falseText={t("events.facts.hidden")}
+								trueTone="success"
+								falseTone="muted"
+							/>
 						),
 					},
 					{
-						key: "更新于",
+						key: t("events.facts.updatedAt"),
 						value: <span className="text-xs">{formatRelative(event.updated_at, now)}</span>,
 					},
 				]}
-				columns={2}
+				// 右栏宽度约 200px：两列会把「Jeopardy 解题」和时间窗挤成折行，单列更好读。
+				columns={1}
 			/>
 		</SectionCard>
 	);
 }
 
 /** 个人赛参赛 / 退赛（仅未开始时可用）。 */
-export function JoinLeaveControl({ info }: { info: EventInfo }) {
+export function JoinLeaveControl({ info, locked = false }: { info: EventInfo; locked?: boolean }) {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const now = useNow(30_000);
-	const status = computeEventStatus(info.event.start_time, info.event.end_time ?? null, now.getTime());
-	const canJoin = status === "upcoming";
+	const status = computeEventStatus(
+		info.event.start_time,
+		info.event.end_time ?? null,
+		now.getTime(),
+	);
+	const gate = participationGate(info.event, now.getTime());
+	const canJoin = !locked && gate.kind === "open";
 
 	const invalidate = () => {
 		void queryClient.invalidateQueries({ queryKey: qk.events.detail(info.event.id) });
@@ -106,22 +170,47 @@ export function JoinLeaveControl({ info }: { info: EventInfo }) {
 	};
 
 	const join = useMutation({
-		mutationFn: () => callVoid(client.service.events.join(info.event.id), "加入赛事"),
+		mutationFn: () =>
+			callVoid(client.service.events.join(info.event.id), t("events.participation.joinAction")),
 		onSuccess: () => {
-			toast.success("已加入赛事");
+			toast.success(t("events.participation.joinSuccess"));
 			invalidate();
 		},
-		onError: (error) => toast.apiError("加入失败", error),
+		onError: (error) => toast.apiError(t("events.participation.joinFailed"), error),
 	});
 
 	const leave = useMutation({
-		mutationFn: () => callVoid(client.service.events.leave(info.event.id), "退出赛事"),
+		mutationFn: () =>
+			callVoid(client.service.events.leave(info.event.id), t("events.participation.leave")),
 		onSuccess: () => {
-			toast.success("已退出赛事");
+			toast.success(t("events.participation.leaveSuccess"));
 			invalidate();
 		},
-		onError: (error) => toast.apiError("退出失败", error),
+		onError: (error) => toast.apiError(t("events.participation.leaveFailed"), error),
 	});
+
+	const gateReason =
+		locked || gate.kind !== "closed"
+			? t("events.participation.lockedHint")
+			: t("events.participation.notOpenHint");
+
+	// 练习赛 / 系统托管赛事：后端明确拒绝自助报名，这里不显示按钮，避免「点了必失败」。
+	if (gate.kind === "not-competition" || gate.kind === "system-managed") {
+		return (
+			<p className="text-sm text-muted-foreground">
+				{gate.kind === "not-competition"
+					? t("events.participation.practiceHint")
+					: t("events.participation.systemManagedHint")}
+			</p>
+		);
+	}
+
+	// 已结束的赛事：报名/退出都已关闭，不再渲染一个永远点不动的按钮。
+	if (status === "ended") {
+		return (
+			<p className="text-sm text-muted-foreground">{t("events.participation.endedHint")}</p>
+		);
+	}
 
 	return (
 		<div className="space-y-2">
@@ -129,34 +218,33 @@ export function JoinLeaveControl({ info }: { info: EventInfo }) {
 				<Button
 					variant="destructive"
 					disabled={!canJoin || leave.isPending}
-					title={canJoin ? undefined : "赛事已开始，无法退出"}
+					title={canJoin ? undefined : gateReason}
 					onClick={async () => {
 						const ok = await confirm({
-							title: "退出该赛事？",
+							title: t("events.participation.leaveTitle"),
 							description: info.event.title,
-							consequences: ["退出后需要重新加入才能继续参赛", "已获得的解题记录仍保留"],
+							consequences: [
+								t("events.participation.leaveConsequence1"),
+								t("events.participation.leaveConsequence2"),
+							],
 							tone: "danger",
-							confirmText: "退出赛事",
+							confirmText: t("events.participation.leaveConfirm"),
 						});
 						if (ok) leave.mutate();
 					}}
 				>
-					<LogOut /> 退出赛事
+					<LogOut aria-hidden="true" /> {t("events.participation.leave")}
 				</Button>
 			) : (
 				<Button
 					disabled={!canJoin || join.isPending}
-					title={canJoin ? undefined : "赛事已开始，无法加入"}
+					title={canJoin ? undefined : gateReason}
 					onClick={() => join.mutate()}
 				>
-					<LogIn /> 加入赛事
+					<LogIn aria-hidden="true" /> {t("events.participation.join")}
 				</Button>
 			)}
-			{!canJoin ? (
-				<p className="text-xs text-muted-foreground">
-					参赛名单在赛事开始后即锁定（后端同样会拒绝此时的加入/退出请求）。
-				</p>
-			) : null}
+			{!canJoin ? <p className="text-xs text-muted-foreground">{gateReason}</p> : null}
 			{join.isError ? <InlineError error={join.error} /> : null}
 			{leave.isError ? <InlineError error={leave.error} /> : null}
 		</div>
@@ -164,13 +252,14 @@ export function JoinLeaveControl({ info }: { info: EventInfo }) {
 }
 
 /** 战队赛：建队 / 用 Team ID 加入 / 退队 / 查看成员。 */
-export function TeamPanel({ info }: { info: EventInfo }) {
+export function TeamPanel({ info, locked = false }: { info: EventInfo; locked?: boolean }) {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const now = useNow(30_000);
-	const status = computeEventStatus(info.event.start_time, info.event.end_time ?? null, now.getTime());
-	const canChange = status === "upcoming";
+	const gate = participationGate(info.event, now.getTime());
+	const canChange = !locked && gate.kind === "open";
 	const [teamName, setTeamName] = useState("");
 	const [teamId, setTeamId] = useState("");
 
@@ -181,45 +270,64 @@ export function TeamPanel({ info }: { info: EventInfo }) {
 
 	const createTeam = useMutation({
 		mutationFn: () =>
-			call(client.service.events.createTeam({ event_id: info.event.id, name: teamName.trim() }), "创建战队"),
+			call(
+				client.service.events.createTeam({ event_id: info.event.id, name: teamName.trim() }),
+				t("events.team.createAction"),
+			),
 		onSuccess: () => {
-			toast.success("战队已创建", "你已成为队长。");
+			toast.success(t("events.team.createSuccess"), t("events.team.createSuccessDescription"));
 			setTeamName("");
 			invalidate();
 		},
-		onError: (error) => toast.apiError("创建战队失败", error),
+		onError: (error) => toast.apiError(t("events.team.createFailed"), error),
 	});
 
 	const joinTeam = useMutation({
 		mutationFn: (id: string) =>
-			callVoid(client.service.events.joinTeam({ event_id: info.event.id, team_id: id }), "加入战队"),
+			callVoid(
+				client.service.events.joinTeam({ event_id: info.event.id, team_id: id }),
+				t("events.team.joinAction"),
+			),
 		onSuccess: () => {
-			toast.success("已加入战队");
+			toast.success(t("events.team.joinSuccess"));
 			setTeamId("");
 			invalidate();
 		},
-		onError: (error) => toast.apiError("加入战队失败", error),
+		onError: (error) => toast.apiError(t("events.team.joinFailed"), error),
 	});
 
 	const quitTeam = useMutation({
 		mutationFn: (id: string) =>
-			callVoid(client.service.events.quitTeam({ event_id: info.event.id, team_id: id }), "退出战队"),
+			callVoid(
+				client.service.events.quitTeam({ event_id: info.event.id, team_id: id }),
+				t("events.team.quitAction"),
+			),
 		onSuccess: () => {
-			toast.success("已退出战队");
+			toast.success(t("events.team.quitSuccess"));
 			invalidate();
 		},
-		onError: (error) => toast.apiError("退出战队失败", error),
+		onError: (error) => toast.apiError(t("events.team.quitFailed"), error),
 	});
 
 	const team = info.team_result;
 
-	if (!info.joined) {
+	// 已加入但战队关系缺失（历史半加入数据）同样需要给出加入 / 建队入口，
+	// 否则会卡在一个只有说明文字、没有任何操作的死胡同里。
+	if (!info.joined || !team) {
 		if (!canChange) {
 			return (
 				<EmptyBlock
-					title="未参赛"
-					description="赛事已开始，无法再加入。"
-					icon={<ShieldAlert className="size-5" />}
+					title={
+						info.joined
+							? t("events.team.noTeamTitle")
+							: t("events.team.notJoinedTitle")
+					}
+					description={
+						info.joined
+							? t("events.team.noTeamLockedDescription")
+							: t("events.team.notJoinedDescription")
+					}
+					icon={<ShieldAlert className="size-5" aria-hidden="true" />}
 				/>
 			);
 		}
@@ -227,14 +335,14 @@ export function TeamPanel({ info }: { info: EventInfo }) {
 			<div className="space-y-4">
 				<div className="space-y-2">
 					<Label htmlFor="join-team-id" className="text-xs">
-						已有战队？用 Team ID 加入
+						{t("events.team.joinTitle")}
 					</Label>
 					<div className="flex gap-2">
 						<Input
 							id="join-team-id"
 							value={teamId}
 							onChange={(event) => setTeamId(event.target.value)}
-							placeholder="战队 UUID"
+							placeholder={t("events.team.teamIdPlaceholder")}
 							className="font-mono text-xs"
 						/>
 						<Button
@@ -242,27 +350,27 @@ export function TeamPanel({ info }: { info: EventInfo }) {
 							disabled={teamId.trim() === "" || joinTeam.isPending}
 							onClick={() => joinTeam.mutate(teamId.trim())}
 						>
-							<Users /> 加入
+							<Users aria-hidden="true" /> {t("events.team.join")}
 						</Button>
 					</div>
 				</div>
 				<Separator />
 				<div className="space-y-2">
 					<Label htmlFor="create-team-name" className="text-xs">
-						或创建新战队（创建者默认为队长）
+						{t("events.team.createTitle")}
 					</Label>
 					<div className="flex gap-2">
 						<Input
 							id="create-team-name"
 							value={teamName}
 							onChange={(event) => setTeamName(event.target.value)}
-							placeholder="战队名称"
+							placeholder={t("events.team.namePlaceholder")}
 						/>
 						<Button
 							disabled={teamName.trim() === "" || createTeam.isPending}
 							onClick={() => createTeam.mutate()}
 						>
-							创建
+							{t("events.team.create")}
 						</Button>
 					</div>
 				</div>
@@ -272,26 +380,19 @@ export function TeamPanel({ info }: { info: EventInfo }) {
 		);
 	}
 
-	if (!team) {
-		return (
-			<EmptyBlock
-				title="未加入战队"
-				description="你已参赛但还没有战队，加入或创建一个战队后即可协作。"
-			/>
-		);
-	}
-
 	return (
 		<div className="space-y-4">
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<div className="flex flex-wrap items-center gap-2">
 					<span className="text-sm font-semibold">{team.team.name}</span>
 					{team.team.banned ? (
-						<TonePill tone="danger" icon={<ShieldAlert />}>
-							战队已被封禁
+						<TonePill tone="danger" icon={<ShieldAlert aria-hidden="true" />}>
+							{t("events.team.banned")}
 						</TonePill>
 					) : null}
-					<TonePill tone="info">{team.team.points} 分</TonePill>
+					<TonePill tone="info" className="tnum">
+						{t("events.team.points", { points: team.team.points })}
+					</TonePill>
 				</div>
 				{canChange ? (
 					<Button
@@ -300,39 +401,53 @@ export function TeamPanel({ info }: { info: EventInfo }) {
 						disabled={quitTeam.isPending}
 						onClick={async () => {
 							const ok = await confirm({
-								title: "退出战队？",
+								title: t("events.team.quitTitle"),
 								description: team.team.name,
-								consequences: ["退队后需要重新加入或创建战队", "战队共享的积分不受影响"],
+								consequences: [
+									t("events.team.quitConsequence1"),
+									t("events.team.quitConsequence2"),
+								],
 								tone: "danger",
-								confirmText: "退出战队",
+								confirmText: t("events.team.quitConfirm"),
 							});
 							if (ok) quitTeam.mutate(team.team.id);
 						}}
 					>
-						<LogOut /> 退出战队
+						<LogOut aria-hidden="true" /> {t("events.team.quitAction")}
 					</Button>
-				) : null}
+				) : (
+					<p className="text-xs text-muted-foreground">{t("events.team.lockedNote")}</p>
+				)}
 			</div>
 
 			<KeyValueList
 				columns={1}
 				items={[
-					{ key: "Team ID", value: <MonoText>{team.team.id}</MonoText> },
+					{ key: t("events.team.teamId"), value: <MonoText>{team.team.id}</MonoText> },
 					...(team.team.description
-						? [{ key: "战队简介", value: <ReadonlyBlock>{team.team.description}</ReadonlyBlock> }]
+						? [
+								{
+									key: t("events.team.description"),
+									value: <ReadonlyBlock>{team.team.description}</ReadonlyBlock>,
+								},
+							]
 						: []),
 					{
-						key: "成员",
+						key: t("events.team.members"),
 						value: (
 							<ul className="space-y-1">
 								{team.members.map((member) => (
 									<li key={member.member.user_id} className="flex items-center gap-2 text-sm">
 										<TonePill tone={member.member.role === "captain" ? "info" : "muted"}>
-											{member.member.role === "captain" ? "队长" : "队员"}
+											{member.member.role === "captain"
+												? t("events.team.captain")
+												: t("events.team.member")}
 										</TonePill>
 										<span className="truncate">{member.member_name}</span>
 										<span className="text-xs text-muted-foreground">
-											{formatRelative(member.member.joined_at, now)}加入
+											{t("events.team.joinedAt", {
+												time: formatRelative(member.member.joined_at, now),
+											})}
 										</span>
 									</li>
 								))}
@@ -348,15 +463,20 @@ export function TeamPanel({ info }: { info: EventInfo }) {
 
 /** 赛后 writeup（PDF）提交状态 + 上传。 */
 export function EventWriteupPanel({ info }: { info: EventInfo }) {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const [file, setFile] = useState<File | null>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const own = useQuery({
 		queryKey: qk.events.ownWriteup(info.event.id),
 		queryFn: async () => {
 			try {
-				return await callMaybe<string>(client.service.events.getOwnWp(info.event.id), "我的 writeup");
+				return await callMaybe<string>(
+					client.service.events.getOwnWp(info.event.id),
+					t("events.writeup.ownAction"),
+				);
 			} catch (error) {
 				if (isNotFound(error)) return null;
 				throw error;
@@ -379,40 +499,96 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 				},
 			}),
 		onSuccess: () => {
-			toast.success("writeup 已提交");
+			toast.success(t("events.writeup.success"));
 			setFile(null);
 			void queryClient.invalidateQueries({ queryKey: qk.events.ownWriteup(info.event.id) });
 		},
-		onError: (error) => toast.apiError("提交失败", error),
+		onError: (error) => toast.apiError(t("events.writeup.failed"), error),
 	});
 
-	if (own.isPending) return <LoadingBlock label="读取 writeup 状态…" />;
+	if (own.isPending) return <LoadingBlock label={t("events.writeup.loading")} />;
+	if (own.isError) {
+		return (
+			<div className="space-y-2">
+				<InlineError error={own.error} />
+				<Button variant="outline" size="sm" onClick={() => void own.refetch()}>
+					{t("common.retry")}
+				</Button>
+			</div>
+		);
+	}
 
-	const submitted = own.data && own.data.trim().length > 0;
+	// 防御：真实后端返回 string | null；非字符串（契约漂移）按「未提交」处理，绝不崩页。
+	const submitted = typeof own.data === "string" && own.data.trim().length > 0;
 
 	return (
 		<div className="space-y-3">
 			{submitted ? (
-				<div className="rounded-md border bg-muted/30 p-3 text-sm">
-					<p className="mb-1 font-medium">已提交 writeup</p>
+				<div className="rounded-lg border bg-muted/30 p-3 text-sm">
+					<p className="mb-1 font-medium">{t("events.writeup.submitted")}</p>
 					<MonoText className="text-muted-foreground">{own.data}</MonoText>
 				</div>
 			) : (
-				<p className="text-sm text-muted-foreground">还没有提交 writeup（PDF）。</p>
+				<p className="text-sm text-muted-foreground">{t("events.writeup.notSubmitted")}</p>
 			)}
 			<div className="flex flex-wrap items-center gap-2">
-				<Input
+				<input
+					ref={fileInputRef}
 					type="file"
 					accept="application/pdf"
-					className="max-w-xs"
-					onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+					aria-label={t("events.writeup.fileLabel")}
+					className="sr-only"
+					onChange={async (event) => {
+						const picked = event.target.files?.[0] ?? null;
+						event.target.value = "";
+						// `accept` 只是选择器过滤，用户可切到「所有文件」：这里先挡一次非 PDF。
+						if (
+							picked &&
+							picked.type !== "application/pdf" &&
+							!picked.name.toLowerCase().endsWith(".pdf")
+						) {
+							toast.warning(t("events.writeup.notPdf"));
+							setFile(null);
+							return;
+						}
+						// 后缀 / MIME 都可能伪造；读文件头挡掉必然被后端拒绝的伪 PDF。
+						if (picked) {
+							// 后端只读取前 5 字节并要求精确等于 %PDF-；这里完全按同一契约校验，
+							// 不能放过“文件中间某处出现 %PDF-”的伪 PDF。
+							const head = new Uint8Array(await picked.slice(0, 5).arrayBuffer());
+							const magic = String.fromCharCode(...head);
+							if (magic !== "%PDF-") {
+								toast.error(t("events.writeup.invalidPdf"));
+								setFile(null);
+								return;
+							}
+						}
+						setFile(picked);
+					}}
 				/>
+				<Button
+					type="button"
+					variant="outline"
+					onClick={() => fileInputRef.current?.click()}
+				>
+					<FileUp aria-hidden="true" />
+					{t("events.writeup.choose")}
+				</Button>
+				{file ? (
+					<span className="max-w-48 truncate text-xs text-muted-foreground" title={file.name}>
+						{file.name}
+					</span>
+				) : null}
 				<Button
 					disabled={!file || upload.isPending}
 					onClick={() => file && upload.mutate(file)}
 				>
-					{upload.isPending ? <Upload className="animate-pulse" /> : <FileUp />}
-					{submitted ? "重新提交" : "提交 writeup"}
+					{upload.isPending ? (
+						<Loader2 className="animate-spin" aria-hidden="true" />
+					) : (
+						<FileUp aria-hidden="true" />
+					)}
+					{submitted ? t("events.writeup.resubmit") : t("events.writeup.submit")}
 				</Button>
 			</div>
 			{upload.isError ? <InlineError error={upload.error} /> : null}
@@ -421,15 +597,40 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 }
 
 /** 未参赛且赛事已开始时的门禁提示（与后端权限一致）。 */
-export function MemberGateNotice() {
+export function MemberGateNotice({ event }: { event: Events }) {
+	const { t } = useTranslation();
+	const gate = participationGate(event);
+	const ended = eventStatusOf(event) === "ended";
+	const title =
+		gate.kind === "not-competition"
+			? t("events.gate.practiceTitle")
+			: gate.kind === "system-managed"
+				? t("events.gate.systemTitle")
+				: gate.kind === "closed"
+					? t("events.gate.closedTitle")
+					: ended
+						? t("events.gate.endedTitle")
+						: t("events.gate.title");
+	const description =
+		gate.kind === "not-competition"
+			? t("events.gate.practiceDescription")
+			: gate.kind === "system-managed"
+				? t("events.gate.systemDescription")
+				: gate.kind === "closed"
+					? t("events.gate.closedDescription")
+					: ended
+						? t("events.gate.endedDescription")
+						: t("events.gate.description");
 	return (
-		<div className="rounded-lg border border-[var(--warning)]/40 bg-[var(--warning)]/10 p-4">
+		<div
+			role="status"
+			className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-700 dark:text-amber-400"
+		>
 			<p className="flex items-center gap-2 text-sm font-medium">
-				<ShieldAlert className="size-4" /> 你尚未加入本赛事
+				<ShieldAlert className="size-4 shrink-0" aria-hidden="true" />
+				{title}
 			</p>
-			<p className="mt-1 text-sm text-muted-foreground">
-				赛事开始后参赛名单即锁定，题目、积分榜与实例都只对已参赛选手开放。请在赛事开始前加入。
-			</p>
+			<p className="mt-1 text-sm text-muted-foreground">{description}</p>
 		</div>
 	);
 }

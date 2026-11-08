@@ -13,6 +13,7 @@ import { ImagePlus, Loader2 } from "lucide-react";
 
 import { uploadFile } from "~/api/call";
 import { errorText } from "~/api/errors";
+import { useTranslation } from "react-i18next";
 import { useClient } from "~/api/client";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
@@ -43,18 +44,19 @@ function safeUrlTransform(url: string): string {
 export function MarkdownView({
 	children,
 	className,
-	emptyText = "（无内容）",
+	emptyText,
 }: {
 	children: string | null | undefined;
 	className?: string;
 	emptyText?: string;
 }) {
+	const { t } = useTranslation();
 	const content = (children ?? "").trim();
 	if (content.length === 0) {
-		return <p className="text-sm text-muted-foreground">{emptyText}</p>;
+		return <p className="text-sm text-muted-foreground">{emptyText ?? t("common.misc.emptyBlock")}</p>;
 	}
 	return (
-		<div className={cn("prose-ctf max-w-none", className)}>
+		<div className={cn("prose-ctf max-w-none break-words", className)}>
 			<Markdown
 				remarkPlugins={[remarkGfm]}
 				urlTransform={safeUrlTransform}
@@ -93,16 +95,43 @@ export interface MarkdownEditorProps {
 export function MarkdownEditor({
 	value,
 	onChange,
-	placeholder = "支持 Markdown（GFM）。",
+	placeholder,
 	minHeight = 260,
 	disabled = false,
 	allowUpload = true,
 }: MarkdownEditorProps): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const [tab, setTab] = useState("write");
 	const [uploading, setUploading] = useState(false);
 
+	function decodable(file: File): Promise<boolean> {
+		return new Promise((resolve) => {
+			const url = URL.createObjectURL(file);
+			const probe = new Image();
+			probe.onload = () => {
+				URL.revokeObjectURL(url);
+				resolve(true);
+			};
+			probe.onerror = () => {
+				URL.revokeObjectURL(url);
+				resolve(false);
+			};
+			probe.src = url;
+		});
+	}
+
 	async function handleFile(file: File) {
+		if (!file.type.startsWith("image/")) {
+			toast.error(t("common.markdown.invalidImage"));
+			return;
+		}
+		// accept=image/* 与 MIME 都可能不准确；上传前让浏览器真实解码一次，
+		// 否则坏文件会拿到图床 URL，Markdown 里留下一个永远裂开的图片。
+		if (!(await decodable(file))) {
+			toast.error(t("common.markdown.invalidImage"));
+			return;
+		}
 		setUploading(true);
 		try {
 			// 逃生舱之外的常规门面：`client.service.uploads.upload_image` 返回图片 URL。
@@ -115,12 +144,12 @@ export function MarkdownEditor({
 			});
 			if (url) {
 				onChange(`${value}${value.endsWith("\n") || value.length === 0 ? "" : "\n"}![${file.name}](${url})\n`);
-				toast.success("插图已上传");
+				toast.success(t("common.markdown.uploaded"));
 			} else {
-				toast.error("插图上传失败", "后端未返回图片地址");
+				toast.error(t("common.markdown.uploadFailed"), t("common.markdown.uploadFailedReason"));
 			}
 		} catch (error) {
-			toast.apiError("插图上传失败", error);
+			toast.apiError(t("common.markdown.uploadFailed"), error);
 		} finally {
 			setUploading(false);
 		}
@@ -130,8 +159,8 @@ export function MarkdownEditor({
 		<Tabs value={tab} onValueChange={setTab} className="w-full">
 			<div className="flex items-center justify-between gap-2">
 				<TabsList>
-					<TabsTrigger value="write">编辑</TabsTrigger>
-					<TabsTrigger value="preview">预览</TabsTrigger>
+					<TabsTrigger value="write">{t("common.misc.write")}</TabsTrigger>
+					<TabsTrigger value="preview">{t("common.misc.preview")}</TabsTrigger>
 				</TabsList>
 				{allowUpload ? (
 					<label className="inline-flex">
@@ -153,7 +182,7 @@ export function MarkdownEditor({
 								) : (
 									<ImagePlus className="size-4" />
 								)}
-								插入图片
+								{t("common.markdown.insertImage")}
 							</span>
 						</Button>
 					</label>
@@ -163,7 +192,7 @@ export function MarkdownEditor({
 				<Textarea
 					value={value}
 					disabled={disabled}
-					placeholder={placeholder}
+					placeholder={placeholder ?? t("common.markdown.placeholder")}
 					style={{ minHeight }}
 					onChange={(event) => onChange(event.target.value)}
 					className="font-mono text-sm"

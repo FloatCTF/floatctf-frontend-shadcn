@@ -1,0 +1,46 @@
+/** 外壳（顶栏 / 侧栏 / 命令面板）文案。 */
+
+export default {
+	playerSubtitle: "Field · 选手工作区",
+	adminSubtitle: "Control Room · 运维控制台",
+	playerSession: "选手会话",
+	adminSession: "管理端会话",
+	adminLabel: "管理员",
+	notSignedIn: "未登录",
+	goPlayer: "前往选手端",
+	commandPanel: "命令面板",
+	skipToContent: "跳到主内容",
+	commands: {
+		focusFlag: "定位到「提交 flag」",
+		refresh: "刷新当前页面数据",
+	},
+	command: {
+		recent: "最近访问",
+		adminNav: "管理端导航",
+		playerNav: "选手端导航",
+		nav: "导航",
+		description: "搜索页面与操作",
+		searchPlaceholder: "搜索页面或当前页操作…",
+		empty: "没有匹配结果。",
+		contextual: "当前页面操作",
+		hints: "提示",
+		openPalette: "打开命令面板",
+		trigger: "搜索 / 命令",
+	},
+	notFound: {
+		title: "页面不存在",
+		description: "这个地址没有对应的页面。可能是链接过期，或该资源已被删除。",
+		toPlayer: "返回选手端",
+		toAdmin: "前往管理端",
+	},
+	renderError: {
+		title: "界面渲染出错",
+		hint: "如果反复出现，请刷新页面；已登录状态不会丢失。",
+	},
+	toggleNav: "切换导航",
+	navigation: "导航",
+	mobileNavDescription: "全部页面入口；选中后自动收起。",
+	commandPlaceholder: "搜索页面、题目、账号…",
+	commandEmpty: "没有匹配的命令",
+	commandHint: "命令面板",
+};

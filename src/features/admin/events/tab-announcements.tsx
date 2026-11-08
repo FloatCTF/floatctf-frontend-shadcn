@@ -4,9 +4,12 @@
  * SDK 的四个方法**全部柯里化**（第一层 `eventId`）：
  * `fetch(eventId)({page,limit})`、`create(eventId)(body)`、`patch(eventId)(announcement)`、
  * `remove(eventId)(id_list)`；其中 `patch` 的 URL 用 `announcement.id` 拼接，因此**必须带 id**。
+ *
+ * 文案全部走 `adminEvents.announcements` 命名空间；公告标题 / 正文是用户数据，不翻译。
  */
 
 import { useId, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Megaphone, MoreHorizontal, PencilLine, Plus, Trash2 } from "lucide-react";
 
@@ -36,6 +39,7 @@ import { formatDateTime } from "~/lib/format";
 import { clientPageCount, clientPaged, MobileFacts, PagedTable } from "./shared";
 
 export function EventAnnouncementsTab({ eventId }: { eventId: string }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -64,24 +68,27 @@ export function EventAnnouncementsTab({ eventId }: { eventId: string }): ReactNo
 
 	const remove = useMutation({
 		mutationFn: (ids: string[]) =>
-			call<number>(client.admin.event_announcements.remove(eventId)(ids), "删除公告"),
+			call<number>(
+				client.admin.event_announcements.remove(eventId)(ids),
+				t("adminEvents.actions.deleteAnnouncement"),
+			),
 		onSuccess: (count) => {
-			toast.success(`已删除 ${count} 条公告`);
+			toast.success(t("adminEvents.announcements.toast.deleteSuccess", { count }));
 			invalidate();
 		},
-		onError: (error) => toast.apiError("删除公告失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.announcements.toast.deleteFailed"), error),
 	});
 
 	async function confirmRemove(row: EventAnnouncements) {
 		const ok = await confirm({
-			title: `删除公告「${row.title}」？`,
-			description: "赛事公告删除后不可恢复。",
+			title: t("adminEvents.announcements.confirmRemove.title", { name: row.title }),
+			description: t("adminEvents.announcements.confirmRemove.description"),
 			consequences: [
-				"公告从赛事页与选手端立即消失",
-				"公告正文不会被备份，删除后无法找回（需要重新发布）",
+				t("adminEvents.announcements.confirmRemove.consequence1"),
+				t("adminEvents.announcements.confirmRemove.consequence2"),
 			],
 			tone: "danger",
-			confirmText: "删除公告",
+			confirmText: t("adminEvents.announcements.confirmRemove.confirm"),
 		});
 		if (!ok) return;
 		remove.mutate([row.id]);
@@ -90,13 +97,13 @@ export function EventAnnouncementsTab({ eventId }: { eventId: string }): ReactNo
 	const columns: DataTableColumn<EventAnnouncements>[] = [
 		{
 			id: "title",
-			header: "标题",
+			header: t("adminEvents.announcements.columns.title"),
 			cell: (row) => <span className="font-medium">{row.title}</span>,
 			sortValue: (row) => row.title,
 		},
 		{
 			id: "content",
-			header: "内容",
+			header: t("adminEvents.announcements.columns.content"),
 			cell: (row) => (
 				<button
 					type="button"
@@ -109,52 +116,69 @@ export function EventAnnouncementsTab({ eventId }: { eventId: string }): ReactNo
 		},
 		{
 			id: "created_at",
-			header: "发布时间",
-			cell: (row) => <MonoText>{formatDateTime(row.created_at, { seconds: true })}</MonoText>,
+			header: t("adminEvents.announcements.columns.createdAt"),
+			cell: (row) => <MonoText className="whitespace-nowrap">
+				{formatDateTime(row.created_at, { seconds: true })}
+			</MonoText>,
 			sortValue: (row) => row.created_at,
 			hideBelow: "md",
 		},
 	];
 
-	const rowActions = (row: EventAnnouncements): ReactNode => (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" size="icon-sm" aria-label={`${row.title} 的操作`}>
-					<MoreHorizontal />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end">
-				<DropdownMenuLabel className="max-w-56 truncate">{row.title}</DropdownMenuLabel>
-				<DropdownMenuItem onSelect={() => setPreview(row)}>查看</DropdownMenuItem>
-				<DropdownMenuItem onSelect={() => setEditing({ announcement: row })}>
-					<PencilLine /> 编辑
-				</DropdownMenuItem>
-				<DropdownMenuSeparator />
-				<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove(row)}>
-					<Trash2 /> 删除
-				</DropdownMenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
+	const rowActions = (row: EventAnnouncements): ReactNode => {
+		const actionsLabel = t("adminEvents.announcements.row.actions", { name: row.title });
+		return (
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button variant="ghost" size="icon-sm" aria-label={actionsLabel} title={actionsLabel}>
+						<MoreHorizontal />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuLabel className="max-w-56 truncate">{row.title}</DropdownMenuLabel>
+					<DropdownMenuItem onSelect={() => setPreview(row)}>{t("common.view")}</DropdownMenuItem>
+					<DropdownMenuItem onSelect={() => setEditing({ announcement: row })}>
+						<PencilLine /> {t("common.edit")}
+					</DropdownMenuItem>
+					<DropdownMenuSeparator />
+					<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove(row)}>
+						<Trash2 /> {t("common.delete")}
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		);
+	};
 
 	const mobileCard = (row: EventAnnouncements): ReactNode => (
-		<MobileFacts
-			items={[
-				{ k: "标题", v: <span className="font-medium">{row.title}</span> },
-				{ k: "发布时间", v: <MonoText>{formatDateTime(row.created_at)}</MonoText> },
-				{ k: "内容", v: <span className="line-clamp-3 text-xs">{row.content}</span> },
-			]}
-		/>
+		<div className="space-y-2">
+			<MobileFacts
+				items={[
+					{
+						k: t("adminEvents.announcements.mobile.title"),
+						v: <span className="font-medium">{row.title}</span>,
+					},
+					{
+						k: t("adminEvents.announcements.mobile.createdAt"),
+						v: <MonoText>{formatDateTime(row.created_at)}</MonoText>,
+					},
+					{
+						k: t("adminEvents.announcements.mobile.content"),
+						v: <span className="line-clamp-3 text-xs">{row.content}</span>,
+					},
+				]}
+			/>
+			<div className="flex justify-end">{rowActions(row)}</div>
+		</div>
 	);
 
 	return (
 		<SectionCard
-			title="赛事公告"
-			description="公告发布后选手端赛事页立即可见；支持 Markdown。"
+			title={t("adminEvents.announcements.title")}
+			description={t("adminEvents.announcements.description")}
 			actions={
 				<Toolbar>
 					<Button size="sm" onClick={() => setEditing({ announcement: null })}>
-						<Plus /> 发布公告
+						<Plus /> {t("adminEvents.announcements.publishButton")}
 					</Button>
 				</Toolbar>
 			}
@@ -173,15 +197,15 @@ export function EventAnnouncementsTab({ eventId }: { eventId: string }): ReactNo
 				}}
 				rowActions={rowActions}
 				mobileCard={mobileCard}
-				errorTitle="加载赛事公告失败"
+				errorTitle={t("adminEvents.announcements.loadError")}
 				empty={
 					<EmptyBlock
-						title="还没有公告"
-						description="发布第一条公告，向选手同步赛程与规则变更。"
-						icon={<Megaphone className="size-5" />}
+						title={t("adminEvents.announcements.empty.title")}
+						description={t("adminEvents.announcements.empty.description")}
+						icon={<Megaphone className="size-6" />}
 						action={
 							<Button size="sm" onClick={() => setEditing({ announcement: null })}>
-								<Plus /> 发布公告
+								<Plus /> {t("adminEvents.announcements.publishButton")}
 							</Button>
 						}
 					/>
@@ -205,7 +229,9 @@ export function EventAnnouncementsTab({ eventId }: { eventId: string }): ReactNo
 					}}
 					width="lg"
 					title={preview.title}
-					description={`发布于 ${formatDateTime(preview.created_at, { seconds: true })}`}
+					description={t("adminEvents.announcements.preview.publishedAt", {
+						time: formatDateTime(preview.created_at, { seconds: true }),
+					})}
 				>
 					<MarkdownView>{preview.content}</MarkdownView>
 				</FormSheet>
@@ -227,6 +253,7 @@ function AnnouncementSheet({
 	onClose: () => void;
 	onDone: () => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const formId = useId();
 	const [title, setTitle] = useState(announcement?.title ?? "");
@@ -241,7 +268,7 @@ function AnnouncementSheet({
 						title: title.trim(),
 						content,
 					}),
-					"发布公告",
+					t("adminEvents.actions.publishAnnouncement"),
 				);
 			}
 			// `patch` 用 `announcement.id` 拼 URL —— 必须带 id。
@@ -251,15 +278,20 @@ function AnnouncementSheet({
 					title: title.trim(),
 					content,
 				}),
-				"保存公告",
+				t("adminEvents.actions.saveAnnouncement"),
 			);
 		},
 		onSuccess: () => {
-			toast.success(announcement === null ? "公告已发布" : "公告已更新");
+			toast.success(
+				announcement === null
+					? t("adminEvents.announcements.toast.publishSuccess")
+					: t("adminEvents.announcements.toast.updateSuccess"),
+			);
 			onDone();
 			onClose();
 		},
-		onError: (mutationError) => toast.apiError("保存公告失败", mutationError),
+		onError: (mutationError) =>
+			toast.apiError(t("adminEvents.announcements.toast.saveFailed"), mutationError),
 	});
 
 	return (
@@ -269,14 +301,22 @@ function AnnouncementSheet({
 				if (!next) onClose();
 			}}
 			width="lg"
-			title={announcement === null ? "发布赛事公告" : "编辑赛事公告"}
-			description="发布后选手端赛事页立即可见。"
+			title={
+				announcement === null
+					? t("adminEvents.announcements.editor.createTitle")
+					: t("adminEvents.announcements.editor.editTitle")
+			}
+			description={t("adminEvents.announcements.editor.description")}
 			footer={
 				<FormFooter
 					formId={formId}
 					onCancel={onClose}
 					isPending={save.isPending}
-					submitLabel={announcement === null ? "发布" : "保存"}
+					submitLabel={
+						announcement === null
+							? t("adminEvents.announcements.editor.submitCreate")
+							: t("adminEvents.announcements.editor.submitUpdate")
+					}
 				/>
 			}
 		>
@@ -286,23 +326,31 @@ function AnnouncementSheet({
 				onSubmit={(submitEvent) => {
 					submitEvent.preventDefault();
 					if (title.trim() === "") {
-						setError("公告标题不能为空");
+						setError(t("adminEvents.announcements.editor.titleRequired"));
 						return;
 					}
 					setError(null);
 					save.mutate();
 				}}
 			>
-				<Field label="标题" htmlFor={`${formId}-title`} required error={error}>
+				<Field
+					label={t("adminEvents.announcements.editor.titleLabel")}
+					htmlFor={`${formId}-title`}
+					required
+					error={error}
+				>
 					<Input
 						id={`${formId}-title`}
 						value={title}
 						maxLength={200}
 						onChange={(changeEvent) => setTitle(changeEvent.target.value)}
-						placeholder="例如：比赛时间调整通知"
+						placeholder={t("adminEvents.announcements.editor.titlePlaceholder")}
 					/>
 				</Field>
-				<Field label="内容" hint="支持 Markdown（GFM）。图片上传在管理端不可用，请使用外链。">
+				<Field
+					label={t("adminEvents.announcements.editor.contentLabel")}
+					hint={t("adminEvents.announcements.editor.contentHint")}
+				>
 					<MarkdownEditor value={content} onChange={setContent} allowUpload={false} minHeight={240} />
 				</Field>
 				{save.isError ? <InlineError error={save.error} /> : null}

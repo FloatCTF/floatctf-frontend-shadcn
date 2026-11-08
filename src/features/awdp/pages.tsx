@@ -9,9 +9,12 @@
  *
  * 实时：`useAwdpEventStream`（`lastEvent` 来自 ref，所以用 invalidate 驱动刷新）+
  * `RealtimePill`（显式呈现 auth_error）。
+ *
+ * 文案：全部走 i18n（`awdp.*`）；阶段 / 动作门禁来自 `./domain`（SDK `AwdpPhase`）。
  */
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Database, Trophy } from "lucide-react";
@@ -35,13 +38,20 @@ import {
 	EmptyBlock,
 	ErrorBlock,
 	LoadingBlock,
+	NotFoundBlock,
 	PermissionDeniedBlock,
 } from "~/components/app/states";
+import {
+	WorkspaceAccessBlock,
+	type WorkspaceAccessReason,
+} from "~/components/app/workspace-access";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { formatDateTime, formatDuration, formatInt, formatScore } from "~/lib/format";
-import { useDocumentTitle } from "~/lib/hooks";
+import { computeEventStatus, isPracticeEvent } from "~/lib/event-status";
+import { formatDateTime, formatDuration, formatInt, formatPoints } from "~/lib/format";
+import { useDocumentTitle, useNow } from "~/lib/hooks";
+import type { EventInfo } from "@floatctf/sdk";
 
 import {
 	AwdpActionPanel,
@@ -54,35 +64,65 @@ import {
 	AwdpTrendPanel,
 } from "./components";
 import {
-	AWDP_INSTANCE_RESET_CONSEQUENCES,
+	awdpInstanceResetConsequences,
 	awdpPhaseLabel,
 	awdpPhaseTone,
+	awdpStopConsequences,
 	isAwdpNotConfigured,
 } from "./domain";
 
-/** 停止实例的真实后果（后端：官方判定需要 running 实例）。 */
-const AWDP_STOP_CONSEQUENCES = [
-	"实例容器会被停止：暴露的服务端点不再可用，正在进行的自检 / 评测会失败。",
-	"官方回合判定需要运行中的实例；停止期间该回合不会对你的实例计分。",
-	"逻辑实例与端点保留，之后可以「启动」继续（不会重建容器）。",
-];
-
 export function LabPage(): ReactNode {
 	const { eventId = "" } = useParams<{ eventId: string }>();
-	useDocumentTitle("AWDP 工作台 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("awdp.page.docTitle"));
 
 	const client = useClient();
 	const { useAwdpEventStream } = useBindings();
-	const stream = useAwdpEventStream({ eventId, enabled: Boolean(eventId) });
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
+	const now = useNow(30_000);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 
-	const overviewQuery = useQuery({
-		queryKey: qk.awdp.overview(eventId),
-		queryFn: () => call<AwdpOverview>(client.awdp.player.overview(eventId), "AWDP 总览"),
+	const eventQuery = useQuery({
+		queryKey: qk.events.detail(eventId),
+		queryFn: () =>
+			call<EventInfo>(client.service.events.get(eventId), t("awdp.calls.event")),
 		enabled: Boolean(eventId),
 	});
+	const eventInfo = eventQuery.data;
+	const eventStatus = eventInfo
+		? computeEventStatus(eventInfo.event.start_time, eventInfo.event.end_time, now.getTime())
+		: "unknown";
+
+	// 与后端一致：练习赛 / 未参赛 / 未开始都不允许进入比赛工作台。
+	// 练习 AWDP 走 `/training`（`awdp.runs`），不是事件工作区。
+	// 管理员可以提前开始 AWDP（event.start_time 可能在未来），此时 overview.started_at
+	// 是权威信号；不能只按 event 时间把已开始的比赛挡在门外。
+	const earlyOverviewQuery = useQuery({
+		queryKey: qk.awdp.overview(eventId),
+		queryFn: () => call<AwdpOverview>(client.awdp.player.overview(eventId), t("awdp.calls.overview")),
+		enabled:
+			Boolean(eventId) &&
+			eventInfo !== undefined &&
+			eventInfo.event.family === "awdp" &&
+			!isPracticeEvent(eventInfo.event) &&
+			eventInfo.joined,
+	});
+
+	let access: WorkspaceAccessReason | null = null;
+	if (eventInfo) {
+		if (eventInfo.event.family !== "awdp") access = "wrong-family";
+		else if (isPracticeEvent(eventInfo.event)) access = "practice";
+		else if (!eventInfo.joined) access = "not-joined";
+		else if (eventStatus === "upcoming" && earlyOverviewQuery.data?.started_at == null) {
+			access = "not-started";
+		}
+	}
+	const canAccess = eventQuery.isSuccess && access === null;
+
+	const stream = useAwdpEventStream({ eventId, enabled: Boolean(eventId) && canAccess });
+
+	const overviewQuery = earlyOverviewQuery;
 
 	const overview = overviewQuery.data;
 	const gameboxes = useMemo(() => overview?.gameboxes ?? [], [overview]);
@@ -103,7 +143,7 @@ export function LabPage(): ReactNode {
 		queryFn: () =>
 			callMaybe<AwdpInstance>(
 				client.awdp.player.getInstance(eventId, selectedGameboxId),
-				"实例详情",
+				t("awdp.calls.instance"),
 			),
 		enabled: Boolean(eventId) && Boolean(selectedGameboxId) && activePhase,
 		retry: false,
@@ -134,58 +174,65 @@ export function LabPage(): ReactNode {
 		mutationFn: () =>
 			call<AwdpInstance>(
 				client.awdp.player.startInstance(eventId, selectedGameboxId),
-				"启动实例",
+				t("awdp.calls.startInstance"),
 			),
 		onSuccess: () => {
-			toast.success("实例已启动");
+			toast.success(t("awdp.toasts.instanceStarted"));
 			refreshAll();
 		},
-		onError: (error) => toast.apiError("启动实例失败", error),
+		onError: (error) => toast.apiError(t("awdp.toasts.instanceStartFailed"), error),
 	});
 
 	const stopMutation = useMutation({
 		mutationFn: () =>
-			callVoid(client.awdp.player.stopInstance(eventId, selectedGameboxId), "停止实例"),
+			callVoid(
+				client.awdp.player.stopInstance(eventId, selectedGameboxId),
+				t("awdp.calls.stopInstance"),
+			),
 		onSuccess: () => {
-			toast.success("实例已停止");
+			toast.success(t("awdp.toasts.instanceStopped"));
 			refreshAll();
 		},
-		onError: (error) => toast.apiError("停止实例失败", error),
+		onError: (error) => toast.apiError(t("awdp.toasts.instanceStopFailed"), error),
 	});
 
 	const resetMutation = useMutation({
 		mutationFn: () =>
 			call<AwdpInstance>(
 				client.awdp.player.resetInstance(eventId, selectedGameboxId),
-				"重置实例",
+				t("awdp.calls.resetInstance"),
 			),
 		onSuccess: () => {
-			toast.success("实例已重置为原始状态");
+			toast.success(t("awdp.toasts.instanceReset"));
 			refreshAll();
 		},
-		onError: (error) => toast.apiError("重置实例失败", error),
+		onError: (error) => toast.apiError(t("awdp.toasts.instanceResetFailed"), error),
 	});
 
 	const busy = startMutation.isPending || stopMutation.isPending || resetMutation.isPending;
 
 	async function askStop() {
 		const ok = await confirm({
-			title: `停止「${selected?.name ?? "实例"}」？`,
-			description: "停止后服务端点不再可用，官方回合判定无法执行。",
-			consequences: AWDP_STOP_CONSEQUENCES,
+			title: t("awdp.confirm.stopTitle", {
+				name: selected?.name ?? t("awdp.confirm.instanceNameFallback"),
+			}),
+			description: t("awdp.confirm.stopDescription"),
+			consequences: awdpStopConsequences(t),
 			tone: "danger",
-			confirmText: "停止",
+			confirmText: t("awdp.confirm.stopConfirm"),
 		});
 		if (ok) stopMutation.mutate();
 	}
 
 	async function askReset() {
 		const ok = await confirm({
-			title: `重置「${selected?.name ?? "实例"}」？`,
-			description: "重置会销毁容器并按原始镜像重建（pristine）。",
-			consequences: AWDP_INSTANCE_RESET_CONSEQUENCES,
+			title: t("awdp.confirm.resetTitle", {
+				name: selected?.name ?? t("awdp.confirm.instanceNameFallback"),
+			}),
+			description: t("awdp.confirm.resetDescription"),
+			consequences: awdpInstanceResetConsequences(t),
 			tone: "danger",
-			confirmText: "重置",
+			confirmText: t("awdp.confirm.resetConfirm"),
 		});
 		if (ok) resetMutation.mutate();
 	}
@@ -193,227 +240,296 @@ export function LabPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="AWDP 工作台"
-				description="Break 阶段拿 flag、Fix 阶段上传补丁并自检"
+				title={t("awdp.page.title")}
+				description={t("awdp.page.subtitle")}
 				breadcrumbs={
 					<nav className="flex items-center gap-1.5">
 						<Link to="/events" className="hover:underline">
-							赛事
+							{t("awdp.page.breadcrumbEvents")}
 						</Link>
 						<span>/</span>
 						<Link to={`/events/${eventId}`} className="hover:underline">
-							赛事工作区
+							{t("awdp.page.breadcrumbWorkspace")}
 						</Link>
 						<span>/</span>
-						<span className="text-foreground">AWDP 工作台</span>
+						<span className="text-foreground">{t("awdp.page.breadcrumbCurrent")}</span>
 					</nav>
 				}
 				badge={
 					overview ? (
 						<TonePill tone={awdpPhaseTone(overview.phase)}>
-							{awdpPhaseLabel(overview.phase)}
+							{awdpPhaseLabel(overview.phase, t)}
 						</TonePill>
 					) : null
 				}
 				actions={
-					<RealtimePill
-						state={stream.connectionState}
-						onRefresh={() => {
-							stream.invalidateAwdp();
-							refreshAll();
-						}}
-					/>
+					canAccess ? (
+						<RealtimePill
+							state={stream.connectionState}
+							onRefresh={() => {
+								stream.invalidateAwdp();
+								refreshAll();
+							}}
+						/>
+					) : undefined
 				}
 			/>
 
-			{overviewQuery.isPending ? (
-				<LoadingBlock label="加载 AWDP 总览…" />
+			{eventQuery.isPending ? (
+				<LoadingBlock label={t("awdp.states.loadingOverview")} />
+			) : eventQuery.isError ? (
+				isNotFound(eventQuery.error) ? (
+					<NotFoundBlock
+						title={t("events.workspace.notFoundTitle")}
+						description={t("events.workspace.notFoundDescription")}
+						action={
+							<Button asChild variant="outline">
+								<Link to="/events">{t("events.workspace.backToList")}</Link>
+							</Button>
+						}
+					/>
+				) : (
+					<ErrorBlock
+						error={eventQuery.error}
+						title={t("awdp.states.loadOverview")}
+						onRetry={() => void eventQuery.refetch()}
+					/>
+				)
+			) : access ? (
+				<WorkspaceAccessBlock reason={access} eventId={eventId} practiceEntry="training" />
+			) : overviewQuery.isPending ? (
+				<LoadingBlock label={t("awdp.states.loadingOverview")} />
 			) : overviewQuery.isError ? (
 				isForbidden(overviewQuery.error) ? (
-					<PermissionDeniedBlock description="你不是本赛事的参赛成员（或已离队），无法进入 AWDP 工作台。" />
+					<PermissionDeniedBlock description={t("awdp.states.forbiddenDescription")} />
 				) : isNotFound(overviewQuery.error) || isAwdpNotConfigured(overviewQuery.error) ? (
 					<EmptyBlock
-						title="该赛事未启用 AWDP"
-						description="本赛事没有 AWDP 赛制配置；请从赛事列表确认赛制，或联系管理员。"
+						title={t("awdp.states.notConfiguredTitle")}
+						description={t("awdp.states.notConfiguredDescription")}
 						action={
 							<Button variant="outline" size="sm" asChild>
-								<Link to="/events">返回赛事列表</Link>
+								<Link to="/events">{t("awdp.states.backToEvents")}</Link>
 							</Button>
 						}
 					/>
 				) : (
 					<ErrorBlock
 						error={overviewQuery.error}
-						title="加载 AWDP 总览失败"
+						title={t("awdp.states.loadOverview")}
 						onRetry={() => void overviewQuery.refetch()}
 					/>
 				)
 			) : overview ? (
 				<div className="space-y-5">
 					<SectionCard
-							title="阶段"
-							description="阶段由后端推进；preparing_fix 是 Break→Fix 之间的过渡态，此时不可提交"
-							actions={
-								overview.next_action_at ? (
-									<span className="tnum text-xs text-muted-foreground">
-										下一动作 {formatDateTime(overview.next_action_at, { seconds: true })}
-									</span>
-								) : null
-							}
-						>
-							<AwdpPhaseSteps
-								phase={overview.phase}
-								currentRound={overview.current_round}
-								totalRounds={overview.total_rounds}
-								nextActionAt={overview.next_action_at}
+						title={t("awdp.phases.sectionTitle")}
+						description={t("awdp.phases.sectionDescription")}
+						actions={
+							overview.next_action_at ? (
+								<span className="tnum text-xs text-muted-foreground">
+									{t("awdp.phases.nextActionAt", {
+										time: formatDateTime(overview.next_action_at, {
+											seconds: true,
+										}),
+									})}
+								</span>
+							) : null
+						}
+					>
+						<AwdpPhaseSteps
+							phase={overview.phase}
+							currentRound={overview.current_round}
+							totalRounds={overview.total_rounds}
+							nextActionAt={overview.next_action_at}
+						/>
+						<div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 lg:grid-cols-4">
+							<StatCard
+								label={t("awdp.stats.myScore")}
+								value={formatPoints(overview.my_score)}
+								hint={t("awdp.stats.myScoreHint")}
+								icon={<Trophy className="size-4" aria-hidden="true" />}
+								tone="success"
 							/>
-							<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-								<StatCard
-									label="我的分数"
-									value={formatScore(overview.my_score)}
-									hint="Break + Fix 累计"
-									icon={<Trophy className="size-5" />}
-									tone="success"
-								/>
-								<StatCard
-									label="当前回合"
-									value={`${formatInt(overview.current_round)} / ${formatInt(overview.total_rounds)}`}
-									hint="Fix 回合"
-									icon={<Database className="size-5" />}
-								/>
-								<StatCard
-									label="Break 时长"
-									value={formatDuration(overview.break_duration_secs)}
-									hint={
-										overview.break_ends_at
-											? `结束于 ${formatDateTime(overview.break_ends_at, { seconds: true })}`
-											: "未开始"
-									}
-								/>
-								<StatCard
-									label="Fix 时长 / 回合间隔"
-									value={`${formatDuration(overview.fix_duration_secs)} / ${formatDuration(overview.fix_round_interval_secs)}`}
-									hint={
-										overview.fix_ends_at
-											? `结束于 ${formatDateTime(overview.fix_ends_at, { seconds: true })}`
-											: "未开始"
-									}
-								/>
-							</div>
-							<KeyValueList
-								className="mt-4"
-								columns={3}
-								items={[
-									{
-										key: "Break 单题得分",
-										value: <span className="tnum">{formatScore(overview.break_score)}</span>,
-									},
-									{
-										key: "Fix 每回合得分",
-										value: (
-											<span className="tnum">{formatScore(overview.fix_round_score)}</span>
-										),
-									},
-									{
-										key: "开始时间",
-										value: overview.started_at ? (
-											<span className="tnum">
-												{formatDateTime(overview.started_at, { seconds: true })}
-											</span>
-										) : (
-											<span className="text-muted-foreground">未开始</span>
-										),
-									},
-									{
-										key: "Fix 开始时间",
-										value: overview.fix_started_at ? (
-											<span className="tnum">
-												{formatDateTime(overview.fix_started_at, { seconds: true })}
-											</span>
-										) : (
-											<span className="text-muted-foreground">未开始</span>
-										),
-									},
-									{
-										key: "结束时间",
-										value: overview.finished_at ? (
-											<span className="tnum">
-												{formatDateTime(overview.finished_at, { seconds: true })}
-											</span>
-										) : (
-											<span className="text-muted-foreground">未结束</span>
-										),
-									},
-								]}
+							<StatCard
+								label={t("awdp.stats.currentRound")}
+								value={t("awdp.stats.roundRatio", {
+									current: formatInt(overview.current_round),
+									total: formatInt(overview.total_rounds),
+								})}
+								hint={t("awdp.stats.currentRoundHint")}
+								icon={<Database className="size-4" aria-hidden="true" />}
 							/>
-						</SectionCard>
+							<StatCard
+								label={t("awdp.stats.breakDuration")}
+								value={formatDuration(overview.break_duration_secs)}
+								hint={
+									overview.break_ends_at
+										? t("awdp.stats.endsAt", {
+												time: formatDateTime(overview.break_ends_at, {
+													seconds: true,
+												}),
+											})
+										: t("awdp.stats.notStarted")
+								}
+							/>
+							<StatCard
+								label={t("awdp.stats.fixDuration")}
+								value={`${formatDuration(overview.fix_duration_secs)} / ${formatDuration(overview.fix_round_interval_secs)}`}
+								hint={
+									overview.fix_ends_at
+										? t("awdp.stats.endsAt", {
+												time: formatDateTime(overview.fix_ends_at, {
+													seconds: true,
+												}),
+											})
+										: t("awdp.stats.notStarted")
+								}
+							/>
+						</div>
+						<KeyValueList
+							className="mt-4"
+							columns={3}
+							items={[
+								{
+									key: t("awdp.stats.breakScore"),
+									value: (
+										<span className="tnum">
+											{formatPoints(overview.break_score)}
+										</span>
+									),
+								},
+								{
+									key: t("awdp.stats.fixRoundScore"),
+									value: (
+										<span className="tnum">
+											{formatPoints(overview.fix_round_score)}
+										</span>
+									),
+								},
+								{
+									key: t("awdp.stats.startedAt"),
+									value: overview.started_at ? (
+										<span className="tnum">
+											{formatDateTime(overview.started_at, {
+												seconds: true,
+											})}
+										</span>
+									) : (
+										<span className="text-muted-foreground">
+											{t("awdp.stats.notStarted")}
+										</span>
+									),
+								},
+								{
+									key: t("awdp.stats.fixStartedAt"),
+									value: overview.fix_started_at ? (
+										<span className="tnum">
+											{formatDateTime(overview.fix_started_at, {
+												seconds: true,
+											})}
+										</span>
+									) : (
+										<span className="text-muted-foreground">
+											{t("awdp.stats.notStarted")}
+										</span>
+									),
+								},
+								{
+									key: t("awdp.stats.finishedAt"),
+									value: overview.finished_at ? (
+										<span className="tnum">
+											{formatDateTime(overview.finished_at, {
+												seconds: true,
+											})}
+										</span>
+									) : (
+										<span className="text-muted-foreground">
+											{t("awdp.stats.notFinished")}
+										</span>
+									),
+								},
+							]}
+						/>
+					</SectionCard>
 
-						<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.2fr)]">
-							<div className="space-y-5">
-								<SectionCard
-									title="我的靶机"
-									description="选择要操作的 GameBox；动作区与实例卡都跟随此选择。"
-								>
-									<AwdpGameboxList
-										gameboxes={gameboxes}
-										selectedId={selected?.id ?? null}
-										onSelect={setSelectedId}
-									/>
-								</SectionCard>
-
-								<AwdpInstancePanel
-									gamebox={selected}
-									instance={instance}
-									isPending={
-										activePhase && Boolean(selectedGameboxId) && instanceQuery.isPending
-									}
-									isError={activePhase && instanceQuery.isError}
-									error={instanceQuery.error}
-									busy={busy}
-									phase={phase}
-									onStart={() => startMutation.mutate()}
-									onStop={() => void askStop()}
-									onReset={() => void askReset()}
-									onRefresh={() => void instanceQuery.refetch()}
+					{/* 1280 下三列会把「实例 / 评测」压到 300px 左右：宽屏才三列，其余两列 + 评测整行。 */}
+					<div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.2fr)]">
+						<div className="space-y-5">
+							<SectionCard
+								title={t("awdp.gameboxes.sectionTitle")}
+								description={t("awdp.gameboxes.sectionDescription")}
+							>
+								<AwdpGameboxList
+									gameboxes={gameboxes}
+									selectedId={selected?.id ?? null}
+									onSelect={setSelectedId}
 								/>
-							</div>
+							</SectionCard>
 
-							<AwdpActionPanel
-								eventId={eventId}
+							<AwdpInstancePanel
 								gamebox={selected}
 								instance={instance}
+								isPending={
+									activePhase && Boolean(selectedGameboxId) && instanceQuery.isPending
+								}
+								isError={activePhase && instanceQuery.isError}
+								error={instanceQuery.error}
+								busy={busy}
 								phase={phase}
-								onChanged={refreshAll}
+								onStart={() => startMutation.mutate()}
+								onStop={() => void askStop()}
+								onReset={() => void askReset()}
+								onRefresh={() => void instanceQuery.refetch()}
 							/>
-
-							<AwdpRoundsEvaluationsPanel eventId={eventId} enabled={hasRun} />
 						</div>
 
-						<SectionCard
-							title="积分与趋势"
-							description="明细矩阵按题目 × 回合展开；趋势为平台缓存 30s 的数据。"
-						>
-							<Tabs defaultValue="scoreboard">
-								<TabsList>
-									<TabsTrigger value="scoreboard">积分榜矩阵</TabsTrigger>
-									<TabsTrigger value="scores">我的积分</TabsTrigger>
-									<TabsTrigger value="trend">趋势</TabsTrigger>
-								</TabsList>
-								<TabsContent value="scoreboard" className="pt-3">
-									<AwdpScoreboardPanel eventId={eventId} />
-								</TabsContent>
-								<TabsContent value="scores" className="pt-3">
-									<AwdpMyScoresPanel eventId={eventId} />
-								</TabsContent>
-								<TabsContent value="trend" className="pt-3">
-									<AwdpTrendPanel eventId={eventId} />
-								</TabsContent>
-							</Tabs>
-						</SectionCard>
+						<AwdpActionPanel
+							// 切换 GameBox 或实例重建后必须重置面板内状态：
+							// 否则 A 靶机的 flag / accepted 结果会显示在 B 靶机下面。
+							key={`${selectedGameboxId}:${instance?.runtime_generation ?? 0}`}
+							eventId={eventId}
+							gamebox={selected}
+							instance={instance}
+							phase={phase}
+							onChanged={refreshAll}
+						/>
+
+						<div className="lg:col-span-2 2xl:col-span-1">
+							<AwdpRoundsEvaluationsPanel eventId={eventId} enabled={hasRun} />
+						</div>
+					</div>
+
+					<SectionCard
+						title={t("awdp.scoreboard.sectionTitle")}
+						description={t("awdp.scoreboard.sectionDescription")}
+					>
+						<Tabs defaultValue="scoreboard">
+							<TabsList>
+								<TabsTrigger value="scoreboard">
+									{t("awdp.scoreboard.tabMatrix")}
+								</TabsTrigger>
+								<TabsTrigger value="scores">
+									{t("awdp.scoreboard.tabScores")}
+								</TabsTrigger>
+								<TabsTrigger value="trend">
+									{t("awdp.scoreboard.tabTrend")}
+								</TabsTrigger>
+							</TabsList>
+							<TabsContent value="scoreboard" className="pt-3">
+								<AwdpScoreboardPanel eventId={eventId} />
+							</TabsContent>
+							<TabsContent value="scores" className="pt-3">
+								<AwdpMyScoresPanel eventId={eventId} />
+							</TabsContent>
+							<TabsContent value="trend" className="pt-3">
+								<AwdpTrendPanel eventId={eventId} />
+							</TabsContent>
+						</Tabs>
+					</SectionCard>
 
 					<div className="flex flex-wrap gap-2">
 						<Button variant="outline" size="sm" asChild>
-							<Link to={`/events/${eventId}`}>返回赛事工作区</Link>
+							<Link to={`/events/${eventId}`}>{t("awdp.page.backToWorkspace")}</Link>
 						</Button>
 					</div>
 				</div>

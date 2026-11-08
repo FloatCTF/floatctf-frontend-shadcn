@@ -6,4 +6,4 @@ export { AdminFrontendsPage } from "./frontends";
 export { AdminLogsPage } from "./logs";
 export { AdminScheduledTasksPage } from "./tasks";
 export { AdminSettingsPage } from "./settings";
-export { AdminSuperAdminsPage } from "./super-admins";
+export { AdminRolesPage } from "./roles";

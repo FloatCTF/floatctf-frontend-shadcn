@@ -16,6 +16,7 @@
  */
 
 import { useState, type ReactNode } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { AlertTriangle, Eraser, Play, ShieldAlert } from "lucide-react";
 
 import type { SqlResult } from "@floatctf/sdk";
@@ -38,7 +39,7 @@ import { EmptyBlock } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
-import { formatInt, truncate } from "~/lib/format";
+import { formatDateTime, formatInt, truncate } from "~/lib/format";
 import { useDocumentTitle } from "~/lib/hooks";
 
 /** 与后端一致：单条语句最大长度 / 超时。 */
@@ -46,11 +47,12 @@ const MAX_SQL_LENGTH = 10_000;
 const SQL_TIMEOUT_SECS = 5;
 /** 写语句必须带的后端确认前缀。 */
 const ADMIN_CONFIRMED_PREFIX = "/* ADMIN_CONFIRMED */";
-/** 执行前必须输入的确认词。 */
+/** 执行前必须输入的确认词（只在 UI 层，不是后端契约）。 */
 const EXECUTE_PHRASE = "EXECUTE";
 
 const READ_ONLY_COMMANDS = new Set(["select", "show", "describe", "explain", "with"]);
 
+/** 常用只读示例：技术性 SQL 原文，不做本地化。 */
 const EXAMPLES = [
 	"SELECT datname FROM pg_database WHERE datistemplate = false;",
 	"SELECT tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema');",
@@ -205,7 +207,8 @@ function cellText(value: unknown): string {
 }
 
 export function AdminSqlPage(): ReactNode {
-	useDocumentTitle("SQL 控制台 · FloatCTF 控制台");
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminInfra.sql.documentTitle"));
 	const client = useClient();
 	const confirm = useConfirm();
 	const [sql, setSql] = useState("");
@@ -220,28 +223,31 @@ export function AdminSqlPage(): ReactNode {
 	async function execute() {
 		const parsed = splitStatements(sql);
 		if (parsed.length === 0) {
-			toast.warning("请输入至少一条 SQL 语句");
+			toast.warning(t("adminInfra.sql.toast.emptyInput"));
 			return;
 		}
 		const tooLong = parsed.filter((statement) => statement.length > MAX_SQL_LENGTH);
 		const writes = parsed.filter((statement) => !isReadOnly(statement));
 
 		const ok = await confirm({
-			title: `执行 ${parsed.length} 条 SQL？`,
+			title: t("adminInfra.sql.confirm.title", { count: parsed.length }),
 			description:
 				writes.length > 0
-					? `其中 ${writes.length} 条为写语句（前端会补上后端要求的 ADMIN_CONFIRMED 前缀）`
-					: "全部为只读查询（select / show / describe / explain / with）",
+					? t("adminInfra.sql.confirm.descriptionWrite", { count: writes.length })
+					: t("adminInfra.sql.confirm.descriptionReadOnly"),
 			consequences: [
-				"语句在平台生产数据库上**真实执行**，无法撤销（写语句会立即提交）",
-				"删除 / 更新表数据会导致选手成绩、赛事配置、账号等不可恢复的损坏",
-				"单条语句超过 5 秒会被后端中断；执行会在审计日志中留下记录（不记录 SQL 正文）",
+				t("adminInfra.sql.confirm.consequenceReal"),
+				t("adminInfra.sql.confirm.consequenceDamage"),
+				t("adminInfra.sql.confirm.consequenceTimeout"),
 				tooLong.length > 0
-					? `${tooLong.length} 条语句超过 ${MAX_SQL_LENGTH} 字符上限，会被后端直接拒绝`
-					: "确认后按顺序逐条执行，任一条失败不会中断后续语句",
+					? t("adminInfra.sql.confirm.consequenceTooLong", {
+							count: tooLong.length,
+							max: formatInt(MAX_SQL_LENGTH),
+						})
+					: t("adminInfra.sql.confirm.consequenceSequential"),
 			],
 			tone: "danger",
-			confirmText: "执行",
+			confirmText: t("adminInfra.sql.confirm.confirm"),
 			confirmPhrase: EXECUTE_PHRASE,
 		});
 		if (!ok) return;
@@ -256,19 +262,22 @@ export function AdminSqlPage(): ReactNode {
 			try {
 				if (statement.length > MAX_SQL_LENGTH) {
 					throw new Error(
-						`语句长度 ${statement.length} 超过后端上限 ${MAX_SQL_LENGTH} 字符，未提交`,
+						t("adminInfra.sql.statement.tooLong", {
+							length: formatInt(statement.length),
+							max: formatInt(MAX_SQL_LENGTH),
+						}),
 					);
 				}
 				const result = await call<SqlResult>(
 					client.admin.database.exec_sql({ sql: submitted }),
-					`第 ${index + 1} 条语句`,
+					t("adminInfra.sql.statement.label", { index: index + 1 }),
 				);
 				collected.push({ sql: submitted, ok: true, result });
 			} catch (error) {
 				collected.push({
 					sql: submitted,
 					ok: false,
-					errorMessage: errorText(error, "执行失败"),
+					errorMessage: errorText(error, t("adminInfra.sql.statement.failed")),
 				});
 			}
 			setOutcomes([...collected]);
@@ -280,21 +289,27 @@ export function AdminSqlPage(): ReactNode {
 		setRunning(false);
 		const failed = collected.filter((item) => !item.ok).length;
 		if (failed === 0) {
-			toast.success(`全部 ${collected.length} 条语句执行完成`);
+			toast.success(t("adminInfra.sql.toast.allDone", { count: collected.length }));
 		} else {
 			toast.error(
-				`${collected.length - failed} 条成功，${failed} 条失败`,
-				"逐条结果与后端错误见下方列表。",
+				t("adminInfra.sql.toast.partial", {
+					success: collected.length - failed,
+					failed,
+				}),
+				t("adminInfra.sql.toast.partialDescription"),
 			);
 		}
 	}
 
+	const writeNote =
+		writeCount > 0 ? t("adminInfra.sql.editor.writeNote", { count: writeCount }) : "";
+
 	return (
 		<PageBody>
 			<PageHeader
-				title="SQL 控制台"
-				description="直接对平台 PostgreSQL 执行语句。仅限 superadmin，且需要 TOML 打开 [features].unsafe_sql_admin。"
-				badge={<TonePill tone="danger">极高危</TonePill>}
+				title={t("adminInfra.sql.title")}
+				description={t("adminInfra.sql.description")}
+				badge={<TonePill tone="danger">{t("adminInfra.sql.badge")}</TonePill>}
 				actions={
 					<Toolbar>
 						<Button
@@ -307,8 +322,8 @@ export function AdminSqlPage(): ReactNode {
 								setExecutedAt(null);
 							}}
 						>
-							<Eraser />
-							清空
+							<Eraser className="size-4" aria-hidden="true" />
+							{t("adminInfra.sql.actions.clear")}
 						</Button>
 						<Button
 							variant="destructive"
@@ -316,46 +331,59 @@ export function AdminSqlPage(): ReactNode {
 							disabled={running || statements.length === 0}
 							onClick={() => void execute()}
 						>
-							<Play />
-							{running && progress ? `执行中 ${progress.done}/${progress.total}` : "执行"}
+							<Play className="size-4" aria-hidden="true" />
+							{running && progress
+								? t("adminInfra.sql.actions.executing", {
+										done: progress.done,
+										total: progress.total,
+									})
+								: t("adminInfra.sql.actions.execute")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
-			<div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm">
-				<ShieldAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
+			<div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
+				<ShieldAlert className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
 				<div className="space-y-1">
-					<p className="font-medium text-destructive">这是生产数据库的直接执行入口</p>
+					<p className="font-medium text-destructive">{t("adminInfra.sql.warning.title")}</p>
 					<p className="text-muted-foreground">
-						写语句不可撤销；执行前需要输入确认词{" "}
-						<span className="font-mono">{EXECUTE_PHRASE}</span>。多语句会在前端按 `;`
-						切分后<strong>逐条</strong>提交（后端禁止单请求多语句）；写语句会自动补上{" "}
-						<span className="font-mono">{ADMIN_CONFIRMED_PREFIX}</span> 前缀。
+						<Trans
+							i18nKey="adminInfra.sql.warning.body"
+							values={{ phrase: EXECUTE_PHRASE, prefix: ADMIN_CONFIRMED_PREFIX }}
+							components={{ mono: <MonoText>{null}</MonoText>, strong: <strong /> }}
+						/>
 					</p>
 				</div>
 			</div>
 
 			<SectionCard
-				title="语句"
-				description={`已识别 ${statements.length} 条语句${writeCount > 0 ? `（其中 ${writeCount} 条为写语句）` : ""}；单条上限 ${MAX_SQL_LENGTH} 字符，超时 ${SQL_TIMEOUT_SECS}s。`}
+				title={t("adminInfra.sql.editor.title")}
+				description={t("adminInfra.sql.editor.description", {
+					count: statements.length,
+					writeNote,
+					max: formatInt(MAX_SQL_LENGTH),
+					timeout: SQL_TIMEOUT_SECS,
+				})}
 			>
 				<div className="space-y-3">
 					<Textarea
 						value={sql}
 						onChange={(event) => setSql(event.target.value)}
-						placeholder="SELECT * FROM users LIMIT 10;"
+						placeholder={t("adminInfra.sql.editor.placeholder")}
 						className="min-h-56 font-mono text-sm"
-						aria-label="SQL 输入"
+						aria-label={t("adminInfra.sql.editor.ariaLabel")}
 					/>
 					<div className="space-y-1">
-						<p className="text-xs text-muted-foreground">常用查询示例（点击填入）</p>
+						<p className="text-xs text-muted-foreground">
+							{t("adminInfra.sql.editor.examples")}
+						</p>
 						<div className="flex flex-col gap-1">
 							{EXAMPLES.map((example) => (
 								<button
 									key={example}
 									type="button"
-									className="rounded border bg-muted/30 px-2 py-1 text-left font-mono text-xs hover:bg-muted"
+									className="rounded-md border bg-muted/30 px-2 py-1 text-left font-mono text-xs break-all whitespace-normal hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 									onClick={() => setSql(example)}
 								>
 									{example}
@@ -367,24 +395,31 @@ export function AdminSqlPage(): ReactNode {
 			</SectionCard>
 
 			<SectionCard
-				title="执行结果"
+				title={t("adminInfra.sql.result.title")}
 				description={
 					executedAt
-						? `最近一次执行：${new Date(executedAt).toLocaleString("zh-CN", { hour12: false })}`
-						: "执行后在此逐条显示结果 / 后端错误。"
+						? t("adminInfra.sql.result.descriptionExecuted", {
+								time: formatDateTime(executedAt, { seconds: true }),
+							})
+						: t("adminInfra.sql.result.descriptionIdle")
 				}
 				actions={
 					running && progress ? (
 						<TonePill tone="info">
-							执行中 {progress.done}/{progress.total}
+							<span className="tnum">
+								{t("adminInfra.sql.result.running", {
+									done: progress.done,
+									total: progress.total,
+								})}
+							</span>
 						</TonePill>
 					) : null
 				}
 			>
 				{outcomes.length === 0 ? (
 					<EmptyBlock
-						title="还没有执行结果"
-						description="输入 SQL 并点击执行；每条语句的结果与错误会分别列出。"
+						title={t("adminInfra.sql.result.emptyTitle")}
+						description={t("adminInfra.sql.result.emptyDescription")}
 					/>
 				) : (
 					<ul className="space-y-3">
@@ -392,24 +427,44 @@ export function AdminSqlPage(): ReactNode {
 							<li key={`${index}-${outcome.sql.slice(0, 24)}`} className="space-y-2 rounded-lg border p-3">
 								<div className="flex flex-wrap items-center gap-2">
 									<TonePill tone={outcome.ok ? "success" : "danger"}>
-										#{index + 1} {outcome.ok ? "成功" : "失败"}
+										<span className="tnum">
+											{t("adminInfra.sql.result.itemLabel", {
+												index: index + 1,
+												status: outcome.ok
+													? t("adminInfra.sql.result.success")
+													: t("adminInfra.sql.result.failure"),
+											})}
+										</span>
 									</TonePill>
 									{outcome.result ? (
 										<>
 											<TonePill tone="muted">{outcome.result.sql_type}</TonePill>
 											<span className="tnum font-mono text-xs text-muted-foreground">
 												{outcome.result.sql_type === "query"
-													? `${formatInt(outcome.result.count)} 行`
-													: `影响 ${formatInt(outcome.result.rows_affected)} 行`}{" "}
-												· {formatInt(Number(outcome.result.elapsed_ms))} ms
+													? t("adminInfra.sql.result.rows", {
+															count: formatInt(outcome.result.count),
+														})
+													: t("adminInfra.sql.result.rowsAffected", {
+															count: formatInt(outcome.result.rows_affected),
+														})}{" "}
+												·{" "}
+												{t("adminInfra.sql.result.elapsed", {
+													ms: formatInt(Number(outcome.result.elapsed_ms)),
+												})}
 											</span>
 										</>
 									) : null}
 								</div>
 								<ReadonlyBlock className="font-mono text-xs">{outcome.sql}</ReadonlyBlock>
 								{outcome.errorMessage ? (
-									<div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
-										<AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+									<div
+										className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2"
+										role="alert"
+									>
+										<AlertTriangle
+											className="mt-0.5 size-4 shrink-0 text-destructive"
+											aria-hidden="true"
+										/>
 										<p className="text-sm break-words text-destructive">
 											{outcome.errorMessage}
 										</p>
@@ -429,13 +484,13 @@ export function AdminSqlPage(): ReactNode {
 
 /** 动态列的查询结果表（列取自第一行；值为 JSON 时序列化展示）。 */
 function ResultTable({ rows }: { rows: Array<Record<string, unknown>> }): ReactNode {
-	const columns: DataTableColumn<Record<string, unknown>>[] = Object.keys(rows[0] ?? {}).map(
-		(key) => ({
-			id: key,
-			header: key,
-			cell: (row) => <MonoText>{truncate(cellText(row[key]), 200)}</MonoText>,
-		}),
-	);
+	const { t } = useTranslation();
+	const keys = Object.keys(rows[0] ?? {});
+	const columns: DataTableColumn<Record<string, unknown>>[] = keys.map((key) => ({
+		id: key,
+		header: key,
+		cell: (row) => <MonoText>{truncate(cellText(row[key]), 200)}</MonoText>,
+	}));
 
 	return (
 		<div className="rounded-md border">
@@ -443,10 +498,24 @@ function ResultTable({ rows }: { rows: Array<Record<string, unknown>> }): ReactN
 				data={rows}
 				getRowId={(_row, index) => String(index)}
 				columns={columns}
-				empty={<span className="text-sm text-muted-foreground">查询没有返回数据行</span>}
+				empty={<span className="text-sm text-muted-foreground">{t("adminInfra.sql.result.resultEmpty")}</span>}
+				mobileCard={(row) => (
+					<dl className="space-y-1">
+						{keys.map((key) => (
+							<div key={key} className="flex items-baseline justify-between gap-2">
+								<dt className="min-w-0 shrink-0 font-mono text-xs text-muted-foreground">
+									{key}
+								</dt>
+								<dd className="min-w-0 text-right break-all">
+									<MonoText>{truncate(cellText(row[key]), 200)}</MonoText>
+								</dd>
+							</div>
+						))}
+					</dl>
+				)}
 			/>
-			<p className="border-t px-3 py-2 text-xs text-muted-foreground">
-				共 {formatInt(rows.length)} 行
+			<p className="tnum border-t px-3 py-2 text-xs text-muted-foreground">
+				{t("adminInfra.sql.result.resultCount", { count: formatInt(rows.length) })}
 			</p>
 		</div>
 	);

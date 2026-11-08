@@ -6,6 +6,8 @@
  * 两个已核实的后端语义（CONVENTIONS §6.11 / §6.12）：
  * - `getStatus` 在赛事尚未开通 AWD 时返回 `data = null`（不是错误）→ 用 `callMaybe`；
  * - `getEventNetwork` 在**未分配**时返回 404（reject）→ 映射成「未分配」而不是加载失败。
+ *
+ * 文案全部走 `adminAwdOps.*`；这里的 `call(...)` 动作名同样使用 i18n。
  */
 
 import type {
@@ -17,6 +19,7 @@ import type {
 } from "@floatctf/sdk";
 import type { Events } from "@floatctf/sdk/entity";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { call, callList, callMaybe } from "~/api/call";
 import { useClient } from "~/api/client";
@@ -28,26 +31,34 @@ export const AWD_LIST_LIMIT = 100;
 
 /** 赛事本体（标题 / 赛制 / 时间窗）—— 只用公共 SDK 读，不依赖赛事管理 feature。 */
 export function useAwdEvent(eventId: string) {
+	const { t } = useTranslation();
 	const client = useClient();
 	return useQuery({
 		queryKey: qk.admin.event(eventId),
-		queryFn: () => call<Events>(client.admin.events.get(eventId), "赛事详情"),
+		queryFn: () =>
+			call<Events>(client.admin.events.get(eventId), t("adminAwdOps.actionNames.event")),
 		enabled: eventId !== "",
 	});
 }
 
 /** AWD 赛事状态；`null` = 该赛事尚未开通 AWD（不是错误）。 */
 export function useAwdStatus(eventId: string) {
+	const { t } = useTranslation();
 	const client = useClient();
 	return useQuery({
 		queryKey: qk.awd.adminStatus(eventId),
-		queryFn: () => callMaybe<AwdEventStatus>(client.awd.admin.getStatus(eventId), "AWD 赛事状态"),
+		queryFn: () =>
+			callMaybe<AwdEventStatus>(
+				client.awd.admin.getStatus(eventId),
+				t("adminAwdOps.actionNames.status"),
+			),
 		enabled: eventId !== "",
 	});
 }
 
 /** 赛事网络；`null` = 尚未分配（后端 404）。 */
 export function useAwdEventNetwork(eventId: string) {
+	const { t } = useTranslation();
 	const client = useClient();
 	return useQuery({
 		queryKey: qk.awd.eventNetwork(eventId),
@@ -55,7 +66,7 @@ export function useAwdEventNetwork(eventId: string) {
 			try {
 				return await callMaybe<EventNetworkInfo>(
 					client.awd.admin.getEventNetwork(eventId),
-					"赛事网络",
+					t("adminAwdOps.actionNames.eventNetwork"),
 				);
 			} catch (error) {
 				// 未分配时后端 404：这是「未分配」业务状态，不是加载失败。
@@ -69,11 +80,16 @@ export function useAwdEventNetwork(eventId: string) {
 
 /** 参赛战队（封禁状态来自 `event_teams.banned`，与 AWD 封禁服务同源）。 */
 export function useAwdTeams(eventId: string) {
+	const { t } = useTranslation();
 	const client = useClient();
 	return useQuery({
 		queryKey: qk.admin.eventTeams(eventId),
 		// 柯里化方法：getTeams(eventId) 返回的才是请求函数（第二层无参数）。
-		queryFn: () => call<TeamResult[]>(client.admin.event_teams.getTeams(eventId)(), "战队列表"),
+		queryFn: () =>
+			call<TeamResult[]>(
+				client.admin.event_teams.getTeams(eventId)(),
+				t("adminAwdOps.actionNames.eventTeams"),
+			),
 		enabled: eventId !== "",
 	});
 }

@@ -5,6 +5,7 @@
  */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { AlertTriangle, Inbox, Loader2, Lock, RefreshCw, SearchX, WifiOff } from "lucide-react";
 
 import { Badge } from "~/components/ui/badge";
@@ -57,6 +58,7 @@ export function QueryState<T>({
 	errorTitle,
 	children,
 }: QueryStateProps<T>): ReactNode {
+	const { t } = useTranslation();
 	if (query.isPending) return <>{skeleton ?? <LoadingBlock />}</>;
 	if (query.isError) {
 		return <ErrorBlock error={query.error} title={errorTitle} onRetry={() => query.refetch()} />;
@@ -66,16 +68,17 @@ export function QueryState<T>({
 		if (empty !== undefined) {
 			return <>{typeof empty === "function" ? empty(data) : empty}</>;
 		}
-		return <EmptyBlock title="暂无数据" description="后端未返回内容。" />;
+		return <EmptyBlock title={t("common.table.emptyTitle")} description={t("common.table.emptyDescription")} />;
 	}
 	if (isEmpty?.(data)) {
-		if (empty === undefined) return <EmptyBlock title="暂无数据" />;
+		if (empty === undefined) return <EmptyBlock title={t("common.table.emptyTitle")} />;
 		return <>{typeof empty === "function" ? empty(data) : empty}</>;
 	}
 	return <>{children(data)}</>;
 }
 
-export function LoadingBlock({ label = "加载中…", className }: { label?: string; className?: string }) {
+export function LoadingBlock({ label, className }: { label?: string; className?: string }) {
+	const { t } = useTranslation();
 	return (
 		<div
 			className={cn(
@@ -86,7 +89,7 @@ export function LoadingBlock({ label = "加载中…", className }: { label?: st
 			aria-live="polite"
 		>
 			<Loader2 className="size-5 animate-spin" />
-			<span className="text-sm">{label}</span>
+			<span className="text-sm">{label ?? t("common.loading")}</span>
 		</div>
 	);
 }
@@ -118,6 +121,7 @@ export interface ErrorBlockProps {
 
 /** 错误块：可见、具体、可重试；网络 / 403 / 404 有专门语义。 */
 export function ErrorBlock({ error, title, onRetry, className }: ErrorBlockProps) {
+	const { t } = useTranslation();
 	const detail = errorDetail(error);
 	const network = isNetworkError(error);
 	const forbidden = isForbidden(error);
@@ -125,12 +129,12 @@ export function ErrorBlock({ error, title, onRetry, className }: ErrorBlockProps
 	const heading =
 		title ??
 		(network
-			? "网络连接失败"
+			? t("errors.network")
 			: forbidden
-				? "没有访问权限"
+				? t("errors.forbidden")
 				: notFound
-					? "资源不存在"
-					: "加载失败");
+					? t("errors.notFound")
+					: t("errors.generic"));
 
 	return (
 		<div
@@ -153,7 +157,7 @@ export function ErrorBlock({ error, title, onRetry, className }: ErrorBlockProps
 			</div>
 			{detail ? (
 				<details className="max-w-xl text-left">
-					<summary className="cursor-pointer text-xs text-muted-foreground">技术细节</summary>
+					<summary className="cursor-pointer text-xs text-muted-foreground">{t("errors.technicalDetails")}</summary>
 					<pre className="mt-2 overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs">
 						{detail}
 					</pre>
@@ -161,8 +165,8 @@ export function ErrorBlock({ error, title, onRetry, className }: ErrorBlockProps
 			) : null}
 			{onRetry ? (
 				<Button variant="outline" size="sm" onClick={onRetry}>
-					<RefreshCw className="size-4" />
-					重试
+					<RefreshCw className="size-4" aria-hidden="true" />
+					{t("common.retry")}
 				</Button>
 			) : null}
 		</div>
@@ -197,16 +201,20 @@ export function EmptyBlock({
 	className,
 	variant = "empty",
 }: EmptyBlockProps) {
-	const fallbackTitle = variant === "filtered" ? "没有匹配的结果" : "暂无数据";
+	const { t } = useTranslation();
+	const fallbackTitle =
+		variant === "filtered" ? t("common.table.emptyFilteredTitle") : t("common.table.emptyTitle");
 	const Media = variant === "filtered" ? SearchX : Inbox;
 	return (
 		<Empty className={cn("border border-dashed py-10", className)}>
 			<EmptyHeader>
-				<EmptyMedia variant="icon">{icon ?? <Media className="size-5" />}</EmptyMedia>
+				<EmptyMedia variant="icon">{icon ?? <Media className="size-6" />}</EmptyMedia>
 				<EmptyTitle>{title ?? fallbackTitle}</EmptyTitle>
 				<EmptyDescription>
 					{description ??
-						(variant === "filtered" ? "试试调整搜索或筛选条件。" : "这里还没有内容。")}
+						(variant === "filtered"
+							? t("common.table.emptyFilteredDescription")
+							: t("common.table.emptyDescription"))}
 				</EmptyDescription>
 				{action ? <EmptyContent>{action}</EmptyContent> : null}
 			</EmptyHeader>
@@ -215,15 +223,16 @@ export function EmptyBlock({
 }
 
 export function PermissionDeniedBlock({ description }: { description?: string }) {
+	const { t } = useTranslation();
 	return (
 		<Empty className="border border-dashed py-10">
 			<EmptyHeader>
 				<EmptyMedia variant="icon">
-					<Lock className="size-5" />
+					<Lock className="size-6" />
 				</EmptyMedia>
-				<EmptyTitle>权限不足</EmptyTitle>
+				<EmptyTitle>{t("common.states.forbiddenTitle")}</EmptyTitle>
 				<EmptyDescription>
-					{description ?? "当前账号没有访问该资源的权限，请联系赛事管理员。"}
+					{description ?? t("common.states.forbiddenDescription")}
 				</EmptyDescription>
 			</EmptyHeader>
 		</Empty>
@@ -231,22 +240,23 @@ export function PermissionDeniedBlock({ description }: { description?: string })
 }
 
 export function NotFoundBlock({
-	title = "页面不存在",
-	description = "地址可能已变更，或该资源已被删除。",
+	title,
+	description,
 	action,
 }: {
 	title?: string;
 	description?: string;
 	action?: ReactNode;
 }) {
+	const { t } = useTranslation();
 	return (
 		<Empty className="border border-dashed py-14">
 			<EmptyHeader>
 				<EmptyMedia variant="icon">
-					<SearchX className="size-5" />
+					<SearchX className="size-6" />
 				</EmptyMedia>
-				<EmptyTitle>{title}</EmptyTitle>
-				<EmptyDescription>{description}</EmptyDescription>
+				<EmptyTitle>{title ?? t("common.states.notFoundTitle")}</EmptyTitle>
+				<EmptyDescription>{description ?? t("common.states.notFoundDescription")}</EmptyDescription>
 				{action ? <EmptyContent>{action}</EmptyContent> : null}
 			</EmptyHeader>
 		</Empty>
@@ -255,11 +265,12 @@ export function NotFoundBlock({
 
 /** 后台刷新指示（列表已加载、正在 refetch）。 */
 export function RefreshingBadge({ active }: { active: boolean }) {
+	const { t } = useTranslation();
 	if (!active) return null;
 	return (
 		<Badge variant="outline" className="gap-1 text-muted-foreground">
 			<Loader2 className="size-3 animate-spin" />
-			刷新中
+			{t("common.refreshing")}
 		</Badge>
 	);
 }

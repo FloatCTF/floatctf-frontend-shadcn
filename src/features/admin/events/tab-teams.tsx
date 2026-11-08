@@ -3,13 +3,16 @@
  *
  * `getTeams(eventId)` 是**柯里化且第二层无参数**：`client.admin.event_teams.getTeams(eventId)()`。
  * 该接口不接受 `page`/`limit`（一次返回全量 + `meta.total`），因此这里做客户端分页。
+ *
+ * 文案全部走 `adminEvents.teams` 命名空间。
  */
 
 import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, MoreHorizontal, ShieldCheck, Trash2, Users } from "lucide-react";
 
-import { call, callList } from "~/api/call";
+import { call, callList, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { BooleanPill, TonePill } from "~/components/app/badges";
@@ -38,8 +41,9 @@ function memberLabel(member: TeamMemberResult): string {
 }
 
 function MemberList({ members }: { members: TeamMemberResult[] }): ReactNode {
+	const { t } = useTranslation();
 	if (members.length === 0) {
-		return <span className="text-xs text-muted-foreground">无成员</span>;
+		return <span className="text-xs text-muted-foreground">{t("adminEvents.teams.member.empty")}</span>;
 	}
 	return (
 		<ul className="space-y-1">
@@ -47,7 +51,9 @@ function MemberList({ members }: { members: TeamMemberResult[] }): ReactNode {
 				<li key={member.username} className="flex flex-wrap items-center gap-2 text-xs">
 					<span className="font-medium">{memberLabel(member)}</span>
 					<TonePill tone={member.role === EventTeamMemberRole.Captain ? "info" : "muted"}>
-						{member.role === EventTeamMemberRole.Captain ? "队长" : "成员"}
+						{member.role === EventTeamMemberRole.Captain
+							? t("adminEvents.teams.member.captain")
+							: t("adminEvents.teams.member.member")}
 					</TonePill>
 					<MonoText>{member.points.toFixed(2)}</MonoText>
 				</li>
@@ -63,6 +69,7 @@ export function EventTeamsTab({
 	eventId: string;
 	participantMode: string;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -90,60 +97,63 @@ export function EventTeamsTab({
 	const ban = useMutation({
 		mutationFn: async (teamIds: string[]) => {
 			for (const teamId of teamIds) {
-				await call(
+				await callVoid(
 					client.admin.event_teams.banned({ event_id: eventId, team_id: teamId }),
-					"封禁战队",
+					t("adminEvents.actions.banTeam"),
 				);
 			}
 		},
 		onSuccess: (_result, teamIds) => {
-			toast.success(`已封禁 ${teamIds.length} 支战队`);
+			toast.success(t("adminEvents.teams.toast.banSuccess", { count: teamIds.length }));
 			setSelectedIds([]);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("封禁战队失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.teams.toast.banFailed"), error),
 	});
 
 	const unban = useMutation({
 		mutationFn: async (teamIds: string[]) => {
 			for (const teamId of teamIds) {
-				await call(
+				await callVoid(
 					client.admin.event_teams.unbanned({ event_id: eventId, team_id: teamId }),
-					"解除封禁",
+					t("adminEvents.actions.unbanTeam"),
 				);
 			}
 		},
 		onSuccess: (_result, teamIds) => {
-			toast.success(`已解除 ${teamIds.length} 支战队的封禁`);
+			toast.success(t("adminEvents.teams.toast.unbanSuccess", { count: teamIds.length }));
 			setSelectedIds([]);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("解除封禁失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.teams.toast.unbanFailed"), error),
 	});
 
 	const remove = useMutation({
 		mutationFn: (ids: string[]) =>
-			call<number>(client.admin.event_teams.remove(eventId)(ids), "删除战队"),
+			call<number>(
+				client.admin.event_teams.remove(eventId)(ids),
+				t("adminEvents.actions.deleteTeam"),
+			),
 		onSuccess: (count) => {
-			toast.success(`已删除 ${count} 支战队`);
+			toast.success(t("adminEvents.teams.toast.removeSuccess", { count }));
 			setSelectedIds([]);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("删除战队失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.teams.toast.removeFailed"), error),
 	});
 
 	async function confirmBan(row: TeamResult) {
 		const ok = await confirm({
-			title: `封禁战队「${row.team.name}」？`,
-			description: "封禁在本赛事范围内生效。",
+			title: t("adminEvents.teams.confirmBan.title", { name: row.team.name }),
+			description: t("adminEvents.teams.confirmBan.description"),
 			consequences: [
-				"该战队成员在本赛事提交 flag 会被后端拒绝（Team is banned from this event）",
-				"该战队从赛事积分榜中移除（后端按 event_teams.banned = false 过滤）",
-				"AWD 赛事：该战队的 WireGuard / GameBox 网络会被防火墙规则阻断",
-				"战队、成员与解题记录不会被删除；可随时「解除封禁」恢复",
+				t("adminEvents.teams.confirmBan.consequence1"),
+				t("adminEvents.teams.confirmBan.consequence2"),
+				t("adminEvents.teams.confirmBan.consequence3"),
+				t("adminEvents.teams.confirmBan.consequence4"),
 			],
 			tone: "danger",
-			confirmText: "封禁",
+			confirmText: t("adminEvents.teams.confirmBan.confirm"),
 			confirmPhrase: row.team.name,
 		});
 		if (!ok) return;
@@ -154,17 +164,19 @@ export function EventTeamsTab({
 		if (rows.length === 0) return;
 		const single = rows.length === 1 ? rows[0] : null;
 		const ok = await confirm({
-			title: single ? `删除战队「${single.team.name}」？` : `删除所选 ${rows.length} 支战队？`,
-			description: "删除战队会同时清理其成员的赛事参赛记录。",
+			title: single
+				? t("adminEvents.teams.confirmRemove.singleTitle", { name: single.team.name })
+				: t("adminEvents.teams.confirmRemove.bulkTitle", { count: rows.length }),
+			description: t("adminEvents.teams.confirmRemove.description"),
 			consequences: [
-				"战队行与战队成员名册（event_team_members）被删除",
-				"战队成员在本赛事的参赛记录（event_users）一并移除，积分榜不再显示",
-				"该战队的解题记录随 team_id 外键级联删除，成绩不可恢复",
-				"如为 AWD 赛事，请确认该战队运行时已无需保留",
+				t("adminEvents.teams.confirmRemove.consequence1"),
+				t("adminEvents.teams.confirmRemove.consequence2"),
+				t("adminEvents.teams.confirmRemove.consequence3"),
+				t("adminEvents.teams.confirmRemove.consequence4"),
 			],
 			tone: "danger",
-			confirmText: "删除战队",
-			confirmPhrase: single ? single.team.name : "delete",
+			confirmText: t("adminEvents.teams.confirmRemove.confirm"),
+			confirmPhrase: single ? single.team.name : t("adminEvents.teams.confirmRemove.phraseBulk"),
 		});
 		if (!ok) return;
 		remove.mutate(rows.map((row) => row.team.id));
@@ -173,12 +185,12 @@ export function EventTeamsTab({
 	const columns: DataTableColumn<TeamResult>[] = [
 		{
 			id: "name",
-			header: "战队",
+			header: t("adminEvents.teams.columns.team"),
 			cell: (row) => (
 				<div className="min-w-0">
 					<span className="font-medium">{row.team.name}</span>
 					{row.team.description ? (
-						<p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{row.team.description}</p>
+						<p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{row.team.description}</p>
 					) : null}
 				</div>
 			),
@@ -186,7 +198,7 @@ export function EventTeamsTab({
 		},
 		{
 			id: "captain",
-			header: "队长",
+			header: t("adminEvents.teams.columns.captain"),
 			cell: (row) =>
 				row.captain ? <MonoText>{row.captain}</MonoText> : <span className="text-xs">—</span>,
 			sortValue: (row) => row.captain,
@@ -194,24 +206,24 @@ export function EventTeamsTab({
 		},
 		{
 			id: "members",
-			header: "成员",
+			header: t("adminEvents.teams.columns.members"),
 			cell: (row) => <MemberList members={row.members} />,
 		},
 		{
 			id: "points",
-			header: "积分",
+			header: t("adminEvents.teams.columns.points"),
 			align: "right",
 			cell: (row) => <MonoText>{row.team.points.toFixed(2)}</MonoText>,
 			sortValue: (row) => row.team.points,
 		},
 		{
 			id: "banned",
-			header: "状态",
+			header: t("adminEvents.teams.columns.status"),
 			cell: (row) => (
 				<BooleanPill
 					value={row.team.banned}
-					trueText="已封禁"
-					falseText="正常"
+					trueText={t("adminEvents.teams.values.banned")}
+					falseText={t("adminEvents.teams.values.normal")}
 					trueTone="danger"
 					falseTone="success"
 				/>
@@ -220,71 +232,88 @@ export function EventTeamsTab({
 		},
 		{
 			id: "created_at",
-			header: "创建时间",
-			cell: (row) => <MonoText>{formatDateTime(row.team.created_at, { seconds: true })}</MonoText>,
+			header: t("adminEvents.teams.columns.createdAt"),
+			cell: (row) => <MonoText className="whitespace-nowrap">
+				{formatDateTime(row.team.created_at, { seconds: true })}
+			</MonoText>,
 			sortValue: (row) => row.team.created_at,
 			hideBelow: "lg",
 		},
 	];
 
-	const rowActions = (row: TeamResult): ReactNode => (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" size="icon-sm" aria-label={`${row.team.name} 的操作`}>
-					<MoreHorizontal />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end">
-				<DropdownMenuLabel className="max-w-56 truncate">{row.team.name}</DropdownMenuLabel>
-				{row.team.banned ? (
-					<DropdownMenuItem onSelect={() => unban.mutate([row.team.id])}>
-						<ShieldCheck /> 解除封禁
+	const rowActions = (row: TeamResult): ReactNode => {
+		const actionsLabel = t("adminEvents.teams.row.actions", { name: row.team.name });
+		return (
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button variant="ghost" size="icon-sm" aria-label={actionsLabel} title={actionsLabel}>
+						<MoreHorizontal />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuLabel className="max-w-56 truncate">{row.team.name}</DropdownMenuLabel>
+					{row.team.banned ? (
+						<DropdownMenuItem onSelect={() => unban.mutate([row.team.id])}>
+							<ShieldCheck /> {t("adminEvents.teams.row.unban")}
+						</DropdownMenuItem>
+					) : (
+						<DropdownMenuItem variant="destructive" onSelect={() => void confirmBan(row)}>
+							<Ban /> {t("adminEvents.teams.row.ban")}
+						</DropdownMenuItem>
+					)}
+					<DropdownMenuSeparator />
+					<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove([row])}>
+						<Trash2 /> {t("adminEvents.teams.row.remove")}
 					</DropdownMenuItem>
-				) : (
-					<DropdownMenuItem variant="destructive" onSelect={() => void confirmBan(row)}>
-						<Ban /> 封禁战队
-					</DropdownMenuItem>
-				)}
-				<DropdownMenuSeparator />
-				<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove([row])}>
-					<Trash2 /> 删除战队
-				</DropdownMenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
+				</DropdownMenuContent>
+			</DropdownMenu>
+		);
+	};
 
 	const mobileCard = (row: TeamResult): ReactNode => (
-		<MobileFacts
-			items={[
-				{ k: "战队", v: <span className="font-medium">{row.team.name}</span> },
-				{ k: "队长", v: row.captain ? <MonoText>{row.captain}</MonoText> : "—" },
-				{ k: "成员", v: <MemberList members={row.members} /> },
-				{ k: "积分", v: <MonoText>{row.team.points.toFixed(2)}</MonoText> },
-				{
-					k: "状态",
-					v: (
-						<BooleanPill
-							value={row.team.banned}
-							trueText="已封禁"
-							falseText="正常"
-							trueTone="danger"
-							falseTone="success"
-						/>
-					),
-				},
-			]}
-		/>
+		<div className="space-y-2">
+			<MobileFacts
+				items={[
+					{
+						k: t("adminEvents.teams.mobile.team"),
+						v: <span className="font-medium">{row.team.name}</span>,
+					},
+					{
+						k: t("adminEvents.teams.mobile.captain"),
+						v: row.captain ? <MonoText>{row.captain}</MonoText> : "—",
+					},
+					{ k: t("adminEvents.teams.mobile.members"), v: <MemberList members={row.members} /> },
+					{
+						k: t("adminEvents.teams.mobile.points"),
+						v: <MonoText>{row.team.points.toFixed(2)}</MonoText>,
+					},
+					{
+						k: t("adminEvents.teams.mobile.status"),
+						v: (
+							<BooleanPill
+								value={row.team.banned}
+								trueText={t("adminEvents.teams.values.banned")}
+								falseText={t("adminEvents.teams.values.normal")}
+								trueTone="danger"
+								falseTone="success"
+							/>
+						),
+					},
+				]}
+			/>
+			<div className="flex justify-end">{rowActions(row)}</div>
+		</div>
 	);
 
 	const selectedRows = (query.data?.items ?? []).filter((item) => selectedIds.includes(item.team.id));
 
 	return (
 		<SectionCard
-			title="赛事战队"
+			title={t("adminEvents.teams.title")}
 			description={
 				participantMode === "team"
-					? "本赛事为战队赛；封禁按战队生效，成员名单来自后端的 event_team_members。"
-					: "本赛事为个人赛（participant_mode=individual），通常没有战队数据。"
+					? t("adminEvents.teams.descriptionTeam")
+					: t("adminEvents.teams.descriptionIndividual")
 			}
 			actions={
 				<Toolbar>
@@ -295,7 +324,7 @@ export function EventTeamsTab({
 								size="sm"
 								onClick={() => unban.mutate(selectedRows.map((row) => row.team.id))}
 							>
-								<ShieldCheck /> 解除封禁
+								<ShieldCheck /> {t("adminEvents.teams.toolbar.unban")}
 							</Button>
 							<Button
 								variant="destructive"
@@ -303,30 +332,32 @@ export function EventTeamsTab({
 								onClick={() => {
 									void (async () => {
 										const ok = await confirm({
-											title: `封禁所选 ${selectedRows.length} 支战队？`,
-											description: "封禁在本赛事范围内生效。",
+											title: t("adminEvents.teams.confirmBulkBan.title", {
+												count: selectedRows.length,
+											}),
+											description: t("adminEvents.teams.confirmBulkBan.description"),
 											consequences: [
-												"这些战队成员在本赛事提交 flag 会被后端拒绝",
-												"这些战队会从赛事积分榜中移除",
-												"战队与解题记录保留，可随时解除封禁",
+												t("adminEvents.teams.confirmBulkBan.consequence1"),
+												t("adminEvents.teams.confirmBulkBan.consequence2"),
+												t("adminEvents.teams.confirmBulkBan.consequence3"),
 											],
 											tone: "danger",
-											confirmText: "全部封禁",
-											confirmPhrase: "ban",
+											confirmText: t("adminEvents.teams.confirmBulkBan.confirm"),
+											confirmPhrase: t("adminEvents.teams.confirmBulkBan.phrase"),
 										});
 										if (!ok) return;
 										ban.mutate(selectedRows.map((row) => row.team.id));
 									})();
 								}}
 							>
-								<Ban /> 封禁所选
+								<Ban /> {t("adminEvents.teams.toolbar.banSelected")}
 							</Button>
 							<Button
 								variant="destructive"
 								size="sm"
 								onClick={() => void confirmRemove(selectedRows)}
 							>
-								<Trash2 /> 删除所选
+								<Trash2 /> {t("adminEvents.teams.toolbar.removeSelected")}
 							</Button>
 						</>
 					) : null}
@@ -350,16 +381,20 @@ export function EventTeamsTab({
 				selectedIds={selectedIds}
 				onSelectionChange={setSelectedIds}
 				mobileCard={mobileCard}
-				errorTitle="加载赛事战队失败"
+				errorTitle={t("adminEvents.teams.loadError")}
 				empty={
 					<EmptyBlock
-						title={participantMode === "team" ? "还没有战队" : "个人赛没有战队"}
+						title={
+							participantMode === "team"
+								? t("adminEvents.teams.empty.teamTitle")
+								: t("adminEvents.teams.empty.individualTitle")
+						}
 						description={
 							participantMode === "team"
-								? "战队由选手端创建 / 平台分配，管理端只能查看、封禁或删除。"
-								: "本赛事 participant_mode=individual，后端不会返回战队数据。"
+								? t("adminEvents.teams.empty.teamDescription")
+								: t("adminEvents.teams.empty.individualDescription")
 						}
-						icon={<Users className="size-5" />}
+						icon={<Users className="size-6" />}
 					/>
 				}
 			/>

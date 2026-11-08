@@ -58,9 +58,14 @@ function createQueryClient(): QueryClient {
 				staleTime: 15_000,
 				gcTime: 5 * 60_000,
 				retry: (failureCount, error) => {
-					const status = (error as { httpStatus?: number }).httpStatus;
-					if (status === 401 || status === 403 || status === 404) return false;
-					return failureCount < 2;
+					// 业务错误（信封 code≠0）与 4xx 重试没有意义：只会让「加载中」多转几秒。
+					const { httpStatus, kind } = error as { httpStatus?: number; kind?: string };
+					// 只对「网络抖动」与 5xx / 429 重试；业务错误、契约错误、4xx 立刻展示。
+					if (kind === "network") return failureCount < 2;
+					if (httpStatus === 429 || (httpStatus !== undefined && httpStatus >= 500)) {
+						return failureCount < 2;
+					}
+					return false;
 				},
 				refetchOnWindowFocus: false,
 			},

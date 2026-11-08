@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import i18n from "~/lib/i18n";
 import { formatRelative } from "~/lib/format";
 import { useNow } from "~/lib/hooks";
 import { cn } from "~/lib/utils";
@@ -21,11 +22,13 @@ export function UserAvatar({
 	size?: "sm" | "default" | "lg";
 	className?: string;
 }) {
-	const initials = name.trim().slice(0, 2).toUpperCase() || "?";
+	// 契约漂移（例如 DTO 字段改名）不应把整页打崩：缺名字时退化为占位符。
+	const safeName = (name ?? "").trim();
+	const initials = safeName.slice(0, 2).toUpperCase() || "?";
 	const sizeClass = size === "sm" ? "size-6" : size === "lg" ? "size-10" : "size-8";
 	return (
 		<Avatar className={cn(sizeClass, className)}>
-			{avatar ? <AvatarImage src={avatar} alt={name} /> : null}
+			{avatar ? <AvatarImage src={avatar} alt={safeName} /> : null}
 			<AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
 		</Avatar>
 	);
@@ -77,8 +80,12 @@ export function AbsoluteTime({
 	className?: string;
 	seconds?: boolean;
 }): ReactNode {
+	const parsed = value ? new Date(value) : null;
+	// 未知时间（缺失 / 非法 / epoch 0）不把 1970 放进 tooltip。
+	const unknown =
+		parsed === null || Number.isNaN(parsed.getTime()) || parsed.getTime() === 0;
 	return (
-		<span className={cn("tnum text-xs", className)} title={value ?? undefined}>
+		<span className={cn("tnum text-xs", className)} title={unknown ? undefined : value ?? undefined}>
 			{value ? formatDateTimeLocal(value, seconds) : "—"}
 		</span>
 	);
@@ -87,7 +94,9 @@ export function AbsoluteTime({
 function formatDateTimeLocal(value: string, seconds: boolean): string {
 	const date = new Date(value);
 	if (Number.isNaN(date.getTime())) return value;
-	return date.toLocaleString("zh-CN", {
+	// 开发注册表 / 早期待迁移数据用 0 表示「未知」；渲染成 1970 会让人误以为真实安装时间。
+	if (date.getTime() === 0) return "—";
+	return date.toLocaleString(i18n.language === "en" ? "en-US" : "zh-CN", {
 		year: "numeric",
 		month: "2-digit",
 		day: "2-digit",

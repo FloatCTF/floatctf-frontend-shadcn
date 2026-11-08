@@ -6,6 +6,9 @@
 
 ## 结论
 
+- 全部页面已按 [`docs/theme.md`](../../docs/theme.md) 完成 UI 重做（中性黑白控制台、亮色默认、
+  语义色无独立令牌），且**所有用户可见文案走 i18n（中英双语）**；一致性由
+  `pnpm i18n:check` 与 `pnpm theme:audit` 守护。
 - `required`：**89/89 覆盖**（complete 范围）
 - `optional`：30 行，除个别平台侧只读信息外均已实现
 - `specialized`：8 行，Docker / SQL / 终端 / 平台网络 / 前端选择器均已实现
@@ -103,7 +106,7 @@
 | 管理端：总览与内容 · Admin | 全局公告 CRUD | optional | `src/features/admin/core/*` | 真实聚合统计 / 用户 / 题库（导入·扫描·校验·构建）/ 题集 / GameBox 库 / 平台网络 |
 | 管理端：总览与内容 · Admin | 讨论管理（列表 / 删除 / 评论删除） | optional | `src/features/admin/core/*` | 真实聚合统计 / 用户 / 题库（导入·扫描·校验·构建）/ 题集 / GameBox 库 / 平台网络 |
 | 管理端：总览与内容 · Admin | 武器库管理 CRUD + 文件上传 | optional | `src/features/admin/core/*` | 真实聚合统计 / 用户 / 题库（导入·扫描·校验·构建）/ 题集 / GameBox 库 / 平台网络 |
-| 管理端：总览与内容 · Admin | 超管账号 CRUD | optional | `src/features/admin/core/*` | 真实聚合统计 / 用户 / 题库（导入·扫描·校验·构建）/ 题集 / GameBox 库 / 平台网络 |
+| 管理端：总览与内容 · Admin | 角色与权限治理（RBAC） | optional | `src/features/admin/core/*` | 真实聚合统计 / 用户 / 题库（导入·扫描·校验·构建）/ 题集 / GameBox 库 / 平台网络 |
 | 管理端：总览与内容 · Admin | 操作日志查询 | optional | `src/features/admin/core/*` | 真实聚合统计 / 用户 / 题库（导入·扫描·校验·构建）/ 题集 / GameBox 库 / 平台网络 |
 | 管理端：总览与内容 · Admin | 动态设置 CRUD（含受保护键 `FRONTEND_ACTIVE`） | required | `src/features/admin/core/*` | 真实聚合统计 / 用户 / 题库（导入·扫描·校验·构建）/ 题集 / GameBox 库 / 平台网络 |
 | 管理端：赛事管理 · Admin Events | 赛事列表 / 创建 / 编辑 / 删除 | required | `src/features/admin/events/*` | 真实赛事列表与创建、控制台各标签（配置/题目/成员/战队/公告/实例/日志/writeup/数据） |
@@ -134,13 +137,13 @@
 | 管理端：AWDP 运维 · Admin AWDP | 积分榜 | required | `src/features/admin/awdp-ops/*`（`/admin/events/:id/awdp`） | 真实 AWDP 配置/生命周期/挂载/实例/积分榜/大屏 |
 | 管理端：AWDP 运维 · Admin AWDP | 数据大屏 | optional | `src/features/admin/awdp-ops/*`（`/admin/events/:id/awdp`） | 真实 AWDP 配置/生命周期/挂载/实例/积分榜/大屏 |
 | 管理端：基础设施、系统与平台设置 · Admin Infra | Docker 容器管理（列表 / 启动 / 停止 / 删除） | specialized | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | `/admin/infra/docker`（容器 / 镜像 / 网络三块） |
-| 管理端：基础设施、系统与平台设置 · Admin Infra | Docker 镜像管理（列表 / 删除） | specialized | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | 设置（含 FRONTEND_ACTIVE）/前端选择器（逃生舱）/日志/计划任务/超管/公告/讨论/武器库/Docker/SQL/终端/版本 |
-| 管理端：基础设施、系统与平台设置 · Admin Infra | Docker 网络管理（列表 / 创建 / 删除） | specialized | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | 设置（含 FRONTEND_ACTIVE）/前端选择器（逃生舱）/日志/计划任务/超管/公告/讨论/武器库/Docker/SQL/终端/版本 |
+| 管理端：基础设施、系统与平台设置 · Admin Infra | Docker 镜像管理（列表 / 删除） | specialized | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | 设置（含 FRONTEND_ACTIVE）/前端选择器（逃生舱）/日志/计划任务/角色/公告/讨论/武器库/Docker/SQL/终端/版本 |
+| 管理端：基础设施、系统与平台设置 · Admin Infra | Docker 网络管理（列表 / 创建 / 删除） | specialized | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | 设置（含 FRONTEND_ACTIVE）/前端选择器（逃生舱）/日志/计划任务/角色/公告/讨论/武器库/Docker/SQL/终端/版本 |
 | 管理端：基础设施、系统与平台设置 · Admin Infra | SQL 控制台（多语句执行） | specialized | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | `/admin/infra/sql`，执行前需输入确认词 |
-| 管理端：基础设施、系统与平台设置 · Admin Infra | 计划任务 CRUD + 手动运行 | optional | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | 设置（含 FRONTEND_ACTIVE）/前端选择器（逃生舱）/日志/计划任务/超管/公告/讨论/武器库/Docker/SQL/终端/版本 |
+| 管理端：基础设施、系统与平台设置 · Admin Infra | 计划任务 CRUD + 手动运行 | optional | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | 设置（含 FRONTEND_ACTIVE）/前端选择器（逃生舱）/日志/计划任务/角色/公告/讨论/武器库/Docker/SQL/终端/版本 |
 | 管理端：基础设施、系统与平台设置 · Admin Infra | Web 终端（session 授权 + WebSocket 交互） | specialized | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | 逃生舱实现：`client.adminHttp.post("/terminal/session")` + 原生 `WebSocket`（SDK 无终端抽象） |
 | 管理端：基础设施、系统与平台设置 · Admin Platform | 已安装前端选择器（读取本地注册表 + 写 `FRONTEND_ACTIVE`） | specialized | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | 逃生舱实现：同源 `fetch(DEFAULT_REGISTRY_URL)` + `parseRegistry`；写设置走 `admin.settings.patch` |
-| 管理端：基础设施、系统与平台设置 · Admin Platform | 静态制品下载（presigned URL → Blob） | optional | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | 设置（含 FRONTEND_ACTIVE）/前端选择器（逃生舱）/日志/计划任务/超管/公告/讨论/武器库/Docker/SQL/终端/版本 |
+| 管理端：基础设施、系统与平台设置 · Admin Platform | 静态制品下载（presigned URL → Blob） | optional | `src/features/admin/platform/*` · `src/features/admin/community/*` · `src/features/admin/infra/*` | 设置（含 FRONTEND_ACTIVE）/前端选择器（逃生舱）/日志/计划任务/角色/公告/讨论/武器库/Docker/SQL/终端/版本 |
 
 ## 说明
 

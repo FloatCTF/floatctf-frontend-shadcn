@@ -35,9 +35,14 @@
 
 ## 3. Visual direction
 
-- **设计语言**：shadcn/ui 原生语汇 —— 中性灰阶（zinc）、1px 边框、低饱和强调色、`rounded-lg` 卡片、
-  无渐变无阴影堆叠；信息密度偏高，符合「运维控制台 + 解题工作台」。
-- **排版**：系统 UI 字体栈；数值 / flag / 分数 / 时间戳使用等宽字体（`font-mono`）+ `tabular-nums`。
+- **设计语言**：以主仓库 [`docs/theme.md`](../../docs/theme.md) 为唯一事实源 —— 中性黑白控制台
+  （chroma=0 的 OKLCH 灰阶）、1px 描边、颜色只表达状态（emerald / amber / sky / destructive）、
+  无渐变无装饰阴影；信息密度偏高，符合「运维控制台 + 解题工作台」。
+- **主题**：亮色默认（`#fafafa` 底 / 白卡片 / 近黑主按钮），暗色 `#0f0f0f` 底 / `#171717` 卡片 / 近白主按钮；
+  偏好存 `localStorage`，首屏脚本防闪烁。
+- **排版**：Geist Variable + 中文回退系统无衬线；数值 / flag / 分数 / 时间戳使用等宽字体（`font-mono`）+ `tabular-nums`。
+- **多语言**：所有用户可见文案走 react-i18next（中英双语），语言偏好持久化并同步 `<html lang>`；
+  日期/数字格式跟随语言。
 - **间距**：4px 基准（Tailwind 刻度）；卡片内边距 16/20px，页面容器 `max-w-screen-2xl` + 24/32px 边距。
 - **响应式**：`lg` 以上为侧边栏 + 主区（可折叠）；`< lg` 侧边栏收进 `Sheet`，选手端底部为 `BottomNav`，
   表格退化为卡片列表（`DataTable` 的 `renderMobileCard`）。

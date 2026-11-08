@@ -2,10 +2,11 @@
  * 题库 / GameBox 库共用的「一次性操作结果」表格 —— 扫描、校验、构建。
  *
  * 铁律：后端返回的**每一条**结果都要如实展示（含 `message` 里的失败原因），
- * 不允许用一句「操作成功」把失败吞掉。
+ * 不允许用一句「操作成功」把失败吞掉。用户可见文案全部来自 `adminCore.ops.*`。
  */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { TonePill, type PillTone } from "~/components/app/badges";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
@@ -20,13 +21,19 @@ export interface ScanRow {
 	message: string;
 }
 
-const SCAN_STATUS: Record<ScanRow["status"], { tone: PillTone; label: string }> = {
-	added: { tone: "success", label: "已登记" },
-	skipped: { tone: "muted", label: "已跳过" },
-	error: { tone: "danger", label: "失败" },
-};
-
 export function ScanResultTable({ items }: { items: ScanRow[] }): ReactNode {
+	const { t } = useTranslation();
+	const statusMeta = (status: ScanRow["status"]): { tone: PillTone; label: string } => {
+		switch (status) {
+			case "added":
+				return { tone: "success", label: t("adminCore.ops.scan.status.added") };
+			case "skipped":
+				return { tone: "muted", label: t("adminCore.ops.scan.status.skipped") };
+			case "error":
+				return { tone: "danger", label: t("adminCore.ops.scan.status.error") };
+		}
+	};
+
 	const columns: DataTableColumn<ScanRow>[] = [
 		{
 			id: "safe_name",
@@ -36,7 +43,7 @@ export function ScanResultTable({ items }: { items: ScanRow[] }): ReactNode {
 		},
 		{
 			id: "name",
-			header: "名称",
+			header: t("adminCore.ops.scan.columns.name"),
 			cell: (row) =>
 				row.name ? (
 					<span className="text-sm">{row.name}</span>
@@ -48,7 +55,7 @@ export function ScanResultTable({ items }: { items: ScanRow[] }): ReactNode {
 		},
 		{
 			id: "version",
-			header: "版本",
+			header: t("adminCore.ops.scan.columns.version"),
 			cell: (row) =>
 				row.version ? (
 					<MonoText>{row.version}</MonoText>
@@ -59,9 +66,9 @@ export function ScanResultTable({ items }: { items: ScanRow[] }): ReactNode {
 		},
 		{
 			id: "status",
-			header: "状态",
+			header: t("adminCore.ops.scan.columns.status"),
 			cell: (row) => {
-				const entry = SCAN_STATUS[row.status] ?? { tone: "muted" as PillTone, label: row.status };
+				const entry = statusMeta(row.status);
 				return (
 					<TonePill tone={entry.tone} title={row.status}>
 						{entry.label}
@@ -72,8 +79,10 @@ export function ScanResultTable({ items }: { items: ScanRow[] }): ReactNode {
 		},
 		{
 			id: "message",
-			header: "说明",
-			cell: (row) => <span className="text-xs text-muted-foreground">{row.message || "—"}</span>,
+			header: t("adminCore.ops.scan.columns.message"),
+			cell: (row) => (
+				<span className="text-xs text-muted-foreground">{row.message || "—"}</span>
+			),
 		},
 	];
 
@@ -82,19 +91,22 @@ export function ScanResultTable({ items }: { items: ScanRow[] }): ReactNode {
 			data={items}
 			getRowId={(row) => row.safe_name}
 			columns={columns}
-			mobileCard={(row) => (
-				<div className="space-y-1.5">
-					<div className="flex items-center justify-between gap-2">
-						<MonoText>{row.safe_name}</MonoText>
-						<TonePill tone={(SCAN_STATUS[row.status] ?? { tone: "muted" as PillTone }).tone}>
-							{SCAN_STATUS[row.status]?.label ?? row.status}
-						</TonePill>
+			mobileCard={(row) => {
+				const entry = statusMeta(row.status);
+				return (
+					<div className="space-y-1.5">
+						<div className="flex items-center justify-between gap-2">
+							<MonoText>{row.safe_name}</MonoText>
+							<TonePill tone={entry.tone} title={row.status}>
+								{entry.label}
+							</TonePill>
+						</div>
+						<p className="text-sm">{row.name ?? "—"}</p>
+						<p className="text-xs text-muted-foreground">{row.message || "—"}</p>
 					</div>
-					<p className="text-sm">{row.name ?? "—"}</p>
-					<p className="text-xs text-muted-foreground">{row.message || "—"}</p>
-				</div>
-			)}
-			empty={<span>扫描未返回任何条目</span>}
+				);
+			}}
+			empty={<span>{t("adminCore.ops.scan.empty")}</span>}
 		/>
 	);
 }
@@ -114,6 +126,7 @@ export function BuildResultTable<T extends BuildRow>({
 	nameOf: (row: T) => string;
 	label: string;
 }): ReactNode {
+	const { t } = useTranslation();
 	const columns: DataTableColumn<T>[] = [
 		{
 			id: "name",
@@ -123,15 +136,19 @@ export function BuildResultTable<T extends BuildRow>({
 		},
 		{
 			id: "is_ok",
-			header: "结果",
+			header: t("adminCore.ops.build.columns.result"),
 			cell: (row) => (
-				<TonePill tone={row.is_ok ? "success" : "danger"}>{row.is_ok ? "成功" : "失败"}</TonePill>
+				<TonePill tone={row.is_ok ? "success" : "danger"}>
+					{row.is_ok
+						? t("adminCore.ops.build.success")
+						: t("adminCore.ops.build.failure")}
+				</TonePill>
 			),
 			sortValue: (row) => (row.is_ok ? 1 : 0),
 		},
 		{
 			id: "message",
-			header: "后端消息",
+			header: t("adminCore.ops.build.columns.message"),
 			cell: (row) => (
 				<span className={row.is_ok ? "text-xs text-muted-foreground" : "text-xs text-destructive"}>
 					{row.message || "—"}
@@ -150,13 +167,15 @@ export function BuildResultTable<T extends BuildRow>({
 					<div className="flex items-center justify-between gap-2">
 						<span className="text-sm font-medium">{nameOf(row)}</span>
 						<TonePill tone={row.is_ok ? "success" : "danger"}>
-							{row.is_ok ? "成功" : "失败"}
+							{row.is_ok
+								? t("adminCore.ops.build.success")
+								: t("adminCore.ops.build.failure")}
 						</TonePill>
 					</div>
 					<p className="text-xs text-muted-foreground">{row.message || "—"}</p>
 				</div>
 			)}
-			empty={<span>没有可执行的对象（后端未返回任何结果）</span>}
+			empty={<span>{t("adminCore.ops.build.empty")}</span>}
 		/>
 	);
 }

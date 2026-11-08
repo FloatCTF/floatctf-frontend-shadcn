@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Search, Trash2 } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
@@ -14,7 +15,7 @@ import { cn } from "~/lib/utils";
 export function SearchInput({
 	value,
 	onChange,
-	placeholder = "搜索",
+	placeholder,
 	className,
 }: {
 	value: string;
@@ -22,14 +23,19 @@ export function SearchInput({
 	placeholder?: string;
 	className?: string;
 }): ReactNode {
+	const { t } = useTranslation();
+	const label = placeholder ?? t("adminPlatform.common.searchPlaceholder");
 	return (
 		<div className={cn("relative w-full sm:max-w-72", className)}>
-			<Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+			<Search
+				className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+				aria-hidden="true"
+			/>
 			<Input
 				value={value}
 				onChange={(event) => onChange(event.target.value)}
-				placeholder={placeholder}
-				aria-label={placeholder}
+				placeholder={label}
+				aria-label={label}
 				className="pl-8"
 			/>
 		</div>
@@ -73,13 +79,15 @@ export function DeleteSelectedButton({
 	count,
 	isPending = false,
 	onClick,
-	label = "删除所选",
+	label,
 }: {
 	count: number;
 	isPending?: boolean;
 	onClick: () => void;
 	label?: string;
 }): ReactNode {
+	const { t } = useTranslation();
+	const text = label ?? t("adminPlatform.common.deleteSelected");
 	return (
 		<Button
 			variant="destructive"
@@ -87,21 +95,28 @@ export function DeleteSelectedButton({
 			disabled={count === 0 || isPending}
 			onClick={onClick}
 		>
-			{isPending ? <Loader2 className="animate-spin" /> : <Trash2 />}
-			{label}
-			{count > 0 ? `（${count}）` : ""}
+			{isPending ? (
+				<Loader2 className="animate-spin" aria-hidden="true" />
+			) : (
+				<Trash2 aria-hidden="true" />
+			)}
+			{text}
+			{count > 0 ? t("adminPlatform.common.deleteSelectedCount", { count }) : ""}
 		</Button>
 	);
 }
 
 /** 页码越界（删除末页条目）时的兜底块。 */
 export function OutOfRangeBlock({ onReset }: { onReset: () => void }): ReactNode {
+	const { t } = useTranslation();
 	return (
 		<div className="space-y-3 rounded-lg border border-dashed px-4 py-8 text-center">
-			<p className="text-sm font-medium">当前页没有数据</p>
-			<p className="text-xs text-muted-foreground">条目可能刚被删除，翻页状态需要重置。</p>
+			<p className="text-sm font-medium">{t("adminPlatform.common.outOfRangeTitle")}</p>
+			<p className="text-xs text-muted-foreground">
+				{t("adminPlatform.common.outOfRangeDescription")}
+			</p>
 			<Button size="sm" variant="outline" onClick={onReset}>
-				回到第 1 页
+				{t("adminPlatform.common.resetPage")}
 			</Button>
 		</div>
 	);

@@ -1,5 +1,5 @@
 /**
- * 管理端 · Web 终端（`/admin/infra/terminal`，specialized 能力）。
+ * 管理端 · Web 终端（`/admin/infra/terminal`，specialized 能力，**宿主权限**）。
  *
  * ## 逃生舱声明（PUBLIC SDK GAP · class B）
  *
@@ -18,11 +18,19 @@
  *
  * 失败态：功能由 TOML `[features].enable_web_terminal` 门控，关闭时 `POST /terminal/session`
  * 返回 404；后端文案（纯文本 body）会原样显示在页面上，并给出重连入口。
+ *
+ * 高危约束（docs/theme.md §8.2 / 本仓库 CONVENTIONS §0.5）：会话等于宿主 shell，
+ * **必须**先 `useConfirm()`（含 `confirmPhrase`）才建立连接；不自动连接。
+ *
+ * 主题：xterm 的背景 / 前景 / 光标 / 选区在挂载时从 CSS 令牌（`--background` 等）读取，
+ * 并在亮暗切换时重设 `terminal.options.theme`，绝不写死十六进制颜色。
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { FitAddon } from "@xterm/addon-fit";
-import { Terminal } from "@xterm/xterm";
+import { Terminal, type ITheme } from "@xterm/xterm";
+import type { TFunction } from "i18next";
 import { PlugZap, RotateCw, ShieldAlert, TerminalSquare } from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 
@@ -31,9 +39,12 @@ import { FloatCTFError } from "@floatctf/sdk";
 import { useClient } from "~/api/client";
 import { errorText } from "~/api/errors";
 import { TonePill, type PillTone } from "~/components/app/badges";
-import { PageBody, PageHeader, SectionCard, Toolbar } from "~/components/app/page";
+import { useConfirm } from "~/components/app/confirm";
+import { MonoText, PageBody, PageHeader, SectionCard, Toolbar } from "~/components/app/page";
+import { EmptyBlock } from "~/components/app/states";
 import { Button } from "~/components/ui/button";
 import { useDocumentTitle } from "~/lib/hooks";
+import { useTheme } from "~/lib/theme";
 
 type TerminalStatus =
 	| "idle"
@@ -43,14 +54,85 @@ type TerminalStatus =
 	| "closed"
 	| "error";
 
-const STATUS_META: Record<TerminalStatus, { tone: PillTone; text: string }> = {
-	idle: { tone: "muted", text: "未连接" },
-	authorizing: { tone: "info", text: "申请终端票据…" },
-	connecting: { tone: "info", text: "建立 WebSocket…" },
-	connected: { tone: "success", text: "已连接" },
-	closed: { tone: "warning", text: "连接已断开" },
-	error: { tone: "danger", text: "连接失败" },
+const STATUS_TONE: Record<TerminalStatus, PillTone> = {
+	idle: "muted",
+	authorizing: "info",
+	connecting: "info",
+	connected: "success",
+	closed: "warning",
+	error: "danger",
 };
+
+const STATUS_TEXT_KEY: Record<TerminalStatus, string> = {
+	idle: "adminInfra.terminal.status.idle",
+	authorizing: "adminInfra.terminal.status.authorizing",
+	connecting: "adminInfra.terminal.status.connecting",
+	connected: "adminInfra.terminal.status.connected",
+	closed: "adminInfra.terminal.status.closed",
+	error: "adminInfra.terminal.status.error",
+};
+
+/** 打开宿主 shell 前必须输入的确认词（只在 UI 层）。 */
+const CONNECT_PHRASE = "CONNECT";
+
+/** oklch(L C H [/ A]) → xterm 可解析的 sRGB 字符串（令牌是 oklch，xterm 只认 hex/rgb/hsl）。 */
+function oklchToCss(value: string): string | null {
+	const match =
+		/^oklch\(\s*([0-9.]+)(%?)\s+([0-9.]+)\s+([0-9.]+)(?:deg)?\s*(?:\/\s*([0-9.]+)(%?))?\s*\)$/i.exec(
+			value.trim(),
+		);
+	if (!match) return null;
+	const lightness = Number(match[1]) / (match[2] === "%" ? 100 : 1);
+	const chroma = Number(match[3]);
+	const hue = (Number(match[4]) * Math.PI) / 180;
+	const alpha = match[5] ? Number(match[5]) / (match[6] === "%" ? 100 : 1) : 1;
+
+	// OKLCh → OKLab → 线性 sRGB（Björn Ottosson 的矩阵）。
+	const a = chroma * Math.cos(hue);
+	const b = chroma * Math.sin(hue);
+	const lPrime = lightness + 0.3963377774 * a + 0.2158037573 * b;
+	const mPrime = lightness - 0.1055613458 * a - 0.0638541728 * b;
+	const sPrime = lightness - 0.0894841775 * a - 1.291485548 * b;
+	const l = lPrime ** 3;
+	const m = mPrime ** 3;
+	const s = sPrime ** 3;
+	const linear = [
+		4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+		-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+		-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+	];
+	const channels = linear.map((channel) => {
+		const clamped = Math.min(1, Math.max(0, channel));
+		const encoded =
+			clamped <= 0.0031308 ? 12.92 * clamped : 1.055 * clamped ** (1 / 2.4) - 0.055;
+		return Math.round(encoded * 255);
+	});
+	return alpha >= 1
+		? `rgb(${channels[0]}, ${channels[1]}, ${channels[2]})`
+		: `rgba(${channels[0]}, ${channels[1]}, ${channels[2]}, ${Number(alpha.toFixed(3))})`;
+}
+
+/** 读取一个 CSS 颜色令牌，换算成 xterm 能解析的颜色字符串。 */
+function readTokenColor(name: string): string | undefined {
+	if (typeof window === "undefined") return undefined;
+	const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+	if (raw.length === 0) return undefined;
+	return raw.toLowerCase().startsWith("oklch(") ? (oklchToCss(raw) ?? undefined) : raw;
+}
+
+/** xterm 主题：全部来自语义令牌，亮暗切换时重新读取。 */
+function readTerminalTheme(): ITheme {
+	const background = readTokenColor("--background");
+	const foreground = readTokenColor("--foreground");
+	const border = readTokenColor("--border");
+	return {
+		background,
+		foreground,
+		cursor: foreground,
+		cursorAccent: background,
+		selectionBackground: border,
+	};
+}
 
 /** 从 `client.adminBaseUrl` 派生 WS URL：http(s) → ws(s)，路径加 `/terminal/ws`。 */
 export function buildTerminalWsUrl(adminBaseUrl: string, origin: string): string {
@@ -64,33 +146,44 @@ export function buildTerminalWsUrl(adminBaseUrl: string, origin: string): string
  * 后端错误文案：actix 的 `ErrorNotFound("Web terminal is disabled")` 是**纯文本** body，
  * 平台错误模型只解析 JSON `message`，因此这里额外把纯文本 body 附上。
  */
-function describeTerminalError(error: unknown): string {
-	const base = errorText(error, "终端连接失败");
+function describeTerminalError(error: unknown, t: TFunction): string {
+	const base = errorText(error, t("adminInfra.terminal.error.fallback"));
 	if (error instanceof FloatCTFError) {
 		const data = error.response?.data;
 		if (typeof data === "string" && data.trim().length > 0) {
-			return `${base} —— 后端：${data.trim()}`;
+			return t("adminInfra.terminal.error.withBackend", {
+				message: base,
+				backend: data.trim(),
+			});
 		}
 		if (error.httpStatus === 404) {
-			return `${base}（终端功能可能未在 TOML 打开 [features].enable_web_terminal）`;
+			return t("adminInfra.terminal.error.disabledHint", { message: base });
 		}
 	}
 	return base;
 }
 
 export function AdminTerminalPage(): ReactNode {
-	useDocumentTitle("Web 终端 · FloatCTF 控制台");
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminInfra.terminal.documentTitle"));
 	const client = useClient();
+	const confirm = useConfirm();
+	const theme = useTheme();
 	const containerRef = useRef<HTMLDivElement>(null);
+	const terminalRef = useRef<Terminal | null>(null);
 	const [status, setStatus] = useState<TerminalStatus>("idle");
 	const [error, setError] = useState<string | null>(null);
 	const [attempt, setAttempt] = useState(0);
+
+	// 终端内的提示文案不应因切换语言而重建会话（那会杀掉 shell），因此用 ref 取最新 t。
+	const tRef = useRef(t);
+	tRef.current = t;
 
 	const adminBaseUrl = client.adminBaseUrl;
 
 	const connectEffect = useCallback(() => {
 		const container = containerRef.current;
-		if (!container) return;
+		if (!container) return undefined;
 
 		let disposed = false;
 		const terminal = new Terminal({
@@ -99,13 +192,12 @@ export function AdminTerminalPage(): ReactNode {
 			fontSize: 14,
 			fontFamily: 'Menlo, Monaco, "Courier New", monospace',
 			allowProposedApi: true,
-			theme: {
-				background: "#0b0b0d",
-				foreground: "#e4e4e7",
-				cursor: "#e4e4e7",
-				selectionBackground: "#3f3f46",
-			},
+			// 语义色对比度兜底：亮色模式下 ANSI 调色板也保持可读。
+			minimumContrastRatio: 4.5,
+			// 挂载时从 CSS 变量读取，亮色模式不会残留暗色终端。
+			theme: readTerminalTheme(),
 		});
+		terminalRef.current = terminal;
 		const fitAddon = new FitAddon();
 		terminal.loadAddon(fitAddon);
 
@@ -138,7 +230,7 @@ export function AdminTerminalPage(): ReactNode {
 				await client.adminHttp.post("/terminal/session");
 			} catch (sessionError) {
 				if (disposed) return;
-				const message = describeTerminalError(sessionError);
+				const message = describeTerminalError(sessionError, tRef.current);
 				setStatus("error");
 				setError(message);
 				writeLine(message, "error");
@@ -153,7 +245,7 @@ export function AdminTerminalPage(): ReactNode {
 				ws = new WebSocket(url);
 			} catch (socketError) {
 				if (disposed) return;
-				const message = describeTerminalError(socketError);
+				const message = describeTerminalError(socketError, tRef.current);
 				setStatus("error");
 				setError(message);
 				writeLine(message, "error");
@@ -165,7 +257,7 @@ export function AdminTerminalPage(): ReactNode {
 			ws.onopen = () => {
 				if (disposed) return;
 				setStatus("connected");
-				writeLine("已连接到平台 Web 终端（ticket 一次性消费）", "info");
+				writeLine(tRef.current("adminInfra.terminal.section.connectedLine"), "info");
 				sendResize();
 			};
 
@@ -186,20 +278,28 @@ export function AdminTerminalPage(): ReactNode {
 
 			ws.onerror = () => {
 				if (disposed) return;
+				const message = tRef.current("adminInfra.terminal.error.wsError");
 				setStatus("error");
-				setError("WebSocket 连接异常（票据可能已过期或被拒绝）");
-				writeLine("WebSocket error", "error");
+				setError(message);
+				writeLine(message, "error");
 			};
 
 			ws.onclose = (event) => {
 				if (disposed) return;
 				setStatus((previous) => (previous === "error" ? previous : "closed"));
-				writeLine(
+				const translate = tRef.current;
+				const closedText =
 					event.code === 1000
-						? "连接已关闭"
-						: `连接已关闭（code=${event.code}${event.reason ? ` ${event.reason}` : ""}）`,
-					event.code === 1000 ? "muted" : "error",
-				);
+						? translate("adminInfra.terminal.error.closed")
+						: event.reason
+							? translate("adminInfra.terminal.error.closedWithReason", {
+									code: event.code,
+									reason: event.reason,
+								})
+							: translate("adminInfra.terminal.error.closedWithCode", {
+									code: event.code,
+								});
+				writeLine(closedText, event.code === 1000 ? "muted" : "error");
 				if (socket === ws) socket = null;
 			};
 		}
@@ -246,60 +346,91 @@ export function AdminTerminalPage(): ReactNode {
 				socket.close();
 				socket = null;
 			}
+			terminalRef.current = null;
 			terminal.dispose();
 			setStatus("idle");
 		};
 	}, [adminBaseUrl, client]);
 
 	useEffect(() => {
+		if (attempt === 0) return;
 		const cleanup = connectEffect();
 		return cleanup;
 		// attempt 变化时整体重连（先 dispose 旧终端 / socket）。
 	}, [connectEffect, attempt]);
 
-	const meta = STATUS_META[status];
+	// 亮暗切换：重设 xterm 主题，不重建会话（重建会杀掉正在使用的 shell）。
+	useEffect(() => {
+		const terminal = terminalRef.current;
+		if (!terminal) return;
+		terminal.options.theme = readTerminalTheme();
+	}, [theme, status]);
+
+	/** 高危：建立会话前必须显式确认，确认词只在 UI 层。 */
+	async function requestSession() {
+		const ok = await confirm({
+			title: t("adminInfra.terminal.confirm.title"),
+			description: t("adminInfra.terminal.confirm.description"),
+			consequences: [
+				t("adminInfra.terminal.confirm.consequenceHost"),
+				t("adminInfra.terminal.confirm.consequenceRealtime"),
+				t("adminInfra.terminal.confirm.consequenceSession"),
+			],
+			tone: "danger",
+			confirmText: t("adminInfra.terminal.confirm.confirm"),
+			confirmPhrase: CONNECT_PHRASE,
+		});
+		if (!ok) return;
+		setError(null);
+		setAttempt((value) => value + 1);
+	}
+
+	const statusMeta = {
+		tone: STATUS_TONE[status],
+		text: t(STATUS_TEXT_KEY[status]),
+	};
+	const busy = status === "authorizing" || status === "connecting";
+	const wsEndpoint = `${adminBaseUrl.replace(/\/+$/, "")}/terminal/ws`;
 
 	return (
 		<PageBody>
 			<PageHeader
-				title="Web 终端"
-				description="在宿主 helper 上打开的交互式 shell（fish > zsh > bash > sh）。鉴权用一次性 HttpOnly 票据，token 不进入 URL。"
-				badge={<TonePill tone="muted">specialized</TonePill>}
+				title={t("adminInfra.terminal.title")}
+				description={t("adminInfra.terminal.description")}
+				badge={<TonePill tone="muted">{t("adminInfra.specialized")}</TonePill>}
 				actions={
 					<Toolbar>
-						<TonePill tone={meta.tone} icon={<PlugZap />}>
-							{meta.text}
+						<TonePill tone={statusMeta.tone} icon={<PlugZap />}>
+							{statusMeta.text}
 						</TonePill>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => setAttempt((value) => value + 1)}
-							disabled={status === "authorizing" || status === "connecting"}
-						>
-							<RotateCw />
-							重新连接
+						<Button size="sm" onClick={() => void requestSession()} disabled={busy}>
+							{attempt === 0 ? (
+								<TerminalSquare className="size-4" aria-hidden="true" />
+							) : (
+								<RotateCw className="size-4" aria-hidden="true" />
+							)}
+							{attempt === 0
+								? t("adminInfra.terminal.actions.connect")
+								: t("adminInfra.terminal.actions.reconnect")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
 			<div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
-				<ShieldAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-				<span>
-					终端直接落在宿主环境：命令以宿主权限执行，且会真实修改容器 / 网络 / 文件。
-					关闭页面或点「重新连接」会结束当前会话（票据一次性，不能复用）。
-				</span>
+				<ShieldAlert className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+				<span>{t("adminInfra.terminal.warning")}</span>
 			</div>
 
 			{error ? (
 				<div
-					className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm"
+					className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm"
 					role="alert"
 				>
 					<span className="text-destructive">{error}</span>
-					<Button variant="outline" size="sm" onClick={() => setAttempt((value) => value + 1)}>
-						<RotateCw />
-						重试
+					<Button variant="outline" size="sm" onClick={() => void requestSession()}>
+						<RotateCw className="size-4" aria-hidden="true" />
+						{t("common.retry")}
 					</Button>
 				</div>
 			) : null}
@@ -307,16 +438,32 @@ export function AdminTerminalPage(): ReactNode {
 			<SectionCard
 				title={
 					<span className="inline-flex items-center gap-2">
-						<TerminalSquare className="size-4" />
-						交互终端
+						<TerminalSquare className="size-4" aria-hidden="true" />
+						{t("adminInfra.terminal.section.title")}
 					</span>
 				}
-				description={`WS 端点：${adminBaseUrl.replace(/\/+$/, "")}/terminal/ws（由 adminBaseUrl 派生）`}
+				description={
+					<Trans
+						i18nKey="adminInfra.terminal.section.description"
+						values={{ url: wsEndpoint }}
+						components={{ mono: <MonoText>{null}</MonoText> }}
+					/>
+				}
 				contentClassName="p-0"
 			>
-				<div className="h-[68vh] min-h-80 bg-[#0b0b0d] p-2">
-					<div ref={containerRef} className="h-full w-full" />
-				</div>
+				{attempt === 0 ? (
+					<div className="p-4">
+						<EmptyBlock
+							title={t("adminInfra.terminal.section.idleTitle")}
+							description={t("adminInfra.terminal.section.idleDescription")}
+							icon={<TerminalSquare className="size-6" />}
+						/>
+					</div>
+				) : (
+					<div className="h-[68svh] min-h-80 bg-background p-2">
+						<div ref={containerRef} className="h-full w-full" />
+					</div>
+				)}
 			</SectionCard>
 		</PageBody>
 	);

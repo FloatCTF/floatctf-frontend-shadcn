@@ -20,7 +20,7 @@ function Toaster({ ...props }: ToasterProps) {
 		<Sonner
 			theme={theme}
 			className="toaster group"
-			position="bottom-right"
+			position="top-right"
 			richColors
 			closeButton
 			icons={{

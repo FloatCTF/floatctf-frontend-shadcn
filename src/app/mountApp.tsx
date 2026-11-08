@@ -8,6 +8,8 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router";
 
 import { createRuntime, setUnauthorizedHandler } from "~/api/client";
+// i18n 必须在任何页面渲染前初始化（react-i18next 的全局单例）。
+import "~/lib/i18n";
 import { initTheme } from "~/lib/theme";
 
 import { AppProviders, ErrorBoundary } from "./providers";

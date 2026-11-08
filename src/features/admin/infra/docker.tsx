@@ -15,21 +15,23 @@
  */
 
 import { useState, type FormEvent, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
 	keepPreviousData,
 	useMutation,
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
+import type { TFunction } from "i18next";
 import {
 	Container,
 	HardDrive,
+	Info,
 	Network as NetworkIcon,
 	Play,
 	Plus,
 	RefreshCw,
 	Square,
-	Star,
 	Trash2,
 } from "lucide-react";
 
@@ -54,6 +56,7 @@ import {
 	PageHeader,
 	PaginationBar,
 	SectionCard,
+	Toolbar,
 } from "~/components/app/page";
 import {
 	EmptyBlock,
@@ -73,6 +76,12 @@ import { SearchInput, filterCurrentPage, fromUnixSeconds, useListState } from ".
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
+/** Docker 自身输出的「无标签」表示，属于技术标识，不做本地化。 */
+const NONE_TAG = "<none>";
+/** 高危确认词（只在 UI 层，后端契约是 ADMIN_CONFIRMED 前缀）。 */
+const STOP_PHRASE = "STOP";
+const DELETE_PHRASE = "DELETE";
+
 /** 容器状态（bollard Debug 输出）→ 语义色。 */
 function containerTone(status: string): PillTone {
 	switch (status.toLowerCase()) {
@@ -91,6 +100,22 @@ function containerTone(status: string): PillTone {
 	}
 }
 
+/** 已知状态的本地化标签；未知状态原样展示，不猜语义。 */
+const CONTAINER_STATUS_KEYS: Record<string, string> = {
+	created: "created",
+	running: "running",
+	paused: "paused",
+	restarting: "restarting",
+	removing: "removing",
+	exited: "exited",
+	dead: "dead",
+};
+
+function containerStatusText(status: string, t: TFunction): string {
+	const key = CONTAINER_STATUS_KEYS[status.toLowerCase()];
+	return key ? t(`adminInfra.docker.status.${key}`) : status;
+}
+
 function isRunning(status: string): boolean {
 	return status.toLowerCase() === "running";
 }
@@ -99,30 +124,36 @@ function offsetParams(page: number, pageSize: number): QueryParams {
 	return { offset: (Math.max(1, page) - 1) * pageSize, limit: pageSize };
 }
 
+/** 容器的展示名：没有名称时用 ID 前缀（与 toast / 确认框保持一致）。 */
+function containerLabel(row: FloatDockerContainer): string {
+	return row.name || row.id.slice(0, 12);
+}
+
 export function AdminDockerPage(): ReactNode {
-	useDocumentTitle("Docker · FloatCTF 控制台");
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminInfra.docker.documentTitle"));
 
 	return (
 		<PageBody>
 			<PageHeader
-				title="Docker"
-				description="宿主容器 / 镜像 / 网络治理。所有调用经宿主 helper 的受限协议"
-				badge={<TonePill tone="muted">specialized</TonePill>}
+				title={t("adminInfra.docker.title")}
+				description={t("adminInfra.docker.description")}
+				badge={<TonePill tone="muted">{t("adminInfra.specialized")}</TonePill>}
 			/>
 
 			<Tabs defaultValue="containers">
-				<TabsList>
+				<TabsList className="max-w-full overflow-x-auto">
 					<TabsTrigger value="containers">
-						<Container className="size-4" />
-						容器
+						<Container className="size-4" aria-hidden="true" />
+						{t("adminInfra.docker.tabs.containers")}
 					</TabsTrigger>
 					<TabsTrigger value="images">
-						<HardDrive className="size-4" />
-						镜像
+						<HardDrive className="size-4" aria-hidden="true" />
+						{t("adminInfra.docker.tabs.images")}
 					</TabsTrigger>
 					<TabsTrigger value="networks">
-						<NetworkIcon className="size-4" />
-						网络
+						<NetworkIcon className="size-4" aria-hidden="true" />
+						{t("adminInfra.docker.tabs.networks")}
 					</TabsTrigger>
 				</TabsList>
 				<TabsContent value="containers" className="mt-4">
@@ -142,10 +173,12 @@ export function AdminDockerPage(): ReactNode {
 // ── 容器 ────────────────────────────────────────────────────────────────────
 
 function ContainersTab(): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const list = useListState(20);
+	const empty = t("common.empty");
 	const params = offsetParams(list.page, list.pageSize);
 
 	const query = useQuery({
@@ -161,45 +194,67 @@ function ContainersTab(): ReactNode {
 
 	const startMutation = useMutation({
 		mutationFn: (row: FloatDockerContainer) =>
-			callVoid(client.admin.docker.startContainer(row.id), "启动容器"),
+			callVoid(
+				client.admin.docker.startContainer(row.id),
+				t("adminInfra.docker.containers.actions.start"),
+			),
 		onSuccess: (_data, row) => {
-			toast.success(`容器 ${row.name || row.id.slice(0, 12)} 已启动`);
+			toast.success(
+				t("adminInfra.docker.containers.toast.started", { name: containerLabel(row) }),
+			);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("启动容器失败", error),
+		onError: (error) =>
+			toast.apiError(t("adminInfra.docker.containers.toast.startFailed"), error),
 	});
 
 	const stopMutation = useMutation({
 		mutationFn: (row: FloatDockerContainer) =>
-			callVoid(client.admin.docker.stopContainer(row.id), "停止容器"),
+			callVoid(
+				client.admin.docker.stopContainer(row.id),
+				t("adminInfra.docker.containers.actions.stop"),
+			),
 		onSuccess: (_data, row) => {
-			toast.success(`容器 ${row.name || row.id.slice(0, 12)} 已停止`);
+			toast.success(
+				t("adminInfra.docker.containers.toast.stopped", { name: containerLabel(row) }),
+			);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("停止容器失败", error),
+		onError: (error) =>
+			toast.apiError(t("adminInfra.docker.containers.toast.stopFailed"), error),
 	});
 
 	const deleteMutation = useMutation({
 		mutationFn: (row: FloatDockerContainer) =>
-			callVoid(client.admin.docker.deleteContainer(row.id), "删除容器"),
+			callVoid(
+				client.admin.docker.deleteContainer(row.id),
+				t("adminInfra.docker.containers.actions.delete"),
+			),
 		onSuccess: (_data, row) => {
-			toast.success(`容器 ${row.name || row.id.slice(0, 12)} 已删除`);
+			toast.success(
+				t("adminInfra.docker.containers.toast.deleted", { name: containerLabel(row) }),
+			);
 			invalidate();
 			void queryClient.invalidateQueries({ queryKey: qk.admin.dockerImages() });
 			void queryClient.invalidateQueries({ queryKey: qk.admin.dockerNetworks() });
 		},
-		onError: (error) => toast.apiError("删除容器失败", error),
+		onError: (error) =>
+			toast.apiError(t("adminInfra.docker.containers.toast.deleteFailed"), error),
 	});
 
 	async function startContainer(row: FloatDockerContainer) {
 		const ok = await confirm({
-			title: `启动容器 ${row.name || row.id.slice(0, 12)}？`,
-			description: `镜像 ${row.image}`,
+			title: t("adminInfra.docker.containers.confirm.start.title", {
+				name: containerLabel(row),
+			}),
+			description: t("adminInfra.docker.containers.confirm.start.description", {
+				image: row.image,
+			}),
 			consequences: [
-				"容器会以原有配置重新启动，占用宿主端口与资源",
-				"若是平台管理的题目 / GameBox 实例容器，可能与实例生命周期状态不一致",
+				t("adminInfra.docker.containers.confirm.start.consequenceResources"),
+				t("adminInfra.docker.containers.confirm.start.consequenceLifecycle"),
 			],
-			confirmText: "启动",
+			confirmText: t("adminInfra.docker.containers.confirm.start.confirm"),
 		});
 		if (!ok) return;
 		startMutation.mutate(row);
@@ -207,16 +262,21 @@ function ContainersTab(): ReactNode {
 
 	async function stopContainer(row: FloatDockerContainer) {
 		const ok = await confirm({
-			title: `停止容器 ${row.name || row.id.slice(0, 12)}？`,
-			description: `镜像 ${row.image} · 当前状态 ${row.status}`,
+			title: t("adminInfra.docker.containers.confirm.stop.title", {
+				name: containerLabel(row),
+			}),
+			description: t("adminInfra.docker.containers.confirm.stop.description", {
+				image: row.image,
+				status: containerStatusText(row.status, t),
+			}),
 			consequences: [
-				"容器内进程会被终止，未持久化的数据（内存态 / 临时文件）全部丢失",
-				"选手正在使用的实例环境会立即不可用",
-				"容器不会自动重启（平台实例需要重新启动流程）",
+				t("adminInfra.docker.containers.confirm.stop.consequenceProcesses"),
+				t("adminInfra.docker.containers.confirm.stop.consequencePlayers"),
+				t("adminInfra.docker.containers.confirm.stop.consequenceRestart"),
 			],
 			tone: "danger",
-			confirmText: "停止容器",
-			confirmPhrase: "STOP",
+			confirmText: t("adminInfra.docker.containers.confirm.stop.confirm"),
+			confirmPhrase: STOP_PHRASE,
 		});
 		if (!ok) return;
 		stopMutation.mutate(row);
@@ -224,16 +284,21 @@ function ContainersTab(): ReactNode {
 
 	async function deleteContainer(row: FloatDockerContainer) {
 		const ok = await confirm({
-			title: `删除容器 ${row.name || row.id.slice(0, 12)}？`,
-			description: `镜像 ${row.image} · 状态 ${row.status}`,
+			title: t("adminInfra.docker.containers.confirm.delete.title", {
+				name: containerLabel(row),
+			}),
+			description: t("adminInfra.docker.containers.confirm.delete.description", {
+				image: row.image,
+				status: containerStatusText(row.status, t),
+			}),
 			consequences: [
-				"容器会被强制删除（包括其可写层），容器内数据永久丢失",
-				"若容器仍属于某个赛事实例，平台记录会与被删除的运行时资源不一致",
-				"删除后不可恢复，只能依赖镜像重新创建",
+				t("adminInfra.docker.containers.confirm.delete.consequenceData"),
+				t("adminInfra.docker.containers.confirm.delete.consequenceInstance"),
+				t("adminInfra.docker.containers.confirm.delete.consequenceIrreversible"),
 			],
 			tone: "danger",
-			confirmText: "永久删除",
-			confirmPhrase: "DELETE",
+			confirmText: t("adminInfra.docker.containers.confirm.delete.confirm"),
+			confirmPhrase: DELETE_PHRASE,
 		});
 		if (!ok) return;
 		deleteMutation.mutate(row);
@@ -250,19 +315,21 @@ function ContainersTab(): ReactNode {
 	const columns: DataTableColumn<FloatDockerContainer>[] = [
 		{
 			id: "name",
-			header: "名称",
+			header: t("adminInfra.docker.columns.name"),
 			sortValue: (row) => row.name,
-			cell: (row) => <span className="font-medium">{row.name || "—"}</span>,
+			cell: (row) => <span className="font-mono font-medium">{row.name || empty}</span>,
 		},
 		{
 			id: "id",
-			header: "容器 ID",
+			header: t("adminInfra.docker.columns.containerId"),
 			hideBelow: "md",
-			cell: (row) => <CopyText value={row.id} label="容器 ID" />,
+			cell: (row) => (
+				<CopyText value={row.id} label={t("adminInfra.docker.columns.containerId")} />
+			),
 		},
 		{
 			id: "image",
-			header: "镜像",
+			header: t("adminInfra.docker.columns.image"),
 			hideBelow: "lg",
 			cell: (row) => (
 				<MonoText className="text-muted-foreground" title={row.image}>
@@ -272,41 +339,45 @@ function ContainersTab(): ReactNode {
 		},
 		{
 			id: "status",
-			header: "状态",
+			header: t("adminInfra.docker.columns.status"),
 			sortValue: (row) => row.status,
-			cell: (row) => <TonePill tone={containerTone(row.status)}>{row.status}</TonePill>,
+			cell: (row) => (
+				<TonePill tone={containerTone(row.status)} title={row.status}>
+					{containerStatusText(row.status, t)}
+				</TonePill>
+			),
 		},
 		{
 			id: "ports",
-			header: "端口",
+			header: t("adminInfra.docker.columns.ports"),
 			hideBelow: "md",
 			cell: (row) => (
-				<MonoText className="text-muted-foreground">{row.ports || "—"}</MonoText>
+				<MonoText className="text-muted-foreground">{row.ports || empty}</MonoText>
 			),
 		},
 		{
 			id: "created",
-			header: "创建时间",
+			header: t("adminInfra.docker.columns.createdAt"),
 			align: "right",
 			sortValue: (row) => row.created,
 			cell: (row) => {
 				const created = fromUnixSeconds(row.created);
-				return created ? <AbsoluteTime value={created} /> : <span>—</span>;
+				return created ? <AbsoluteTime value={created} /> : <span>{empty}</span>;
 			},
 		},
 	];
 
 	return (
 		<SectionCard
-			title="容器"
-			description="服务端按 offset/limit 分页"
+			title={t("adminInfra.docker.containers.section.title")}
+			description={t("adminInfra.docker.containers.section.description")}
 			actions={
-				<div className="flex flex-wrap items-center gap-2">
+				<Toolbar>
 					<RefreshingBadge active={query.isFetching && !query.isPending} />
 					<SearchInput
 						value={list.search}
 						onChange={list.setSearch}
-						placeholder="在当前页内筛选（名称 / ID / 镜像 / 状态）"
+						placeholder={t("adminInfra.docker.containers.searchPlaceholder")}
 					/>
 					<Button
 						variant="outline"
@@ -314,21 +385,21 @@ function ContainersTab(): ReactNode {
 						onClick={() => void query.refetch()}
 						disabled={query.isFetching}
 					>
-						<RefreshCw />
-						刷新
+						<RefreshCw className="size-4" aria-hidden="true" />
+						{t("common.refresh")}
 					</Button>
-				</div>
+				</Toolbar>
 			}
 		>
 			<QueryState
 				query={query}
 				skeleton={<TableSkeleton rows={6} columns={6} />}
-				errorTitle="加载容器列表失败"
+				errorTitle={t("adminInfra.docker.containers.errorTitle")}
 				isEmpty={(result) => result.items.length === 0}
 				empty={
 					<EmptyBlock
-						title="没有容器"
-						description="宿主上还没有任何容器；若本应为空而这里有误，请检查 helper 状态。"
+						title={t("adminInfra.docker.containers.empty.title")}
+						description={t("adminInfra.docker.containers.empty.description")}
 					/>
 				}
 			>
@@ -337,8 +408,8 @@ function ContainersTab(): ReactNode {
 						{visible.length === 0 ? (
 							<EmptyBlock
 								variant="filtered"
-								title="当前页没有匹配的容器"
-								description="后端 Docker 接口不支持服务端过滤，请翻页或清空搜索词"
+								title={t("adminInfra.docker.containers.filtered.title")}
+								description={t("adminInfra.docker.containers.filtered.description")}
 							/>
 						) : (
 							<DataTable
@@ -351,8 +422,8 @@ function ContainersTab(): ReactNode {
 											<Button
 												variant="ghost"
 												size="icon-sm"
-												aria-label="停止容器"
-												title="停止容器"
+												aria-label={t("adminInfra.docker.containers.actions.stop")}
+												title={t("adminInfra.docker.containers.actions.stop")}
 												disabled={stopMutation.isPending}
 												onClick={() => void stopContainer(row)}
 											>
@@ -362,8 +433,8 @@ function ContainersTab(): ReactNode {
 											<Button
 												variant="ghost"
 												size="icon-sm"
-												aria-label="启动容器"
-												title="启动容器"
+												aria-label={t("adminInfra.docker.containers.actions.start")}
+												title={t("adminInfra.docker.containers.actions.start")}
 												disabled={startMutation.isPending}
 												onClick={() => void startContainer(row)}
 											>
@@ -374,8 +445,8 @@ function ContainersTab(): ReactNode {
 											variant="ghost"
 											size="icon-sm"
 											className="text-destructive"
-											aria-label="删除容器"
-											title="删除容器"
+											aria-label={t("adminInfra.docker.containers.actions.delete")}
+											title={t("adminInfra.docker.containers.actions.delete")}
 											disabled={deleteMutation.isPending}
 											onClick={() => void deleteContainer(row)}
 										>
@@ -386,25 +457,38 @@ function ContainersTab(): ReactNode {
 								mobileCard={(row) => (
 									<div className="space-y-2">
 										<div className="flex items-start justify-between gap-2">
-											<span className="font-medium">{row.name || "—"}</span>
-											<TonePill tone={containerTone(row.status)}>{row.status}</TonePill>
+											<span className="min-w-0 font-mono font-medium break-words">
+												{row.name || empty}
+											</span>
+											<TonePill tone={containerTone(row.status)} title={row.status}>
+												{containerStatusText(row.status, t)}
+											</TonePill>
 										</div>
 										<p className="text-xs text-muted-foreground">
 											<MonoText>{truncate(row.image, 40)}</MonoText>
 										</p>
-										<p className="text-xs text-muted-foreground">
-											端口 <MonoText>{row.ports || "—"}</MonoText>
+										<p className="flex items-baseline gap-1 text-xs text-muted-foreground">
+											{t("adminInfra.docker.containers.portsLabel")}
+											<MonoText>{row.ports || empty}</MonoText>
 										</p>
 										<div className="flex items-center gap-2">
 											{isRunning(row.status) ? (
-												<Button variant="outline" size="sm" onClick={() => void stopContainer(row)}>
-													<Square />
-													停止
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => void stopContainer(row)}
+												>
+													<Square className="size-4" aria-hidden="true" />
+													{t("adminInfra.docker.containers.actions.stopShort")}
 												</Button>
 											) : (
-												<Button variant="outline" size="sm" onClick={() => void startContainer(row)}>
-													<Play />
-													启动
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => void startContainer(row)}
+												>
+													<Play className="size-4" aria-hidden="true" />
+													{t("adminInfra.docker.containers.actions.startShort")}
 												</Button>
 											)}
 											<Button
@@ -413,8 +497,8 @@ function ContainersTab(): ReactNode {
 												className="text-destructive"
 												onClick={() => void deleteContainer(row)}
 											>
-												<Trash2 />
-												删除
+												<Trash2 className="size-4" aria-hidden="true" />
+												{t("adminInfra.docker.containers.actions.deleteShort")}
 											</Button>
 										</div>
 									</div>
@@ -439,10 +523,12 @@ function ContainersTab(): ReactNode {
 // ── 镜像 ────────────────────────────────────────────────────────────────────
 
 function ImagesTab(): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const list = useListState(20);
+	const empty = t("common.empty");
 	const params = offsetParams(list.page, list.pageSize);
 
 	const query = useQuery({
@@ -453,27 +539,34 @@ function ImagesTab(): ReactNode {
 
 	const deleteMutation = useMutation({
 		mutationFn: (row: ImageInfo) =>
-			callVoid(client.admin.docker.deleteImage(row.id), "删除镜像"),
+			callVoid(
+				client.admin.docker.deleteImage(row.id),
+				t("adminInfra.docker.images.actions.delete"),
+			),
 		onSuccess: () => {
-			toast.success("镜像已删除");
+			toast.success(t("adminInfra.docker.images.toast.deleted"));
 			void queryClient.invalidateQueries({ queryKey: qk.admin.dockerImages() });
 		},
-		onError: (error) => toast.apiError("删除镜像失败", error),
+		onError: (error) =>
+			toast.apiError(t("adminInfra.docker.images.toast.deleteFailed"), error),
 	});
 
 	async function deleteImage(row: ImageInfo) {
 		const label = row.repo_tags.length > 0 ? row.repo_tags.join(", ") : row.id.slice(0, 12);
 		const ok = await confirm({
-			title: `删除镜像 ${truncate(label, 40)}？`,
-			description: `镜像 ID ${row.id.slice(0, 12)} · 大小 ${formatBytes(row.size)}`,
+			title: t("adminInfra.docker.images.confirm.title", { name: truncate(label, 40) }),
+			description: t("adminInfra.docker.images.confirm.description", {
+				id: row.id.slice(0, 12),
+				size: formatBytes(row.size),
+			}),
 			consequences: [
-				"依赖该镜像的容器将无法再创建 / 重启（正在运行的容器不受影响）",
-				"重新拉起需要重新拉取或重建镜像，恢复依赖网络与构建时间",
-				"删除后不可恢复",
+				t("adminInfra.docker.images.confirm.consequenceDependents"),
+				t("adminInfra.docker.images.confirm.consequenceRebuild"),
+				t("adminInfra.docker.images.confirm.consequenceIrreversible"),
 			],
 			tone: "danger",
-			confirmText: "永久删除",
-			confirmPhrase: "DELETE",
+			confirmText: t("adminInfra.docker.images.confirm.confirm"),
+			confirmPhrase: DELETE_PHRASE,
 		});
 		if (!ok) return;
 		deleteMutation.mutate(row);
@@ -485,14 +578,14 @@ function ImagesTab(): ReactNode {
 	const columns: DataTableColumn<ImageInfo>[] = [
 		{
 			id: "repo_tags",
-			header: "标签",
+			header: t("adminInfra.docker.columns.tags"),
 			cell: (row) =>
 				row.repo_tags.length === 0 ? (
-					<TonePill tone="muted">&lt;none&gt;</TonePill>
+					<TonePill tone="muted">{NONE_TAG}</TonePill>
 				) : (
 					<div className="flex flex-wrap gap-1">
 						{row.repo_tags.map((tag) => (
-							<MonoText key={tag} className="rounded bg-muted px-1.5 py-0.5">
+							<MonoText key={tag} className="rounded-md bg-muted px-1.5 py-0.5">
 								{tag}
 							</MonoText>
 						))}
@@ -501,40 +594,40 @@ function ImagesTab(): ReactNode {
 		},
 		{
 			id: "id",
-			header: "镜像 ID",
+			header: t("adminInfra.docker.columns.imageId"),
 			hideBelow: "md",
 			cell: (row) => <MonoText className="text-muted-foreground">{row.id.slice(0, 24)}</MonoText>,
 		},
 		{
 			id: "size",
-			header: "大小",
+			header: t("adminInfra.docker.columns.size"),
 			align: "right",
 			sortValue: (row) => row.size,
 			cell: (row) => <MonoText>{formatBytes(row.size)}</MonoText>,
 		},
 		{
 			id: "created",
-			header: "创建时间",
+			header: t("adminInfra.docker.columns.createdAt"),
 			align: "right",
 			sortValue: (row) => row.created,
 			cell: (row) => {
 				const created = fromUnixSeconds(row.created);
-				return created ? <AbsoluteTime value={created} /> : <span>—</span>;
+				return created ? <AbsoluteTime value={created} /> : <span>{empty}</span>;
 			},
 		},
 	];
 
 	return (
 		<SectionCard
-			title="镜像"
-			description="服务端按 offset/limit 分页；搜索只作用于当前页。"
+			title={t("adminInfra.docker.images.section.title")}
+			description={t("adminInfra.docker.images.section.description")}
 			actions={
-				<div className="flex flex-wrap items-center gap-2">
+				<Toolbar>
 					<RefreshingBadge active={query.isFetching && !query.isPending} />
 					<SearchInput
 						value={list.search}
 						onChange={list.setSearch}
-						placeholder="在当前页内筛选（标签 / ID）"
+						placeholder={t("adminInfra.docker.images.searchPlaceholder")}
 					/>
 					<Button
 						variant="outline"
@@ -542,21 +635,21 @@ function ImagesTab(): ReactNode {
 						onClick={() => void query.refetch()}
 						disabled={query.isFetching}
 					>
-						<RefreshCw />
-						刷新
+						<RefreshCw className="size-4" aria-hidden="true" />
+						{t("common.refresh")}
 					</Button>
-				</div>
+				</Toolbar>
 			}
 		>
 			<QueryState
 				query={query}
 				skeleton={<TableSkeleton rows={5} columns={4} />}
-				errorTitle="加载镜像列表失败"
+				errorTitle={t("adminInfra.docker.images.errorTitle")}
 				isEmpty={(result) => result.items.length === 0}
 				empty={
 					<EmptyBlock
-						title="没有镜像"
-						description="宿主上还没有任何镜像；平台镜像通常由构建 / 拉取流程写入。"
+						title={t("adminInfra.docker.images.empty.title")}
+						description={t("adminInfra.docker.images.empty.description")}
 					/>
 				}
 			>
@@ -565,8 +658,8 @@ function ImagesTab(): ReactNode {
 						{visible.length === 0 ? (
 							<EmptyBlock
 								variant="filtered"
-								title="当前页没有匹配的镜像"
-								description="后端 Docker 接口不支持服务端过滤，请翻页或清空搜索词"
+								title={t("adminInfra.docker.images.filtered.title")}
+								description={t("adminInfra.docker.images.filtered.description")}
 							/>
 						) : (
 							<DataTable
@@ -578,8 +671,8 @@ function ImagesTab(): ReactNode {
 										variant="ghost"
 										size="icon-sm"
 										className="text-destructive"
-										aria-label="删除镜像"
-										title="删除镜像"
+										aria-label={t("adminInfra.docker.images.actions.delete")}
+										title={t("adminInfra.docker.images.actions.delete")}
 										disabled={deleteMutation.isPending}
 										onClick={() => void deleteImage(row)}
 									>
@@ -588,15 +681,17 @@ function ImagesTab(): ReactNode {
 								)}
 								mobileCard={(row) => (
 									<div className="space-y-2">
-										<p className="text-sm">
+										<p className="text-sm break-words">
 											{row.repo_tags.length > 0 ? (
 												<MonoText>{row.repo_tags.join(", ")}</MonoText>
 											) : (
-												<TonePill tone="muted">&lt;none&gt;</TonePill>
+												<TonePill tone="muted">{NONE_TAG}</TonePill>
 											)}
 										</p>
-										<p className="text-xs text-muted-foreground">
-											<MonoText>{row.id.slice(0, 24)}</MonoText> · {formatBytes(row.size)}
+										<p className="flex flex-wrap items-baseline gap-1 text-xs text-muted-foreground">
+											<MonoText>{row.id.slice(0, 24)}</MonoText>
+											<span>·</span>
+											<span className="tnum">{formatBytes(row.size)}</span>
 										</p>
 										<Button
 											variant="ghost"
@@ -604,8 +699,8 @@ function ImagesTab(): ReactNode {
 											className="text-destructive"
 											onClick={() => void deleteImage(row)}
 										>
-											<Trash2 />
-											删除
+											<Trash2 className="size-4" aria-hidden="true" />
+											{t("adminInfra.docker.images.actions.deleteShort")}
 										</Button>
 									</div>
 								)}
@@ -629,11 +724,13 @@ function ImagesTab(): ReactNode {
 // ── 网络 ────────────────────────────────────────────────────────────────────
 
 function NetworksTab(): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const list = useListState(20);
 	const [creating, setCreating] = useState(false);
+	const empty = t("common.empty");
 	const params = offsetParams(list.page, list.pageSize);
 
 	const query = useQuery({
@@ -644,26 +741,34 @@ function NetworksTab(): ReactNode {
 
 	const deleteMutation = useMutation({
 		mutationFn: (row: NetworkInfo) =>
-			callVoid(client.admin.docker.deleteNetwork(row.id), "删除网络"),
+			callVoid(
+				client.admin.docker.deleteNetwork(row.id),
+				t("adminInfra.docker.networks.actions.delete"),
+			),
 		onSuccess: () => {
-			toast.success("网络已删除");
+			toast.success(t("adminInfra.docker.networks.toast.deleted"));
 			void queryClient.invalidateQueries({ queryKey: qk.admin.dockerNetworks() });
 		},
-		onError: (error) => toast.apiError("删除网络失败", error),
+		onError: (error) =>
+			toast.apiError(t("adminInfra.docker.networks.toast.deleteFailed"), error),
 	});
 
 	async function deleteNetwork(row: NetworkInfo) {
 		const ok = await confirm({
-			title: `删除网络 ${row.name}？`,
-			description: `驱动 ${row.driver} · 作用域 ${row.scope} · 子网 ${row.subnet ?? "—"}`,
+			title: t("adminInfra.docker.networks.confirm.title", { name: row.name }),
+			description: t("adminInfra.docker.networks.confirm.description", {
+				driver: row.driver,
+				scope: row.scope,
+				subnet: row.subnet ?? empty,
+			}),
 			consequences: [
-				"已连接到该网络的容器会失去网络连通性（跨容器通信与网关访问中断）",
-				"Docker 拒绝删除仍有活动端点的网络，届时后端会返回具体错误",
-				"删除后不可恢复，需要重建网络并重新连接容器",
+				t("adminInfra.docker.networks.confirm.consequenceConnectivity"),
+				t("adminInfra.docker.networks.confirm.consequenceEndpoints"),
+				t("adminInfra.docker.networks.confirm.consequenceIrreversible"),
 			],
 			tone: "danger",
-			confirmText: "永久删除",
-			confirmPhrase: "DELETE",
+			confirmText: t("adminInfra.docker.networks.confirm.confirm"),
+			confirmPhrase: DELETE_PHRASE,
 		});
 		if (!ok) return;
 		deleteMutation.mutate(row);
@@ -682,55 +787,57 @@ function NetworksTab(): ReactNode {
 	const columns: DataTableColumn<NetworkInfo>[] = [
 		{
 			id: "name",
-			header: "名称",
+			header: t("adminInfra.docker.columns.name"),
 			sortValue: (row) => row.name,
-			cell: (row) => <span className="font-medium">{row.name}</span>,
+			cell: (row) => <span className="font-mono font-medium">{row.name}</span>,
 		},
 		{
 			id: "driver",
-			header: "驱动",
+			header: t("adminInfra.docker.columns.driver"),
 			sortValue: (row) => row.driver,
 			cell: (row) => <TonePill tone="neutral">{row.driver}</TonePill>,
 		},
 		{
 			id: "scope",
-			header: "作用域",
+			header: t("adminInfra.docker.columns.scope"),
 			hideBelow: "sm",
 			sortValue: (row) => row.scope,
 			cell: (row) => <span>{row.scope}</span>,
 		},
 		{
 			id: "subnet",
-			header: "子网",
+			header: t("adminInfra.docker.columns.subnet"),
 			hideBelow: "md",
-			cell: (row) => <MonoText className="text-muted-foreground">{row.subnet ?? "—"}</MonoText>,
+			cell: (row) => <MonoText className="text-muted-foreground">{row.subnet ?? empty}</MonoText>,
 		},
 		{
 			id: "gateway",
-			header: "网关",
+			header: t("adminInfra.docker.columns.gateway"),
 			hideBelow: "lg",
-			cell: (row) => <MonoText className="text-muted-foreground">{row.gateway ?? "—"}</MonoText>,
+			cell: (row) => <MonoText className="text-muted-foreground">{row.gateway ?? empty}</MonoText>,
 		},
 		{
 			id: "id",
-			header: "网络 ID",
+			header: t("adminInfra.docker.columns.networkId"),
 			hideBelow: "xl",
-			cell: (row) => <CopyText value={row.id} label="网络 ID" />,
+			cell: (row) => (
+				<CopyText value={row.id} label={t("adminInfra.docker.columns.networkId")} />
+			),
 		},
 	];
 
 	return (
 		<>
 			<SectionCard
-				title="网络"
-				description="服务端按 offset/limit 分页；搜索只作用于当前页。"
+				title={t("adminInfra.docker.networks.section.title")}
+				description={t("adminInfra.docker.networks.section.description")}
 				actions={
-					<div className="flex flex-wrap items-center gap-2">
+					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
 						<SearchInput
 							value={list.search}
 							onChange={list.setSearch}
-							placeholder="在当前页内筛选（名称 / 子网）"
+							placeholder={t("adminInfra.docker.networks.searchPlaceholder")}
 						/>
 						<Button
 							variant="outline"
@@ -738,25 +845,25 @@ function NetworksTab(): ReactNode {
 							onClick={() => void query.refetch()}
 							disabled={query.isFetching}
 						>
-							<RefreshCw />
-							刷新
+							<RefreshCw className="size-4" aria-hidden="true" />
+							{t("common.refresh")}
 						</Button>
 						<Button size="sm" onClick={() => setCreating(true)}>
-							<Plus />
-							新建网络
+							<Plus className="size-4" aria-hidden="true" />
+							{t("adminInfra.docker.networks.create")}
 						</Button>
-					</div>
+					</Toolbar>
 				}
 			>
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={5} columns={5} />}
-					errorTitle="加载网络列表失败"
+					errorTitle={t("adminInfra.docker.networks.errorTitle")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
 						<EmptyBlock
-							title="没有网络"
-							description="宿主上还没有自定义网络；平台靶场网络通常由赛事流程创建。"
+							title={t("adminInfra.docker.networks.empty.title")}
+							description={t("adminInfra.docker.networks.empty.description")}
 						/>
 					}
 				>
@@ -765,8 +872,8 @@ function NetworksTab(): ReactNode {
 							{visible.length === 0 ? (
 								<EmptyBlock
 									variant="filtered"
-									title="当前页没有匹配的网络"
-									description="后端 Docker 接口不支持服务端过滤，请翻页或清空搜索词"
+									title={t("adminInfra.docker.networks.filtered.title")}
+									description={t("adminInfra.docker.networks.filtered.description")}
 								/>
 							) : (
 								<DataTable
@@ -778,8 +885,8 @@ function NetworksTab(): ReactNode {
 											variant="ghost"
 											size="icon-sm"
 											className="text-destructive"
-											aria-label="删除网络"
-											title="删除网络"
+											aria-label={t("adminInfra.docker.networks.actions.delete")}
+											title={t("adminInfra.docker.networks.actions.delete")}
 											disabled={deleteMutation.isPending}
 											onClick={() => void deleteNetwork(row)}
 										>
@@ -789,12 +896,13 @@ function NetworksTab(): ReactNode {
 									mobileCard={(row) => (
 										<div className="space-y-2">
 											<div className="flex items-start justify-between gap-2">
-												<span className="font-medium">{row.name}</span>
+												<span className="min-w-0 font-mono font-medium break-words">{row.name}</span>
 												<TonePill tone="neutral">{row.driver}</TonePill>
 											</div>
-											<p className="text-xs text-muted-foreground">
-												<MonoText>{row.subnet ?? "—"}</MonoText> · 网关{" "}
-												<MonoText>{row.gateway ?? "—"}</MonoText>
+											<p className="flex flex-wrap items-baseline gap-1 text-xs text-muted-foreground">
+												<MonoText>{row.subnet ?? empty}</MonoText>
+												<span>·</span>
+												<MonoText>{row.gateway ?? empty}</MonoText>
 											</p>
 											<Button
 												variant="ghost"
@@ -802,8 +910,8 @@ function NetworksTab(): ReactNode {
 												className="text-destructive"
 												onClick={() => void deleteNetwork(row)}
 											>
-												<Trash2 />
-												删除
+												<Trash2 className="size-4" aria-hidden="true" />
+												{t("adminInfra.docker.networks.actions.deleteShort")}
 											</Button>
 										</div>
 									)}
@@ -834,6 +942,7 @@ function CreateNetworkSheet({
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const [form, setForm] = useState({
@@ -846,22 +955,35 @@ function CreateNetworkSheet({
 
 	const createMutation = useMutation({
 		mutationFn: (input: { name: string; subnet: string; gateway: string; driver?: string }) =>
-			call(client.admin.docker.createNetwork(input), "创建网络"),
+			call(
+				client.admin.docker.createNetwork(input),
+				t("adminInfra.docker.networks.form.title"),
+			),
 		onSuccess: () => {
-			toast.success("网络已创建", "容器可按名称接入该网络。");
+			toast.success(
+				t("adminInfra.docker.networks.toast.created"),
+				t("adminInfra.docker.networks.toast.createdDescription"),
+			);
 			void queryClient.invalidateQueries({ queryKey: qk.admin.dockerNetworks() });
 			setForm({ name: "", subnet: "", gateway: "", driver: "bridge" });
 			onOpenChange(false);
 		},
-		onError: (error) => toast.apiError("创建网络失败", error),
+		onError: (error) =>
+			toast.apiError(t("adminInfra.docker.networks.toast.createFailed"), error),
 	});
 
 	function submit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		const next: { name?: string; subnet?: string; gateway?: string } = {};
-		if (form.name.trim().length === 0) next.name = "网络名称不能为空";
-		if (form.subnet.trim().length === 0) next.subnet = "子网不能为空（例如 172.20.0.0/16）";
-		if (form.gateway.trim().length === 0) next.gateway = "网关不能为空（例如 172.20.0.1）";
+		if (form.name.trim().length === 0) {
+			next.name = t("adminInfra.docker.networks.form.errors.name");
+		}
+		if (form.subnet.trim().length === 0) {
+			next.subnet = t("adminInfra.docker.networks.form.errors.subnet");
+		}
+		if (form.gateway.trim().length === 0) {
+			next.gateway = t("adminInfra.docker.networks.form.errors.gateway");
+		}
 		setErrors(next);
 		if (Object.keys(next).length > 0) return;
 		createMutation.mutate({
@@ -876,49 +998,68 @@ function CreateNetworkSheet({
 		<FormSheet
 			open={open}
 			onOpenChange={onOpenChange}
-			title="新建 Docker 网络"
-			description="创建自定义 bridge 网络（带显式子网与网关）"
+			title={t("adminInfra.docker.networks.form.title")}
+			description={t("adminInfra.docker.networks.form.description")}
 			width="lg"
 			footer={
 				<FormFooter
 					formId="docker-network-form"
 					isPending={createMutation.isPending}
-					submitLabel="创建"
+					submitLabel={t("adminInfra.docker.networks.form.submit")}
 					onCancel={() => onOpenChange(false)}
-					hint="名称、子网、网关为必填项"
+					hint={t("adminInfra.docker.networks.form.hint")}
 				/>
 			}
 		>
 			<form id="docker-network-form" className="space-y-4" onSubmit={submit}>
-				<Field label="名称" htmlFor="network-name" required error={errors.name}>
+				<Field
+					label={t("adminInfra.docker.networks.form.fields.name")}
+					htmlFor="network-name"
+					required
+					error={errors.name}
+				>
 					<Input
 						id="network-name"
 						value={form.name}
 						onChange={(event) => setForm({ ...form, name: event.target.value })}
-						placeholder="例如 fctf-awd-net"
+						placeholder={t("adminInfra.docker.networks.form.placeholders.name")}
 					/>
 				</Field>
 				<FormGrid columns={2}>
-					<Field label="子网" htmlFor="network-subnet" required error={errors.subnet}>
+					<Field
+						label={t("adminInfra.docker.networks.form.fields.subnet")}
+						htmlFor="network-subnet"
+						required
+						error={errors.subnet}
+					>
 						<Input
 							id="network-subnet"
 							className="font-mono text-xs"
 							value={form.subnet}
 							onChange={(event) => setForm({ ...form, subnet: event.target.value })}
-							placeholder="172.20.0.0/16"
+							placeholder={t("adminInfra.docker.networks.form.placeholders.subnet")}
 						/>
 					</Field>
-					<Field label="网关" htmlFor="network-gateway" required error={errors.gateway}>
+					<Field
+						label={t("adminInfra.docker.networks.form.fields.gateway")}
+						htmlFor="network-gateway"
+						required
+						error={errors.gateway}
+					>
 						<Input
 							id="network-gateway"
 							className="font-mono text-xs"
 							value={form.gateway}
 							onChange={(event) => setForm({ ...form, gateway: event.target.value })}
-							placeholder="172.20.0.1"
+							placeholder={t("adminInfra.docker.networks.form.placeholders.gateway")}
 						/>
 					</Field>
 				</FormGrid>
-				<Field label="驱动" htmlFor="network-driver" hint="默认 bridge。">
+				<Field
+					label={t("adminInfra.docker.networks.form.fields.driver")}
+					htmlFor="network-driver"
+					hint={t("adminInfra.docker.networks.form.driverHint")}
+				>
 					<Input
 						id="network-driver"
 						className="font-mono text-xs"
@@ -926,11 +1067,9 @@ function CreateNetworkSheet({
 						onChange={(event) => setForm({ ...form, driver: event.target.value })}
 					/>
 				</Field>
-				<div className="flex items-start gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-					<Star className="mt-0.5 size-3.5 shrink-0" />
-					<span>
-						子网必须与宿主现有网络不重叠；创建成功后可被赛事 / GameBox 分配流程引用。
-					</span>
+				<div className="flex items-start gap-2 rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+					<Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+					<span>{t("adminInfra.docker.networks.form.note")}</span>
 				</div>
 			</form>
 		</FormSheet>

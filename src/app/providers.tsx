@@ -4,6 +4,7 @@
  */
 
 import { Component, useEffect, type ErrorInfo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Outlet } from "react-router";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -48,7 +49,7 @@ export function SessionBootstrap() {
 
 	const query = useQuery({
 		queryKey: qk.auth.me(),
-		queryFn: () => call(client.service.users.getMe(), "当前用户信息"),
+		queryFn: () => call(client.service.users.getMe(), "users.getMe"),
 		enabled: userToken !== null,
 		retry: false,
 		staleTime: 60_000,
@@ -91,20 +92,27 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBound
 	render(): ReactNode {
 		if (this.state.error) {
 			return (
-				<div className="mx-auto max-w-2xl p-6">
-					<ErrorBlock
-						error={this.state.error}
-						title="界面渲染出错"
-						onRetry={() => this.setState({ error: null })}
-					/>
-					<p className="mt-3 text-center text-xs text-muted-foreground">
-						如果反复出现，请刷新页面；已登录状态不会丢失。
-					</p>
-				</div>
+				<RenderErrorFallback
+					error={this.state.error}
+					onRetry={() => this.setState({ error: null })}
+				/>
 			);
 		}
 		return this.props.children;
 	}
+}
+
+/** 渲染崩溃的可恢复兜底（函数组件才能用 i18n）。 */
+function RenderErrorFallback({ error, onRetry }: { error: Error; onRetry: () => void }) {
+	const { t } = useTranslation();
+	return (
+		<div className="mx-auto max-w-2xl p-6">
+			<ErrorBlock error={error} title={t("shell.renderError.title")} onRetry={onRetry} />
+			<p className="mt-3 text-center text-xs text-muted-foreground">
+				{t("shell.renderError.hint")}
+			</p>
+		</div>
+	);
 }
 
 /** 路由根布局：所有页面 + 全局命令面板 + toast 宿主。 */

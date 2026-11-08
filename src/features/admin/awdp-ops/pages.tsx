@@ -7,23 +7,33 @@
  *
  * 实时性说明：后端没有管理端 AWDP SSE 通道（只有选手端 `/api/events/{id}/awdp/stream`），
  * 因此本页用 30s 轮询 + 显式刷新，而不是挂一个连不上的管理端流。
+ *
+ * 文案全部走 i18n（`adminAwdpOps.*`），阶段文案与动作门禁来自 `./shared`（SDK `AwdpPhase`）。
  */
 
-import { useCallback } from "react";
-import { Link, useParams } from "react-router";
+import { useCallback, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2, Play, RefreshCw, RotateCcw, Square } from "lucide-react";
 
+import { isForbidden, isNotFound } from "~/api/errors";
 import { useClient } from "~/api/client";
+import { TonePill } from "~/components/app/badges";
 import { qk } from "~/api/keys";
 import { useConfirm } from "~/components/app/confirm";
 import { KeyValueList, PageBody, PageHeader, SectionCard } from "~/components/app/page";
-import { ErrorBlock, LoadingBlock } from "~/components/app/states";
+import {
+	ErrorBlock,
+	LoadingBlock,
+	NotFoundBlock,
+	PermissionDeniedBlock,
+} from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { formatDuration } from "~/lib/format";
-import { EVENT_FAMILY_LABEL } from "~/lib/event-status";
+import { EVENT_FAMILY_KEY, PARTICIPANT_MODE_KEY } from "~/lib/event-status";
+import { formatDuration, formatInt } from "~/lib/format";
 import { useDocumentTitle } from "~/lib/hooks";
 
 import { AwdpConfigTab } from "./config-tab";
@@ -33,28 +43,51 @@ import { AwdpInstancesTab } from "./instances-tab";
 import { useAwdpConfig, useAwdpEvent } from "./queries";
 import { AwdpScoresTab } from "./scores-tab";
 import {
-	AWDP_ACTION_CONFIRM,
-	AWDP_ACTION_LABEL,
-	AWDP_PHASE_DESCRIPTION,
+	AWDP_ACTION_ORDER,
+	AWDP_PHASE_ORDER,
 	AwdpPhasePill,
+	awdpActionConfirm,
+	awdpActionLabel,
+	awdpPhaseDescription,
+	awdpPhaseLabel,
+	awdpPhaseTone,
 	buildAwdpGates,
 	runAwdpAction,
 	type AwdpAction,
 } from "./shared";
 
-const ACTION_ORDER: AwdpAction[] = ["start", "breakToFix", "finish"];
+const TAB_KEYS = ["config", "gameboxes", "instances", "scores", "data"] as const;
+type TabKey = (typeof TAB_KEYS)[number];
 
-export function AwdpOpsPage() {
-	useDocumentTitle("AWDP 运维 · FloatCTF");
+function normalizeTab(raw: string | null): TabKey {
+	return TAB_KEYS.find((key) => key === raw) ?? "config";
+}
+
+const ACTION_ICON: Record<AwdpAction, ReactNode> = {
+	start: <Play aria-hidden="true" />,
+	breakToFix: <RotateCcw aria-hidden="true" />,
+	finish: <Square aria-hidden="true" />,
+};
+
+export function AwdpOpsPage(): ReactNode {
 	const { eventId = "" } = useParams<{ eventId: string }>();
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
+	const [searchParams, setSearchParams] = useSearchParams();
 
 	const eventQuery = useAwdpEvent(eventId);
 	const configQuery = useAwdpConfig(eventId);
-
+	const event = eventQuery.data;
 	const phase = configQuery.data?.phase ?? null;
+	const tab = normalizeTab(searchParams.get("tab"));
+
+	useDocumentTitle(
+		event
+			? t("adminAwdpOps.page.documentTitleNamed", { name: event.title })
+			: t("adminAwdpOps.page.documentTitle"),
+	);
 
 	const refreshAll = useCallback(() => {
 		void queryClient.invalidateQueries({ queryKey: qk.awdp.adminConfig(eventId) });
@@ -66,75 +99,152 @@ export function AwdpOpsPage() {
 	}, [queryClient, eventId]);
 
 	const lifecycle = useMutation({
-		mutationFn: (action: AwdpAction) => runAwdpAction(client, eventId, action),
+		mutationFn: (action: AwdpAction) => runAwdpAction(client, eventId, action, t),
 		onSuccess: (_result, action) => {
-			toast.success(`${AWDP_ACTION_LABEL[action]}已提交`, "阶段已更新。");
+			toast.success(
+				t("adminAwdpOps.actions.submitted", { action: awdpActionLabel(action, t) }),
+				t("adminAwdpOps.actions.submittedDescription"),
+			);
 			refreshAll();
 		},
-		onError: (error, action) => toast.apiError(`${AWDP_ACTION_LABEL[action]}失败`, error),
+		onError: (error, action) =>
+			toast.apiError(
+				t("adminAwdpOps.actions.failed", { action: awdpActionLabel(action, t) }),
+				error,
+			),
 	});
 
-	const gates = buildAwdpGates(phase);
-	const event = eventQuery.data;
+	const phaseIndex = phase === null ? -1 : AWDP_PHASE_ORDER.indexOf(phase);
+	const gates = buildAwdpGates(phase, t);
+	const pendingAction = lifecycle.isPending ? lifecycle.variables : null;
+	const refreshing = configQuery.isFetching || eventQuery.isFetching;
+
+	const changeTab = (next: string) => {
+		const nextParams = new URLSearchParams(searchParams);
+		nextParams.set("tab", next);
+		setSearchParams(nextParams, { replace: true });
+	};
+
+	if (eventId === "") {
+		return (
+			<PageBody>
+				<NotFoundBlock
+					title={t("adminAwdpOps.page.missingEventIdTitle")}
+					description={t("adminAwdpOps.page.missingEventIdDescription")}
+					action={
+						<Button asChild>
+							<Link to="/admin/events">{t("adminAwdpOps.page.backToEvents")}</Link>
+						</Button>
+					}
+				/>
+			</PageBody>
+		);
+	}
 
 	if (eventQuery.isPending) {
 		return (
 			<PageBody>
-				<PageHeader title="AWDP 赛事运维" description="加载赛事信息…" />
-				<LoadingBlock label="加载赛事…" />
+				<PageHeader
+					title={t("adminAwdpOps.page.title")}
+					description={t("adminAwdpOps.page.loadingDescription")}
+				/>
+				<LoadingBlock label={t("adminAwdpOps.page.loading")} />
 			</PageBody>
 		);
 	}
 
 	if (eventQuery.isError) {
+		if (isForbidden(eventQuery.error)) {
+			return (
+				<PageBody>
+					<PageHeader title={t("adminAwdpOps.page.title")} />
+					<PermissionDeniedBlock description={t("adminAwdpOps.page.forbiddenDescription")} />
+				</PageBody>
+			);
+		}
+		if (isNotFound(eventQuery.error)) {
+			return (
+				<PageBody>
+					<PageHeader title={t("adminAwdpOps.page.title")} />
+					<NotFoundBlock
+						title={t("adminAwdpOps.page.notFoundTitle")}
+						description={t("adminAwdpOps.page.notFoundDescription")}
+						action={
+							<Button asChild>
+								<Link to="/admin/events">{t("adminAwdpOps.page.backToEvents")}</Link>
+							</Button>
+						}
+					/>
+				</PageBody>
+			);
+		}
 		return (
 			<PageBody>
-				<PageHeader title="AWDP 赛事运维" />
-				<ErrorBlock error={eventQuery.error} title="加载赛事失败" onRetry={() => eventQuery.refetch()} />
-				<Button variant="outline" size="sm" asChild>
+				<PageHeader title={t("adminAwdpOps.page.title")} />
+				<ErrorBlock
+					error={eventQuery.error}
+					title={t("adminAwdpOps.page.loadError")}
+					onRetry={() => void eventQuery.refetch()}
+				/>
+				<Button variant="outline" size="sm" className="w-fit" asChild>
 					<Link to="/admin/events">
-						<ArrowLeft /> 返回赛事列表
+						<ArrowLeft aria-hidden="true" /> {t("adminAwdpOps.page.backToEvents")}
 					</Link>
 				</Button>
 			</PageBody>
 		);
 	}
 
+	const familyKey = event ? EVENT_FAMILY_KEY[event.family] : undefined;
+	const modeKey = event ? PARTICIPANT_MODE_KEY[event.participant_mode] : undefined;
+
 	return (
 		<PageBody>
 			<PageHeader
-				title={`${event?.title ?? "赛事"} · AWDP 运维`}
-				description="AWDP 全流程运维：配置、阶段推进、GameBox 挂载、实例与积分。"
+				title={
+					event
+						? t("adminAwdpOps.page.titleNamed", { name: event.title })
+						: t("adminAwdpOps.page.title")
+				}
+				description={t("adminAwdpOps.page.subtitle")}
+				badge={<AwdpPhasePill phase={phase} />}
 				breadcrumbs={
-					<span className="inline-flex items-center gap-1.5">
-						<Link className="hover:text-foreground" to="/admin/events">
-							赛事
+					<span className="inline-flex flex-wrap items-center gap-1.5">
+						<Link className="hover:text-foreground hover:underline" to="/admin/events">
+							{t("adminAwdpOps.page.breadcrumbEvents")}
 						</Link>
-						<span>/</span>
-						<Link className="hover:text-foreground" to={`/admin/events/${eventId}`}>
+						<span aria-hidden="true">/</span>
+						<Link
+							className="max-w-[16rem] truncate hover:text-foreground hover:underline"
+							to={`/admin/events/${eventId}`}
+							title={event?.title ?? eventId}
+						>
 							{event?.title ?? eventId}
 						</Link>
-						<span>/</span>
-						<span>AWDP 运维</span>
+						<span aria-hidden="true">/</span>
+						<span className="text-foreground" aria-current="page">
+							{t("adminAwdpOps.page.breadcrumbCurrent")}
+						</span>
 					</span>
 				}
-				badge={<AwdpPhasePill phase={phase} />}
 				actions={
 					<>
 						<Button
 							variant="outline"
 							size="sm"
-							disabled={configQuery.isFetching}
+							disabled={refreshing}
 							onClick={() => {
 								void configQuery.refetch();
 								refreshAll();
 							}}
 						>
-							<RefreshCw /> 刷新
+							<RefreshCw className={refreshing ? "animate-spin" : undefined} aria-hidden="true" />
+							{t("common.refresh")}
 						</Button>
-						<Button variant="outline" size="sm" asChild>
+						<Button variant="ghost" size="sm" asChild>
 							<Link to={`/admin/events/${eventId}`}>
-								<ArrowLeft /> 赛事控制台
+								<ArrowLeft aria-hidden="true" />
+								{t("adminAwdpOps.page.backToConsole")}
 							</Link>
 						</Button>
 					</>
@@ -142,50 +252,100 @@ export function AwdpOpsPage() {
 			/>
 
 			<SectionCard
-				title="阶段推进"
-				description="后端 tick 会按时间自动推进；这里的按钮用于提前推进，可用性由当前阶段决定"
+				title={t("adminAwdpOps.phase.sectionTitle")}
+				description={t("adminAwdpOps.phase.sectionDescription")}
 			>
-				<div className="space-y-3">
+				<div className="space-y-4">
 					<div className="flex flex-wrap items-center gap-2">
 						<AwdpPhasePill phase={phase} />
 						<span className="text-xs text-muted-foreground">
-							{AWDP_PHASE_DESCRIPTION[phase ?? ""] ?? "尚未读取到阶段。"}
+							{configQuery.isPending ? t("common.loading") : awdpPhaseDescription(phase, t)}
 						</span>
 					</div>
 
+					{phaseIndex >= 0 ? (
+						<ol
+							className="flex flex-wrap items-center gap-1.5"
+							aria-label={t("adminAwdpOps.phase.stepsLabel")}
+						>
+							{AWDP_PHASE_ORDER.map((step, index) => (
+								<li key={step} className="flex items-center gap-1.5">
+									{index > 0 ? (
+										<ChevronRight
+											className="size-3.5 text-muted-foreground"
+											aria-hidden="true"
+										/>
+									) : null}
+									{index === phaseIndex ? (
+										<TonePill tone={awdpPhaseTone(step)}>
+											{awdpPhaseLabel(step, t)}
+										</TonePill>
+									) : (
+										<span
+											className={
+												index < phaseIndex ? "text-xs text-foreground" : "text-xs text-muted-foreground"
+											}
+										>
+											{awdpPhaseLabel(step, t)}
+										</span>
+									)}
+								</li>
+							))}
+						</ol>
+					) : null}
+
 					<div className="flex flex-wrap items-center gap-2">
-						{ACTION_ORDER.map((action) => {
+						{AWDP_ACTION_ORDER.map((action) => {
 							const gate = gates[action];
+							const label = awdpActionLabel(action, t);
+							const variant =
+								!gate.enabled ? "outline" : action === "finish" ? "destructive" : "default";
 							return (
 								<Button
 									key={action}
-									variant={action === "breakToFix" ? "outline" : "destructive"}
+									variant={variant}
 									size="sm"
 									disabled={!gate.enabled || lifecycle.isPending}
-									title={gate.reason ?? AWDP_ACTION_LABEL[action]}
+									title={gate.reason ?? undefined}
 									onClick={async () => {
-										const ok = await confirm(AWDP_ACTION_CONFIRM[action]);
+										const ok = await confirm(awdpActionConfirm(action, t));
 										if (ok) lifecycle.mutate(action);
 									}}
 								>
-									{AWDP_ACTION_LABEL[action]}
+									{pendingAction === action ? (
+										<Loader2 className="animate-spin" aria-hidden="true" />
+									) : (
+										ACTION_ICON[action]
+									)}
+									{label}
 								</Button>
 							);
 						})}
 					</div>
 
+					{configQuery.isError ? (
+						<ErrorBlock
+							error={configQuery.error}
+							title={t("adminAwdpOps.phase.configError")}
+							onRetry={() => void configQuery.refetch()}
+						/>
+					) : null}
+
 					<ul className="space-y-1 text-xs text-muted-foreground">
-						<li>Break 到期后由 tick 自动推进到修复阶段；Fix 最后一轮 cutoff 后自动结束。</li>
-						<li>
-							「攻破 → 修复」会把全部实例重置为 pristine（runtime_generation +1，公开端口不变）；
-							重置失败会停在 preparing_fix，可用同一按钮重试。
-						</li>
-						{ACTION_ORDER.filter((action) => !gates[action].enabled).map((action) => (
-							<li key={action}>
-								<span className="text-foreground">{AWDP_ACTION_LABEL[action]} 暂不可用</span>
-								<span> · {gates[action].reason}</span>
-							</li>
-						))}
+						<li>{t("adminAwdpOps.phase.autoAdvanceNote")}</li>
+						<li>{t("adminAwdpOps.phase.resetNote")}</li>
+						{configQuery.data
+							? AWDP_ACTION_ORDER.filter((action) => !gates[action].enabled).map((action) => (
+									<li key={action}>
+										<span className="text-foreground">
+											{t("adminAwdpOps.phase.disabledAction", {
+												action: awdpActionLabel(action, t),
+											})}
+										</span>
+										<span> · {gates[action].reason}</span>
+									</li>
+								))
+							: null}
 					</ul>
 
 					{configQuery.data ? (
@@ -193,41 +353,64 @@ export function AwdpOpsPage() {
 							columns={3}
 							items={[
 								{
-									key: "总时长（Break + Fix）",
-									value: formatDuration(
-										configQuery.data.break_duration_secs + configQuery.data.fix_duration_secs,
+									key: t("adminAwdpOps.phase.meta.totalDuration"),
+									value: (
+										<span className="tnum">
+											{formatDuration(
+												configQuery.data.break_duration_secs +
+													configQuery.data.fix_duration_secs,
+											)}
+										</span>
 									),
 								},
-								{ key: "总回合数", value: configQuery.data.total_rounds },
-								{ key: "当前回合", value: configQuery.data.current_round },
-								{ key: "Break 分值", value: configQuery.data.break_score },
-								{ key: "每回合 Fix 分值", value: configQuery.data.fix_round_score },
 								{
-									key: "配置代数",
-									value: configQuery.data.configuration_generation,
+									key: t("adminAwdpOps.phase.meta.totalRounds"),
+									value: <span className="tnum">{formatInt(configQuery.data.total_rounds)}</span>,
+								},
+								{
+									key: t("adminAwdpOps.phase.meta.currentRound"),
+									value: (
+										<span className="tnum">{formatInt(configQuery.data.current_round)}</span>
+									),
+								},
+								{
+									key: t("adminAwdpOps.phase.meta.breakScore"),
+									value: <span className="tnum">{formatInt(configQuery.data.break_score)}</span>,
+								},
+								{
+									key: t("adminAwdpOps.phase.meta.fixRoundScore"),
+									value: (
+										<span className="tnum">{formatInt(configQuery.data.fix_round_score)}</span>
+									),
+								},
+								{
+									key: t("adminAwdpOps.phase.meta.configurationGeneration"),
+									value: (
+										<span className="tnum">
+											{formatInt(configQuery.data.configuration_generation)}
+										</span>
+									),
 								},
 							]}
-						/>
-					) : null}
-
-					{configQuery.isError ? (
-						<ErrorBlock
-							error={configQuery.error}
-							title="加载 AWDP 配置失败"
-							onRetry={() => configQuery.refetch()}
 						/>
 					) : null}
 				</div>
 			</SectionCard>
 
-			<Tabs defaultValue="config">
-				<TabsList className="no-scrollbar flex w-full justify-start overflow-x-auto">
-					<TabsTrigger value="config">配置</TabsTrigger>
-					<TabsTrigger value="gameboxes">GameBox 挂载</TabsTrigger>
-					<TabsTrigger value="instances">实例</TabsTrigger>
-					<TabsTrigger value="scores">积分榜</TabsTrigger>
-					<TabsTrigger value="data">数据大屏</TabsTrigger>
-				</TabsList>
+			<Tabs value={tab} onValueChange={changeTab}>
+				<div className="overflow-x-auto">
+					<TabsList
+						variant="line"
+						className="w-max min-w-full justify-start"
+						aria-label={t("adminAwdpOps.tabs.label")}
+					>
+						<TabsTrigger value="config">{t("adminAwdpOps.tabs.config")}</TabsTrigger>
+						<TabsTrigger value="gameboxes">{t("adminAwdpOps.tabs.gameboxes")}</TabsTrigger>
+						<TabsTrigger value="instances">{t("adminAwdpOps.tabs.instances")}</TabsTrigger>
+						<TabsTrigger value="scores">{t("adminAwdpOps.tabs.scores")}</TabsTrigger>
+						<TabsTrigger value="data">{t("adminAwdpOps.tabs.data")}</TabsTrigger>
+					</TabsList>
+				</div>
 				<TabsContent value="config" className="mt-4">
 					<AwdpConfigTab eventId={eventId} />
 				</TabsContent>
@@ -247,8 +430,10 @@ export function AwdpOpsPage() {
 
 			{event ? (
 				<p className="text-xs text-muted-foreground">
-					赛制：{EVENT_FAMILY_LABEL[event.family] ?? event.family} · 参与模式：
-					{event.participant_mode}
+					{t("adminAwdpOps.page.meta", {
+						family: familyKey ? t(familyKey) : event.family,
+						mode: modeKey ? t(modeKey) : event.participant_mode,
+					})}
 				</p>
 			) : null}
 		</PageBody>

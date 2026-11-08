@@ -8,7 +8,12 @@
   逐行状态见 [CAPABILITY-COVERAGE.md](./CAPABILITY-COVERAGE.md)。
 - **技术栈**：React 19 · TypeScript 5.7 · Vite 6 · Tailwind CSS v4 · shadcn/ui（Radix + CVA）·
   react-router v7 · TanStack Query v5 · TanStack Table v8 · Zustand v5 · sonner · cmdk ·
-  react-markdown + remark-gfm · @xterm/xterm。
+  react-markdown + remark-gfm · @xterm/xterm · **react-i18next（中英双语）** · Geist Variable。
+- **视觉**：严格遵循主仓库 [`docs/theme.md`](../../docs/theme.md) 的「中性控制台」主题 ——
+  纯中性 OKLCH 灰阶（chroma=0）、亮色默认（`#fafafa` / `#0f0f0f`）、Geist 字体、1px 描边优先、
+  颜色只表达状态（emerald / amber / sky / destructive，带暗色变体）、10px 控件圆角 / 14px 卡片圆角。
+- **多语言**：所有用户可见文案走 `t()`，中英资源按域命名空间存放（`src/lib/locales/{zh,en}/domains/`），
+  一致性由 `pnpm i18n:check` 守护（key 与插值占位符必须两端一致）。
 - **交互模型**：双工作区（选手端 **Field** / 管理端 **Control Room**）+ 赛事工作区（标签面板）+
   AWD/AWDP 单页驾驶舱 + 全局命令面板（⌘K）+ 移动端底部导航。
 - **依赖边界**：只 import `@floatctf/sdk`、`@floatctf/frontend-runtime`、`@floatctf/react` 与第三方库；
@@ -40,8 +45,33 @@ cd /home/fb0sh/Projects/floatctf && mise exec -- pnpm install
 mise exec -- pnpm --filter @floatctf/frontend-shadcn typecheck
 mise exec -- pnpm --filter @floatctf/frontend-shadcn build
 
+# 单独跑两项守护检查（build 也会自动跑）
+mise exec -- pnpm --filter @floatctf/frontend-shadcn i18n:check     # 中英 key / 插值 / 代码引用
+mise exec -- pnpm --filter @floatctf/frontend-shadcn theme:audit    # theme.md 可机械检查的部分
+
 # 开发服务器（默认 :13400，自己代理 /api 到开发入口 Caddy :7780）
 mise exec -- pnpm --filter @floatctf/frontend-shadcn dev
+
+# 只想看 UI（本机没有后端时）：起一个 dev-only 的 mock API 占住 :7780
+#   ⚠️ 数据是假的，仅用于视觉预览，绝不进制品；任意账号密码即可“登录”。
+#   默认只监听 127.0.0.1；需要从 WireGuard / 局域网访问时显式放行：
+mise exec -- pnpm --filter @floatctf/frontend-shadcn mock:api -- --host 127.0.0.1 --host 10.66.66.2
+```
+
+mock 路由有快照校验（误删会立即失败）：
+
+```bash
+mise exec -- pnpm --filter @floatctf/frontend-shadcn mock:check          # 对比 scripts/mock-routes.snapshot.json
+mise exec -- pnpm --filter @floatctf/frontend-shadcn mock:check -- --update  # 有意新增路由后落盘
+```
+
+mock 覆盖到「能点通」的程度（赛事 / 题库 / 题解 / 训练场 / AWD / AWDP / 管理端运维），
+并包含 **SSE**：`/events/{id}/awd/stream`、`/events/{id}/awdp/stream`、
+`/service/awdp/runs/{id}/stream` 会保持连接并心跳，因此 UI 的实时通道显示「已连接」。
+想验「断线 → 轮询 → 重连」可以：
+
+```bash
+curl -X POST http://127.0.0.1:7780/api/__sse/close   # 主动断开全部 SSE，前端会立刻转 reconnecting 再自动连回
 ```
 
 打开 **http://127.0.0.1:13400**（或局域网地址）。
@@ -165,7 +195,8 @@ export const feature: FeatureModule = {
 5. **凭据安全**：token 只存在本前端的 store（localStorage，异常兜底），**绝不进 URL / query string**；
    SSH 密码、WireGuard 私钥、flag 等敏感值用 `SecretValue` 默认模糊；不渲染 `password` 字段。
 6. **可访问性**：全部交互可键盘完成；图标按钮带 `aria-label`；对话框/抽屉用 Radix（自带焦点陷阱与
-   `aria-*`）；状态不只靠颜色区分。
+   `aria-*`）；状态不只靠颜色区分。Tab 第一站是「跳到主内容」；命令面板 / 抽屉 / 确认框关闭后焦点
+   回到触发控件（触发元素被列表刷新替换时退回主内容），实现在 `src/lib/focus.ts`。
 7. **资产路径**：一律用 `context.assetBaseUrl` 解析自带资产，绝不硬编码站点根。
 
 ## 7. 已知契约观察（供平台维护者）
@@ -187,10 +218,19 @@ export const feature: FeatureModule = {
    `family=awd` 只允许 `participant_mode=team`；`family=awdp` 只允许 `individual`；
    `purpose=practice` 的 AWDP 赛事**不支持** `join/team`（`UnsupportedForPurpose`），
    练习入口走 `/training`（`awdp.runs`），赛事工作台只对 competition 赛事的参赛者开放。
-5. 后台刷新语义沿用平台已核实值：积分榜 / 趋势 / 解题流水 / 实例 30s，赛事公告与管理端 dashboard 60s，
+5. ~~SSE 失效 key 不一致~~：已对齐 —— `qk.awdp.evaluations` 现为 `["awdp-evals", eventId]`，
+   与 `@floatctf/react` 的 `useAwdpEventStream` 失效列表一致（评测面板随事件刷新）。
+   `qk.runs.evaluations` 对应 `["awdp-run-evals", runId]`，同样与 `useAwdpRunStream` 对齐。
+6. **AWDP 实例缺少 SSH 凭据字段（PUBLIC SDK GAP）**：`AwdpRunDto` / `AwdpInstance` /
+   `AwdpEndpoint` 只有 http/tcp 的 host/port 与 flag server URL，没有 user/password，
+   因此训练/工作台无法渲染 SSH 凭据（不造假数据）。
+7. 后台刷新语义沿用平台已核实值：积分榜 / 趋势 / 解题流水 / 实例 30s，赛事公告与管理端 dashboard 60s，
    AWD/AWDP 面板由 SSE 驱动（非连接态由 `@floatctf/react` 自动降级轮询）。
 
 ## 8. 界面截图
+
+> **截图版本**：**v0.2 主题**（中性黑白、亮色默认、Geist、中英双语），
+> 2026-11-08 按 [docs/theme.md](../../docs/theme.md) 重采，视口 1600×920。
 
 全部截图在**真实 API + 真实播种数据**下采集（见 [docs/E2E-ACCEPTANCE.md](./docs/E2E-ACCEPTANCE.md)），
 原图在 [`docs/images/`](./docs/images/)。
@@ -224,7 +264,7 @@ export const feature: FeatureModule = {
 | 4 | `awd.admin.precheck` 声明 `string`，实际返回对象（`run_id/status/error_msg/failed_checks/checks`） | 预检结果无法展示 | 按真实对象解析 |
 | 5 | `AwdEventConfigInput/AwdEventStatus` 缺 `judge_grace_period_secs` | 该字段无法编辑 | 只读展示 |
 | 6 | `AwdpAdminInstanceDto` 缺 `reset_count` | — | 类型保护读取展示 |
-| 7 | `settings.fetch` 无参数；`weapons.fetch` 忽略参数且无 meta；`super_admin.fetch` 无 filter；Docker 实为 `offset/limit` 且无 filter | 这些列表无法服务端搜索/分页 | 客户端搜索分页，并在页面上写明 |
+| 7 | `settings.fetch` 无参数（不支持服务端搜索/分页）；Docker 用 `offset/limit` 且无 filter | 这两个列表只能客户端处理 | 页面上写明「视图内搜索」/「offset·limit」，不伪装成服务端行为 |
 | 8 | `scheduled_tasks.payload` 声明 `string` 实为 JSON 值；`timeout_secs` 声明 `string` 实为 number | 无法在不使用 `any` 的前提下提交对象 payload | payload 只读展示 |
 | 9 | `AWD_ADMIN_QUERY_KEYS` 不含 event-gameboxes / event-network；管理端无 AWDP SSE（矩阵第 204 行「可用管理端 AWD 流」不成立） | 这两块不随 SSE 刷新 | 手动刷新时补失效；AWDP 管理页用 30s 轮询 |
 | 10 | `updateEventGamebox` 的可空判题字段后端缺 `deserialize_nullable`：显式 `null` 被静默忽略 | 「清空」语义不成立 | 表单禁止清空并写明 |

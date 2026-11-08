@@ -2,11 +2,25 @@
 
 import * as React from "react"
 import { cn } from "~/lib/utils"
+import i18n from "~/lib/i18n"
 import { XIcon } from "lucide-react"
 import { Dialog as SheetPrimitive } from "radix-ui"
+import { restoreFocusAfterLayer } from "~/lib/focus"
 
-function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+function Sheet({ open, ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
+  // 受控 Sheet 关闭后还原焦点（Radix 在触发元素被重渲染时会落到 body）。
+  const wasOpen = React.useRef(false)
+  React.useEffect(() => {
+    if (open) {
+      wasOpen.current = true
+      return
+    }
+    if (wasOpen.current) {
+      wasOpen.current = false
+      restoreFocusAfterLayer()
+    }
+  }, [open])
+  return <SheetPrimitive.Root data-slot="sheet" open={open} {...props} />
 }
 
 function SheetTrigger({
@@ -35,7 +49,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+        "fixed inset-0 z-50 bg-black/20 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
         className
       )}
       {...props}
@@ -53,13 +67,14 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  // Radix 的焦点还原在「触发按钮被重渲染 / 条件挂载」时会落到 body：卸载时统一还原。
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-background shadow-lg transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:animate-in data-[state=open]:duration-500",
+          "fixed z-50 flex flex-col gap-4 rounded-none bg-popover shadow-lg transition ease-out data-[state=closed]:animate-out data-[state=closed]:duration-200 data-[state=open]:animate-in data-[state=open]:duration-200",
           side === "right" &&
             "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
           side === "left" &&
@@ -76,7 +91,7 @@ function SheetContent({
         {showCloseButton && (
           <SheetPrimitive.Close className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-secondary">
             <XIcon className="size-4" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{i18n.t("common.close")}</span>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Content>

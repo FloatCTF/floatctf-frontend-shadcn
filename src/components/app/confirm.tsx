@@ -15,6 +15,11 @@
  * ```
  */
 
+import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+
+import { restoreFocusAfterLayer } from "~/lib/focus";
+
 import {
 	createContext,
 	useCallback,
@@ -62,6 +67,7 @@ interface PendingConfirm extends ConfirmOptions {
 const ConfirmContext = createContext<ConfirmFn | null>(null);
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+	const { t } = useTranslation();
 	const [pending, setPending] = useState<PendingConfirm | null>(null);
 	const [phrase, setPhrase] = useState("");
 	// 保证「关掉对话框（Esc / 遮罩）」也会 resolve(false)，不会悬挂 await。
@@ -87,6 +93,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 	);
 
 	const value = useMemo(() => confirm, [confirm]);
+	useEffect(() => {
+		if (!pending) return;
+		return () => restoreFocusAfterLayer();
+	}, [pending]);
+
 	const phraseOk = !pending?.confirmPhrase || phrase.trim() === pending.confirmPhrase;
 
 	return (
@@ -124,21 +135,21 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 					{pending?.confirmPhrase ? (
 						<div className="space-y-1.5">
 							<Label htmlFor="confirm-phrase">
-								输入 <span className="font-mono">{pending.confirmPhrase}</span> 以确认
+								{t("common.confirm.confirmPhrase", { phrase: pending.confirmPhrase })}
 							</Label>
 							<Input
 								id="confirm-phrase"
 								value={phrase}
 								autoComplete="off"
 								onChange={(event) => setPhrase(event.target.value)}
-								placeholder={pending.confirmPhrase}
+								placeholder={t("common.confirm.typePhraseHint")}
 							/>
 						</div>
 					) : null}
 
 					<AlertDialogFooter>
 						<AlertDialogCancel onClick={() => finish(false)}>
-							{pending?.cancelText ?? "取消"}
+							{pending?.cancelText ?? t("common.cancel")}
 						</AlertDialogCancel>
 						<AlertDialogAction
 							disabled={!phraseOk}
@@ -152,7 +163,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 								finish(true);
 							}}
 						>
-							{pending?.confirmText ?? "确认"}
+							{pending?.confirmText ?? t("common.confirmAction")}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

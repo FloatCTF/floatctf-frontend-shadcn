@@ -8,15 +8,20 @@
  * 4. 可选：写自己的题解（`getMyWriteup` / `createMyWriteup`）与查看他人题解。
  *
  * 注意：`InstancesDto.flag` 由后端恒定脱敏为空 —— 绝不把空值当 flag 展示或兜底。
+ *
+ * 版式：题库详情页把本组件当作**整块工作区**（`PageBody` 扣掉外壳高度后传入
+ * `lg:flex-1`），左右两栏各自独立滚动；赛事页仍按普通页面流嵌入。
  */
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
 	CheckCircle2,
 	Download,
 	ExternalLink,
 	FileText,
+	Loader2,
 	Paperclip,
 	RotateCw,
 	Send,
@@ -26,6 +31,7 @@ import {
 import { call, callMaybe, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
+import { useConfirm } from "~/components/app/confirm";
 import { MarkdownEditor, MarkdownView } from "~/components/app/markdown";
 import {
 	CopyText,
@@ -34,7 +40,7 @@ import {
 	ReadonlyBlock,
 	SectionCard,
 } from "~/components/app/page";
-import { EmptyBlock, ErrorBlock, InlineError, LoadingBlock } from "~/components/app/states";
+import { EmptyBlock, ErrorBlock, InlineError, LoadingBlock, QueryState } from "~/components/app/states";
 import { TonePill } from "~/components/app/badges";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
@@ -45,12 +51,16 @@ import type { ChallengesListItem, Instances } from "@floatctf/sdk";
 import { isNotFound } from "~/api/errors";
 import { formatBytes, formatDateTime, formatRelative } from "~/lib/format";
 import { useNow } from "~/lib/hooks";
+import { cn } from "~/lib/utils";
 
 export type WorkbenchMode = { kind: "practice" } | { kind: "event"; eventId: string };
 
 export interface ChallengeWorkbenchProps {
 	challenge: ChallengesListItem;
 	mode: WorkbenchMode;
+	className?: string;
+	/** 附着在左栏底部的额外区块（题库详情页用它放公开题解）。 */
+	children?: ReactNode;
 }
 
 /** 后端把实例入口写成一条 `<a href=...>`（见 instance_service.rs）；这里只取 URL，不注入 HTML。 */
@@ -77,7 +87,9 @@ function instanceStatusTone(status: string | undefined): "success" | "warning" |
 	}
 }
 
-export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps) {
+export function ChallengeWorkbench({ challenge, mode, className, children }: ChallengeWorkbenchProps) {
+	const { t } = useTranslation();
+	const confirm = useConfirm();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const now = useNow(30_000);
@@ -128,26 +140,29 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 				? call<Instances>(client.service.events.launchSingleInstance(eventId, challenge.id), "启动实例")
 				: call<Instances>(client.service.instances.launch(challenge.id), "启动实例"),
 		onSuccess: () => {
-			toast.success("实例已启动");
+			toast.success(t("jeopardy.workbench.env.started"));
 			invalidateAfterInstanceChange();
 		},
-		onError: (error) => toast.apiError("启动实例失败", error),
+		onError: (error) => toast.apiError(t("jeopardy.workbench.env.startFailed"), error),
 	});
 
 	const destroy = useMutation({
 		mutationFn: (instanceId: string) =>
 			callVoid(client.service.instances.destroy(instanceId), "销毁实例"),
 		onSuccess: () => {
-			toast.success("实例已销毁");
+			toast.success(t("jeopardy.workbench.env.destroyed"));
 			invalidateAfterInstanceChange();
 		},
-		onError: (error) => toast.apiError("销毁实例失败", error),
+		onError: (error) => toast.apiError(t("jeopardy.workbench.env.destroyFailed"), error),
 	});
 
 	const submit = useMutation({
+		// 后端 `POST /submit/flag` 是 `UniResponse<()>`：成功时 data 为 null。
+		// SDK 类型声称返回 ChallengeSolves，但不能拿 `call()` 要求非空 data，
+		// 否则「flag 正确」会被当成「没有返回数据」而显示提交失败。
 		mutationFn: (input: { instanceId: string; flag: string }) =>
 			eventId
-				? call(
+				? callVoid(
 						client.service.submit.submitSingle({
 							event_id: eventId,
 							instance_id: input.instanceId,
@@ -155,7 +170,7 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 						}),
 						"提交 flag",
 					)
-				: call(
+				: callVoid(
 						client.service.submit.submit({
 							instance_id: input.instanceId,
 							flag: input.flag,
@@ -164,33 +179,72 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 					),
 		onSuccess: () => {
 			setFlag("");
-			toast.success("Flag 正确，已计分", "实例已被平台自动回收。");
+			toast.success(
+				t("jeopardy.workbench.submit.success"),
+				t("jeopardy.workbench.submit.successDescription"),
+			);
 			invalidateAfterInstanceChange();
 			void queryClient.invalidateQueries({ queryKey: qk.solves.all });
 			void queryClient.invalidateQueries({ queryKey: qk.auth.me() });
 		},
-		onError: (error) => toast.apiError("提交失败", error),
+		onError: (error) => toast.apiError(t("jeopardy.workbench.submit.failed"), error),
 	});
 
 	const instance = instanceQuery.data ?? null;
 	const instanceUrl = extractInstanceUrl(instance?.content);
+	const statusCode = (instance?.status ?? "").toLowerCase();
+	const statusText =
+		statusCode === "running"
+			? t("jeopardy.status.running")
+			: statusCode === "pending"
+				? t("jeopardy.status.pending")
+				: statusCode === "starting"
+					? t("jeopardy.status.starting")
+					: statusCode === "failed"
+						? t("jeopardy.status.failed")
+						: statusCode === "error"
+							? t("jeopardy.status.error")
+							: instance?.status || t("jeopardy.workbench.env.unknownStatus");
+
+	async function handleDestroy(instanceId: string, identifier: string) {
+		const ok = await confirm({
+			title: t("jeopardy.workbench.confirmDestroy.title"),
+			description: t("jeopardy.workbench.confirmDestroy.description", {
+				identifier: identifier || instanceId,
+			}),
+			consequences: [
+				t("jeopardy.workbench.confirmDestroy.consequenceContainer"),
+				t("jeopardy.workbench.confirmDestroy.consequenceResubmit"),
+			],
+			tone: "danger",
+			confirmText: t("jeopardy.workbench.confirmDestroy.confirmText"),
+		});
+		if (ok) destroy.mutate(instanceId);
+	}
 
 	return (
-		<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
-			<div className="min-w-0 space-y-5">
+		<div
+			className={cn(
+				"grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden",
+				className,
+			)}
+		>
+			<div className="min-w-0 space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
 				<SectionCard
-					title="题目描述"
+					title={t("jeopardy.workbench.descriptionTitle")}
 					description={
 						<div className="flex flex-wrap items-center gap-2">
-							<TonePill tone="neutral" icon={<FileText />}>
-								{challenge.category || "未分类"}
+							<TonePill tone="neutral" icon={<FileText aria-hidden="true" />}>
+								{challenge.category || t("jeopardy.common.categoryFallback")}
 							</TonePill>
 							{challenge.version ? (
-								<TonePill tone="info">版本 {challenge.version}</TonePill>
+								<TonePill tone="info">
+									{t("jeopardy.workbench.version", { version: challenge.version })}
+								</TonePill>
 							) : null}
 							{challenge.solved ? (
-								<TonePill tone="success" icon={<CheckCircle2 />}>
-									已解出
+								<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
+									{t("jeopardy.common.solved")}
 								</TonePill>
 							) : null}
 						</div>
@@ -201,10 +255,12 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 					{challenge.attachment ? (
 						<>
 							<Separator className="my-4" />
-							<div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2">
+							<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
 								<div className="flex min-w-0 items-center gap-2">
-									<Paperclip className="size-4 text-muted-foreground" />
-									<span className="truncate text-sm">{challenge.attachment.name}</span>
+									<Paperclip className="size-4 text-muted-foreground" aria-hidden="true" />
+									<span className="truncate text-sm" title={challenge.attachment.name}>
+										{challenge.attachment.name}
+									</span>
 									{challenge.attachment.size ? (
 										<span className="tnum text-xs text-muted-foreground">
 											{formatBytes(challenge.attachment.size)}
@@ -217,7 +273,8 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 										target="_blank"
 										rel="noopener noreferrer"
 									>
-										<Download /> 下载附件
+										<Download aria-hidden="true" />
+										{t("jeopardy.workbench.attachmentDownload")}
 									</a>
 								</Button>
 							</div>
@@ -226,11 +283,18 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 				</SectionCard>
 
 				<SectionCard
-					title="我的题解"
-					description="仅自己可见，可随时保存；赛后可整理成正式 writeup。"
+					title={t("jeopardy.workbench.myWriteup.title")}
+					description={t("jeopardy.workbench.myWriteup.description")}
 					actions={
-						<Button variant="ghost" size="sm" onClick={() => setWriteupOpen((value) => !value)}>
-							{writeupOpen ? "收起" : "展开编辑"}
+						<Button
+							variant="ghost"
+							size="sm"
+							aria-expanded={writeupOpen}
+							onClick={() => setWriteupOpen((value) => !value)}
+						>
+							{writeupOpen
+								? t("jeopardy.workbench.myWriteup.collapse")
+								: t("jeopardy.workbench.myWriteup.expand")}
 						</Button>
 					}
 				>
@@ -238,20 +302,25 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 						<MyWriteupEditor challengeId={challenge.id} />
 					) : (
 						<p className="text-sm text-muted-foreground">
-							点击「展开编辑」撰写题解（Markdown，支持插图）。
+							{t("jeopardy.workbench.myWriteup.hint")}
 						</p>
 					)}
 				</SectionCard>
+
+				{children}
 			</div>
 
-			<div className="space-y-5">
-				<SectionCard title="解题环境" description="启动实例后在此获取入口并提交 flag。">
+			<div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+				<SectionCard
+					title={t("jeopardy.workbench.env.title")}
+					description={t("jeopardy.workbench.env.description")}
+				>
 					{instanceQuery.isPending ? (
-						<LoadingBlock label="读取实例状态…" />
+						<LoadingBlock label={t("jeopardy.workbench.env.loading")} />
 					) : instanceQuery.isError ? (
 						<ErrorBlock
 							error={instanceQuery.error}
-							title="读取实例失败"
+							title={t("jeopardy.workbench.env.loadError")}
 							onRetry={() => instanceQuery.refetch()}
 						/>
 					) : instance ? (
@@ -260,42 +329,60 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 								columns={1}
 								items={[
 									{
-										key: "状态",
+										key: t("jeopardy.workbench.env.status"),
 										value: (
 											<TonePill tone={instanceStatusTone(instance.status)}>
-												{instance.status || "未知"}
+												{statusText}
 											</TonePill>
 										),
 									},
 									{
-										key: "实例 ID",
-										value: <CopyText value={instance.id} label="实例 ID" />,
+										key: t("jeopardy.workbench.env.instanceId"),
+										value: (
+											<CopyText
+												value={instance.id}
+												label={t("jeopardy.workbench.env.instanceId")}
+											/>
+										),
 									},
 									{
-										key: "容器",
-										value: <MonoText>{instance.identifier || "—"}</MonoText>,
+										key: t("jeopardy.workbench.env.container"),
+										value: instance.identifier ? (
+											<MonoText>{instance.identifier}</MonoText>
+										) : (
+											<span className="text-xs text-muted-foreground">—</span>
+										),
 									},
 									{
-										key: "自动回收",
+										key: t("jeopardy.workbench.env.destroyAt"),
 										value: instance.destroy_at ? (
-											<span className="text-xs">
-												{formatDateTime(instance.destroy_at)}（{formatRelative(instance.destroy_at, now)}）
+											<span className="tnum text-xs">
+												{t("jeopardy.workbench.env.destroyAtValue", {
+													time: formatDateTime(instance.destroy_at),
+													relative: formatRelative(instance.destroy_at, now),
+												})}
 											</span>
 										) : (
-											"—"
+											<span className="text-xs text-muted-foreground">—</span>
 										),
 									},
 								]}
 							/>
 
 							{instanceUrl ? (
-								<div className="rounded-md border bg-muted/30 p-3">
-									<p className="mb-1 text-xs text-muted-foreground">实例入口</p>
-									<div className="flex items-center justify-between gap-2">
-										<CopyText value={instanceUrl} label="实例地址" />
+								<div className="rounded-lg border bg-muted/30 p-3">
+									<p className="mb-1 text-xs text-muted-foreground">
+										{t("jeopardy.workbench.env.entry")}
+									</p>
+									<div className="flex flex-wrap items-center justify-between gap-2">
+										<CopyText
+											value={instanceUrl}
+											label={t("jeopardy.workbench.env.entry")}
+										/>
 										<Button variant="outline" size="sm" asChild>
 											<a href={instanceUrl} target="_blank" rel="noopener noreferrer">
-												<ExternalLink /> 打开
+												<ExternalLink aria-hidden="true" />
+												{t("jeopardy.workbench.env.open")}
 											</a>
 										</Button>
 									</div>
@@ -306,7 +393,7 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 
 							{mode.kind === "event" ? (
 								<p className="text-xs text-muted-foreground">
-									赛事内实例不计入题库并发上限；销毁后可在赛事页面重新启动。
+									{t("jeopardy.workbench.env.eventNote")}
 								</p>
 							) : null}
 
@@ -317,26 +404,36 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 									disabled={launch.isPending}
 									onClick={() => launch.mutate()}
 								>
-									<RotateCw /> 重启实例
+									{launch.isPending ? (
+										<Loader2 className="animate-spin" aria-hidden="true" />
+									) : (
+										<RotateCw aria-hidden="true" />
+									)}
+									{t("jeopardy.workbench.env.relaunch")}
 								</Button>
 								<Button
 									variant="destructive"
 									size="sm"
 									disabled={destroy.isPending}
-									onClick={() => destroy.mutate(instance.id)}
+									onClick={() => void handleDestroy(instance.id, instance.identifier)}
 								>
-									<Trash2 /> 销毁实例
+									{destroy.isPending ? (
+										<Loader2 className="animate-spin" aria-hidden="true" />
+									) : (
+										<Trash2 aria-hidden="true" />
+									)}
+									{t("jeopardy.workbench.env.destroy")}
 								</Button>
 							</div>
 						</div>
 					) : (
 						<div className="space-y-3">
 							<EmptyBlock
-								title="还没有运行中的实例"
+								title={t("jeopardy.workbench.env.emptyTitle")}
 								description={
 									challenge.flag_type === "dynamic"
-										? "这是一道动态题：启动后平台会为你的实例生成独立 flag。"
-										: "启动后即可获得答题入口（静态题无需容器，启动会创建答题实例）。"
+										? t("jeopardy.workbench.env.emptyDynamic")
+										: t("jeopardy.workbench.env.emptyStatic")
 								}
 							/>
 							<Button
@@ -344,47 +441,64 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 								disabled={launch.isPending}
 								onClick={() => launch.mutate()}
 							>
-								<RotateCw /> 启动实例
+								{launch.isPending ? (
+									<Loader2 className="animate-spin" aria-hidden="true" />
+								) : (
+									<RotateCw aria-hidden="true" />
+								)}
+								{t("jeopardy.workbench.env.start")}
 							</Button>
 						</div>
 					)}
 				</SectionCard>
 
-				<SectionCard title="提交 Flag" description="提交正确后平台自动销毁实例并计分。">
+				<SectionCard
+					title={t("jeopardy.workbench.submit.title")}
+					description={t("jeopardy.workbench.submit.description")}
+				>
 					<form
 						className="space-y-3"
 						onSubmit={(event) => {
 							event.preventDefault();
 							if (!instance) {
-								toast.warning("请先启动实例");
+								toast.warning(t("jeopardy.workbench.submit.needInstance"));
 								return;
 							}
 							if (flag.trim() === "") {
-								toast.warning("请填写 flag");
+								toast.warning(t("jeopardy.workbench.submit.needFlag"));
 								return;
 							}
 							submit.mutate({ instanceId: instance.id, flag: flag.trim() });
 						}}
 					>
 						<div className="space-y-1.5">
-							<Label htmlFor="flag-input" className="text-xs">
-								Flag
-							</Label>
+							<Label htmlFor="flag-input">{t("jeopardy.workbench.submit.label")}</Label>
 							<Input
 								id="flag-input"
 								value={flag}
 								onChange={(event) => setFlag(event.target.value)}
-								placeholder="flag{...}"
+								placeholder={t("jeopardy.workbench.submit.placeholder")}
 								className="font-mono"
 								autoComplete="off"
+								aria-describedby="flag-hint"
 							/>
-							<p className="text-xs text-muted-foreground">
-								请勿在比赛期间泄露 flag；提交记录会被平台审计。
+							<p id="flag-hint" className="text-xs text-muted-foreground">
+								{t("jeopardy.workbench.submit.hint")}
 							</p>
 						</div>
 						{submit.isError ? <InlineError error={submit.error} /> : null}
-						<Button type="submit" className="w-full" disabled={submit.isPending || !instance}>
-							<Send /> 提交
+						<Button
+							type="submit"
+							className="w-full"
+							disabled={submit.isPending || !instance}
+							title={!instance ? t("jeopardy.workbench.submit.needInstance") : undefined}
+						>
+							{submit.isPending ? (
+								<Loader2 className="animate-spin" aria-hidden="true" />
+							) : (
+								<Send aria-hidden="true" />
+							)}
+							{t("jeopardy.workbench.submit.submit")}
 						</Button>
 					</form>
 				</SectionCard>
@@ -395,6 +509,7 @@ export function ChallengeWorkbench({ challenge, mode }: ChallengeWorkbenchProps)
 
 /** 我的题解：读取（可能 404 = 还没写）→ 保存（POST upsert）。 */
 export function MyWriteupEditor({ challengeId }: { challengeId: string }) {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const [content, setContent] = useState<string | null>(null);
@@ -423,17 +538,23 @@ export function MyWriteupEditor({ challengeId }: { challengeId: string }) {
 				"保存题解",
 			),
 		onSuccess: () => {
-			toast.success("题解已保存");
+			toast.success(t("jeopardy.workbench.myWriteup.saved"));
 			void queryClient.invalidateQueries({
 				queryKey: qk.challenges.myWriteup(challengeId),
 			});
 		},
-		onError: (error) => toast.apiError("保存失败", error),
+		onError: (error) => toast.apiError(t("jeopardy.workbench.myWriteup.saveFailed"), error),
 	});
 
-	if (query.isPending) return <LoadingBlock label="读取题解…" />;
+	if (query.isPending) return <LoadingBlock label={t("jeopardy.workbench.myWriteup.loading")} />;
 	if (query.isError) {
-		return <ErrorBlock error={query.error} title="读取题解失败" onRetry={() => query.refetch()} />;
+		return (
+			<ErrorBlock
+				error={query.error}
+				title={t("jeopardy.workbench.myWriteup.loadError")}
+				onRetry={() => query.refetch()}
+			/>
+		);
 	}
 
 	const value = content ?? query.data?.content ?? "";
@@ -444,17 +565,27 @@ export function MyWriteupEditor({ challengeId }: { challengeId: string }) {
 				value={value}
 				onChange={(next) => setContent(next)}
 				minHeight={240}
-				placeholder="写下思路、payload、踩坑记录…"
+				placeholder={t("jeopardy.workbench.myWriteup.placeholder")}
 			/>
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<p className="text-xs text-muted-foreground">
-					{query.data?.content ? "已有保存的题解，可继续编辑。" : "还没有保存过题解。"}
+					{query.data?.content
+						? t("jeopardy.workbench.myWriteup.existing")
+						: t("jeopardy.workbench.myWriteup.empty")}
 				</p>
 				<Button
 					disabled={save.isPending || value.trim() === ""}
+					title={
+						value.trim() === ""
+							? t("jeopardy.workbench.myWriteup.saveDisabled")
+							: undefined
+					}
 					onClick={() => save.mutate(value)}
 				>
-					保存题解
+					{save.isPending ? (
+						<Loader2 className="animate-spin" aria-hidden="true" />
+					) : null}
+					{t("jeopardy.workbench.myWriteup.save")}
 				</Button>
 			</div>
 			{save.isError ? <InlineError error={save.error} /> : null}
@@ -464,6 +595,7 @@ export function MyWriteupEditor({ challengeId }: { challengeId: string }) {
 
 /** 他人题解列表（可选能力；按题目维度）。 */
 export function ChallengeWriteups({ challengeId }: { challengeId: string }) {
+	const { t } = useTranslation();
 	const client = useClient();
 	const now = useNow(60_000);
 	const query = useQuery({
@@ -471,31 +603,38 @@ export function ChallengeWriteups({ challengeId }: { challengeId: string }) {
 		queryFn: () => call(client.service.challenges.getWriteups(challengeId), "题解列表"),
 	});
 
-	if (query.isPending) return <LoadingBlock label="加载题解…" />;
-	if (query.isError) {
-		return <ErrorBlock error={query.error} title="加载题解失败" onRetry={() => query.refetch()} />;
-	}
-	const items = query.data ?? [];
-	if (items.length === 0) {
-		return <EmptyBlock title="还没有公开题解" description="赛后选手可以在这里分享思路。" />;
-	}
-
 	return (
-		<ul className="divide-y">
-			{items.map((item) => (
-				<li key={item.id} className="py-3">
-					<div className="flex flex-wrap items-center justify-between gap-2">
-						<span className="text-sm font-medium">{item.nickname}</span>
-						<span className="text-xs text-muted-foreground">
-							{formatRelative(item.writeup.updated_at, now)}
-						</span>
-					</div>
-					<div className="mt-2">
-						<MarkdownView>{item.writeup.content}</MarkdownView>
-					</div>
-				</li>
-			))}
-		</ul>
+		<QueryState
+			query={query}
+			skeleton={<LoadingBlock label={t("jeopardy.writeups.loading")} />}
+			errorTitle={t("jeopardy.writeups.loadError")}
+			isEmpty={(items) => items.length === 0}
+			empty={
+				<EmptyBlock
+					title={t("jeopardy.writeups.emptyTitle")}
+					description={t("jeopardy.writeups.emptyDescription")}
+				/>
+			}
+		>
+			{(items) => (
+				<ul className="divide-y">
+					{items.map((item) => (
+						<li key={item.id} className="py-3">
+							<div className="flex flex-wrap items-center justify-between gap-2">
+								<span className="text-sm font-medium" data-user-data>
+									{item.nickname}
+								</span>
+								<span className="tnum text-xs text-muted-foreground">
+									{formatRelative(item.writeup.updated_at, now)}
+								</span>
+							</div>
+							<div className="mt-2">
+								<MarkdownView>{item.writeup.content}</MarkdownView>
+							</div>
+						</li>
+					))}
+				</ul>
+			)}
+		</QueryState>
 	);
 }
-

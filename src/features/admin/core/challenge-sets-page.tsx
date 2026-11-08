@@ -4,14 +4,17 @@
  * 题目与题集的关联在详情页维护（`/admin/challenge-sets/:setId`）：
  * SDK 的 `createChallengeSet` 只接受 `Partial<ChallengeSets>`（后端其实还接受
  * `challenge_id_list`，但公共类型面没有暴露），因此创建后进入详情页挂题。
+ *
+ * 所有用户可见文案走 `adminCore.challengeSets.*`。
  */
 
 import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRight, Blocks, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 
-import { call, callList } from "~/api/call";
+import { call, callList, callVoid } from "~/api/call";
 import { useAppQueryClient, useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { useConfirm } from "~/components/app/confirm";
@@ -46,7 +49,8 @@ interface SetFormState {
 }
 
 export function AdminChallengeSetsPage(): ReactNode {
-	useDocumentTitle("题集管理 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminCore.challengeSets.documentTitle"));
 	const client = useClient();
 	const navigate = useNavigate();
 	const queryClient = useAppQueryClient();
@@ -77,35 +81,63 @@ export function AdminChallengeSetsPage(): ReactNode {
 		mutationFn: (input: { mode: "create" | "edit"; id?: string; body: SetFormState }) => {
 			const body = { name: input.body.name.trim(), description: input.body.description };
 			if (input.mode === "create") {
-				return call<ChallengeSets>(
+				// 后端 create 成功返回 data:null（ok_none），SDK 类型却标成 ChallengeSets；
+				// 用 call 会把成功当成“没有返回数据”，导致弹失败但 DB 已创建。
+				return callVoid(
 					client.admin.challenges.createChallengeSet(body),
-					"创建题集",
+					t("adminCore.actions.createChallengeSet"),
 				);
 			}
 			// patchChallengeSet(Partial<ChallengeSets>) 的 URL 用 `.id` 拼接，**必须**带 id。
-			return call<ChallengeSets>(
+			return callVoid(
 				client.admin.challenges.patchChallengeSet({ id: input.id ?? "", ...body }),
-				"更新题集",
+				t("adminCore.actions.updateChallengeSet"),
 			);
 		},
-		onSuccess: (_data, input) => {
-			toast.success(input.mode === "create" ? "题集已创建" : "题集已更新");
+		onSuccess: async (_data, input) => {
+			toast.success(
+				input.mode === "create"
+					? t("adminCore.challengeSets.toasts.created")
+					: t("adminCore.challengeSets.toasts.updated"),
+			);
 			invalidate();
 			setEditing(null);
 			setNameError(undefined);
+			if (input.mode === "create") {
+				// create 不返回新行；按名称回查最新一条后进入详情页（页面文案承诺创建后进入详情）。
+				try {
+					const { items } = await callList<ChallengeSets>(
+						client.admin.challenges.getChallengeSets({
+							filter: `name:${input.body.name.trim()}`,
+							page: 1,
+							limit: 1,
+						}),
+					);
+					const created = items[0];
+					if (created) void navigate(`/admin/challenge-sets/${created.id}`);
+				} catch {
+					// 回查失败不覆盖已成功的创建；用户仍可在列表点开题集。
+				}
+			}
 		},
-		onError: (error) => toast.apiError("保存题集失败", error),
+		onError: (error) => toast.apiError(t("adminCore.challengeSets.toasts.saveFailed"), error),
 	});
 
 	const remove = useMutation({
 		mutationFn: (ids: string[]) =>
-			call<number>(client.admin.challenges.deleteChallengeSet(ids), "删除题集"),
+			call<number>(
+				client.admin.challenges.deleteChallengeSet(ids),
+				t("adminCore.actions.deleteChallengeSets"),
+			),
 		onSuccess: (count) => {
-			toast.success(`已删除 ${count} 个题集`, "题集内的题目本身不受影响。");
+			toast.success(
+				t("adminCore.challengeSets.toasts.deleted", { count }),
+				t("adminCore.challengeSets.toasts.deletedDescription"),
+			);
 			invalidate();
 			setSelectedIds([]);
 		},
-		onError: (error) => toast.apiError("删除题集失败", error),
+		onError: (error) => toast.apiError(t("adminCore.challengeSets.toasts.deleteFailed"), error),
 	});
 
 	function openCreate(): void {
@@ -123,8 +155,8 @@ export function AdminChallengeSetsPage(): ReactNode {
 	function submit(): void {
 		if (!editing) return;
 		if (!form.name.trim()) {
-			setNameError("题集名称不能为空");
-			toast.warning("请先填写题集名称");
+			setNameError(t("adminCore.challengeSets.validation.nameRequired"));
+			toast.warning(t("adminCore.challengeSets.toasts.nameRequired"));
 			return;
 		}
 		setNameError(undefined);
@@ -133,14 +165,14 @@ export function AdminChallengeSetsPage(): ReactNode {
 
 	async function confirmRemoveOne(row: ChallengeSets): Promise<void> {
 		const ok = await confirm({
-			title: `删除题集「${row.name}」？`,
-			description: "该操作不可恢复。",
+			title: t("adminCore.challengeSets.confirm.deleteOneTitle", { name: row.name }),
+			description: t("adminCore.challengeSets.confirm.deleteDescription"),
 			consequences: [
-				"题集与其题目关联（challenge_set_items）一并删除",
-				"题目本身保留在题库中，不会被删除",
+				t("adminCore.challengeSets.confirm.deleteConsequence1"),
+				t("adminCore.challengeSets.confirm.deleteConsequence2"),
 			],
 			tone: "danger",
-			confirmText: "删除",
+			confirmText: t("adminCore.challengeSets.confirm.delete"),
 			confirmPhrase: row.name,
 		});
 		if (ok) remove.mutate([row.id]);
@@ -148,18 +180,22 @@ export function AdminChallengeSetsPage(): ReactNode {
 
 	async function confirmRemoveSelected(): Promise<void> {
 		if (selectedIds.length === 0) {
-			toast.warning("请先选择要删除的题集");
+			toast.warning(t("adminCore.challengeSets.toasts.selectForDelete"));
 			return;
 		}
 		const ok = await confirm({
-			title: `删除选中的 ${selectedIds.length} 个题集？`,
-			description: "该操作不可恢复。",
+			title: t("adminCore.challengeSets.confirm.deleteSelectedTitle", {
+				count: selectedIds.length,
+			}),
+			description: t("adminCore.challengeSets.confirm.deleteDescription"),
 			consequences: [
-				`${selectedIds.length} 个题集及其题目关联会被删除`,
-				"题目本身保留在题库中",
+				t("adminCore.challengeSets.confirm.deleteSelectedConsequence1", {
+					count: selectedIds.length,
+				}),
+				t("adminCore.challengeSets.confirm.deleteConsequence2"),
 			],
 			tone: "danger",
-			confirmText: "删除",
+			confirmText: t("adminCore.challengeSets.confirm.delete"),
 			confirmPhrase: "delete",
 		});
 		if (ok) remove.mutate(selectedIds);
@@ -168,7 +204,7 @@ export function AdminChallengeSetsPage(): ReactNode {
 	const columns: DataTableColumn<ChallengeSets>[] = [
 		{
 			id: "name",
-			header: "题集",
+			header: t("adminCore.challengeSets.columns.set"),
 			cell: (row) => (
 				<div className="min-w-0">
 					<p className="truncate text-sm font-medium">{row.name}</p>
@@ -179,7 +215,7 @@ export function AdminChallengeSetsPage(): ReactNode {
 		},
 		{
 			id: "description",
-			header: "描述",
+			header: t("adminCore.challengeSets.columns.description"),
 			cell: (row) =>
 				row.description ? (
 					<span className="line-clamp-2 text-sm text-muted-foreground">{row.description}</span>
@@ -190,7 +226,7 @@ export function AdminChallengeSetsPage(): ReactNode {
 		},
 		{
 			id: "created_at",
-			header: "创建时间",
+			header: t("adminCore.challengeSets.columns.createdAt"),
 			cell: (row) => (
 				<span className="tnum text-xs text-muted-foreground">{formatDateTime(row.created_at)}</span>
 			),
@@ -199,7 +235,7 @@ export function AdminChallengeSetsPage(): ReactNode {
 		},
 		{
 			id: "updated_at",
-			header: "最近更新",
+			header: t("adminCore.challengeSets.columns.updatedAt"),
 			cell: (row) => (
 				<span className="tnum text-xs text-muted-foreground">{formatDateTime(row.updated_at)}</span>
 			),
@@ -211,30 +247,33 @@ export function AdminChallengeSetsPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="题集管理"
-				description="题集把题库中的题目按主题组织起来；题目内容与题集无关。"
+				title={t("adminCore.challengeSets.title")}
+				description={t("adminCore.challengeSets.description")}
 				actions={
 					<Toolbar>
 						<Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
-							<RefreshCw className={query.isFetching ? "animate-spin" : undefined} />
-							刷新
+							<RefreshCw
+								className={query.isFetching ? "animate-spin" : undefined}
+								aria-hidden="true"
+							/>
+							{t("common.refresh")}
 						</Button>
 						<Button onClick={openCreate}>
-							<Plus /> 新建题集
+							<Plus aria-hidden="true" /> {t("adminCore.challengeSets.new")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
 			<SectionCard
-				title="题集列表"
-				description="点任意一行进入题集详情，在那里增删题目。"
+				title={t("adminCore.challengeSets.listTitle")}
+				description={t("adminCore.challengeSets.listDescription")}
 				actions={
 					<Toolbar>
 						<SearchInput
 							value={list.search}
 							onChange={list.setSearch}
-							placeholder="搜索名称 / 描述"
+							placeholder={t("adminCore.challengeSets.searchPlaceholder")}
 						/>
 						{selectedIds.length > 0 ? (
 							<Button
@@ -243,7 +282,8 @@ export function AdminChallengeSetsPage(): ReactNode {
 								onClick={() => void confirmRemoveSelected()}
 								disabled={remove.isPending}
 							>
-								<Trash2 /> 删除选中（{selectedIds.length}）
+								<Trash2 aria-hidden="true" />{" "}
+								{t("adminCore.challengeSets.deleteSelected", { count: selectedIds.length })}
 							</Button>
 						) : null}
 					</Toolbar>
@@ -265,22 +305,24 @@ export function AdminChallengeSetsPage(): ReactNode {
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={4} />}
-					errorTitle="加载题集失败"
+					errorTitle={t("adminCore.challengeSets.error")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
 						list.filter ? (
 							<EmptyBlock
 								variant="filtered"
-								title="没有匹配的题集"
-								description={`没有名称 / 描述匹配「${list.search}」的题集。`}
+								title={t("adminCore.challengeSets.filtered.title")}
+								description={t("adminCore.challengeSets.filtered.description", {
+									query: list.search,
+								})}
 							/>
 						) : (
 							<EmptyBlock
-								title="还没有题集"
-								description="创建题集后可以往里挂题目。"
+								title={t("adminCore.challengeSets.empty.title")}
+								description={t("adminCore.challengeSets.empty.description")}
 								action={
 									<Button size="sm" onClick={openCreate}>
-										<Plus /> 新建题集
+										<Plus aria-hidden="true" /> {t("adminCore.challengeSets.new")}
 									</Button>
 								}
 							/>
@@ -299,41 +341,50 @@ export function AdminChallengeSetsPage(): ReactNode {
 							mobileCard={(row) => (
 								<div className="space-y-1.5">
 									<p className="text-sm font-medium">{row.name}</p>
-									<p className="text-xs text-muted-foreground">{row.description || "无描述"}</p>
+									<p className="text-xs text-muted-foreground">
+										{row.description || t("adminCore.common.noDescription")}
+									</p>
 									<div className="flex flex-wrap gap-2 pt-1">
 										<Button
 											variant="outline"
 											size="sm"
 											onClick={() => void navigate(`/admin/challenge-sets/${row.id}`)}
 										>
-											<Blocks /> 管理题目
+											<Blocks aria-hidden="true" />{" "}
+											{t("adminCore.challengeSets.manageChallenges")}
 										</Button>
 										<Button variant="outline" size="sm" onClick={() => openEdit(row)}>
-											<Pencil /> 编辑
+											<Pencil aria-hidden="true" /> {t("common.edit")}
 										</Button>
 										<Button
 											variant="destructive"
 											size="sm"
 											onClick={() => void confirmRemoveOne(row)}
 										>
-											<Trash2 /> 删除
+											<Trash2 aria-hidden="true" /> {t("common.delete")}
 										</Button>
 									</div>
 								</div>
 							)}
 							rowActions={(row) => (
-								<RowMenu label={`题集 ${row.name} 的操作`}>
+								<RowMenu
+									label={t("adminCore.challengeSets.rowMenu", { name: row.name })}
+								>
 									<DropdownMenuItem
 										onSelect={() => void navigate(`/admin/challenge-sets/${row.id}`)}
 									>
-										<Blocks /> 管理题目
+										<Blocks aria-hidden="true" />{" "}
+										{t("adminCore.challengeSets.manageChallenges")}
 									</DropdownMenuItem>
 									<DropdownMenuItem onSelect={() => openEdit(row)}>
-										<Pencil /> 编辑
+										<Pencil aria-hidden="true" /> {t("common.edit")}
 									</DropdownMenuItem>
 									<DropdownMenuSeparator />
-									<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemoveOne(row)}>
-										<Trash2 /> 删除
+									<DropdownMenuItem
+										variant="destructive"
+										onSelect={() => void confirmRemoveOne(row)}
+									>
+										<Trash2 aria-hidden="true" /> {t("common.delete")}
 									</DropdownMenuItem>
 								</RowMenu>
 							)}
@@ -347,17 +398,25 @@ export function AdminChallengeSetsPage(): ReactNode {
 				onOpenChange={(open) => {
 					if (!open) setEditing(null);
 				}}
-				title={editing?.mode === "edit" ? "编辑题集" : "新建题集"}
+				title={
+					editing?.mode === "edit"
+						? t("adminCore.challengeSets.sheet.editTitle")
+						: t("adminCore.challengeSets.sheet.createTitle")
+				}
 				description={
 					editing?.mode === "edit"
-						? "修改题集名称与描述；题目关联在详情页维护。"
-						: "创建后进入详情页，从题库里选择题目加入。"
+						? t("adminCore.challengeSets.sheet.editDescription")
+						: t("adminCore.challengeSets.sheet.createDescription")
 				}
 				width="md"
 				footer={
 					<FormFooter
 						onCancel={() => setEditing(null)}
-						submitLabel={editing?.mode === "edit" ? "保存修改" : "创建题集"}
+						submitLabel={
+							editing?.mode === "edit"
+								? t("adminCore.challengeSets.sheet.submitSave")
+								: t("adminCore.challengeSets.sheet.submitCreate")
+						}
 						isPending={save.isPending}
 						formId="admin-set-form"
 					/>
@@ -372,14 +431,23 @@ export function AdminChallengeSetsPage(): ReactNode {
 					}}
 				>
 					<FormGrid columns={1}>
-						<Field label="题集名称" htmlFor="set-name" required error={nameError}>
+						<Field
+							label={t("adminCore.challengeSets.sheet.name")}
+							htmlFor="set-name"
+							required
+							error={nameError}
+						>
 							<Input
 								id="set-name"
 								value={form.name}
 								onChange={(event) => setForm({ ...form, name: event.target.value })}
 							/>
 						</Field>
-						<Field label="描述" htmlFor="set-description" hint="可选，用于说明题集主题。">
+						<Field
+							label={t("adminCore.challengeSets.sheet.description")}
+							htmlFor="set-description"
+							hint={t("adminCore.challengeSets.sheet.descriptionHint")}
+						>
 							<Textarea
 								id="set-description"
 								rows={3}
@@ -390,8 +458,8 @@ export function AdminChallengeSetsPage(): ReactNode {
 					</FormGrid>
 					{editing?.mode === "create" ? (
 						<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-							<ArrowRight className="size-3.5" />
-							创建完成后请到详情页添加题目。
+							<ArrowRight className="size-4" aria-hidden="true" />
+							{t("adminCore.challengeSets.sheet.createHint")}
 						</p>
 					) : null}
 				</form>

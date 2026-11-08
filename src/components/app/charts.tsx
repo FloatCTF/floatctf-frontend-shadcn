@@ -4,6 +4,8 @@
  */
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "~/lib/i18n";
 
 import { cn } from "~/lib/utils";
 
@@ -33,7 +35,7 @@ export function TrendChart({
 	formatY = (value: number) => String(Math.round(value)),
 	formatX,
 	className,
-	emptyText = "暂无趋势数据",
+	emptyText,
 }: {
 	series: TrendSeries[];
 	height?: number;
@@ -42,6 +44,7 @@ export function TrendChart({
 	className?: string;
 	emptyText?: string;
 }): ReactNode {
+	const { t } = useTranslation();
 	const [hoverX, setHoverX] = useState<number | null>(null);
 
 	const { minX, maxX, minY, maxY } = useMemo(() => {
@@ -72,7 +75,7 @@ export function TrendChart({
 				)}
 				style={{ height }}
 			>
-				{emptyText}
+				{emptyText ?? t("common.chart.empty")}
 			</div>
 		);
 	}
@@ -88,7 +91,9 @@ export function TrendChart({
 		padding.top + innerHeight - ((value - minY) / (maxY - minY || 1)) * innerHeight;
 
 	const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => minY + ratio * (maxY - minY));
-	const xTickValues = [minX, minX + (maxX - minX) / 2, maxX];
+	// 所有点同一时刻（例如刚解出第一题）时，三个 tick 完全相同；
+	// 直接用它们做 key 会触发 React duplicate key，也会重复画三遍同一标签。
+	const xTickValues = maxX === minX ? [minX] : [minX, minX + (maxX - minX) / 2, maxX];
 
 	const hoveredEntries =
 		hoverX === null
@@ -118,13 +123,15 @@ export function TrendChart({
 				className="w-full"
 				style={{ height }}
 				role="img"
-				aria-label="趋势图"
+				aria-label={t("common.chart.label")}
 				onMouseLeave={() => setHoverX(null)}
 				onMouseMove={(event) => {
 					const rect = event.currentTarget.getBoundingClientRect();
-					const ratio = (event.clientX - rect.left) / rect.width;
-					const x = minX + ratio * (maxX - minX);
-					setHoverX(x);
+					// 先把屏幕坐标换算到 viewBox，再扣除左右 padding；
+					// 直接按整幅宽度取比例会让参考线最多偏移 52px，边缘取点也会错。
+					const svgX = ((event.clientX - rect.left) / rect.width) * width;
+					const ratio = Math.min(1, Math.max(0, (svgX - padding.left) / innerWidth));
+					setHoverX(minX + ratio * (maxX - minX));
 				}}
 			>
 				{yTicks.map((tick) => (
@@ -158,7 +165,7 @@ export function TrendChart({
 						className="fill-muted-foreground"
 						style={{ fontSize: 11 }}
 					>
-						{formatX ? formatX(tick) : new Date(tick).toLocaleTimeString("zh-CN", { hour12: false })}
+						{formatX ? formatX(tick) : new Date(tick).toLocaleTimeString(i18n.language === "en" ? "en-US" : "zh-CN", { hour12: false })}
 					</text>
 				))}
 

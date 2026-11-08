@@ -12,6 +12,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, Download, Megaphone, Puzzle, Swords, Trophy } from "lucide-react";
 
@@ -24,7 +25,6 @@ import { qk } from "~/api/keys";
 import { TonePill } from "~/components/app/badges";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import {
-	MonoText,
 	PageBody,
 	PageHeader,
 	PaginationBar,
@@ -34,6 +34,8 @@ import {
 } from "~/components/app/page";
 import {
 	EmptyBlock,
+	ErrorBlock,
+	InlineError,
 	QueryState,
 	RefreshingBadge,
 	TableSkeleton,
@@ -60,14 +62,15 @@ function rankTone(no: number): "warning" | "info" | "muted" {
 
 /** Top15 用户排行榜（后端固定返回 15 条，无过滤参数）。 */
 export function RankPage(): ReactNode {
-	useDocumentTitle("排行榜 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("community.rank.documentTitle"));
 	const client = useClient();
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
 
 	const query = useQuery({
 		queryKey: qk.solves.top15(),
-		queryFn: () => call<TopUser[]>(client.service.solves.getTop15Users(), "Top15 排行"),
+		queryFn: () => call<TopUser[]>(client.service.solves.getTop15Users(), t("community.requests.top15")),
 		refetchInterval: 30_000,
 		refetchIntervalInBackground: false,
 	});
@@ -86,18 +89,18 @@ export function RankPage(): ReactNode {
 	const columns: DataTableColumn<TopUser>[] = [
 		{
 			id: "no",
-			header: "排名",
+			header: t("community.rank.columns.rank"),
 			align: "center",
 			sortValue: (row) => row.no,
 			cell: (row) => (
 				<TonePill tone={rankTone(row.no)}>
-					{row.no === 1 ? <Trophy /> : null}#{row.no}
+					{row.no === 1 ? <Trophy aria-hidden="true" /> : null}#{row.no}
 				</TonePill>
 			),
 		},
 		{
 			id: "nickname",
-			header: "选手",
+			header: t("community.rank.columns.player"),
 			sortValue: (row) => row.nickname,
 			cell: (row) => (
 				<UserCell
@@ -110,62 +113,85 @@ export function RankPage(): ReactNode {
 		},
 		{
 			id: "solved_count",
-			header: "解出题数",
+			header: t("community.rank.columns.solvedCount"),
 			align: "right",
 			sortValue: (row) => row.solved_count,
-			cell: (row) => <MonoText>{formatInt(row.solved_count)}</MonoText>,
+			cell: (row) => <span className="tnum text-sm">{formatInt(row.solved_count)}</span>,
 		},
 		{
 			id: "solved_last_at",
-			header: "最近解出",
+			header: t("community.rank.columns.lastSolved"),
 			align: "right",
 			sortValue: (row) => row.solved_last_at,
 			cell: (row) => <RelativeTime value={row.solved_last_at} />,
 		},
 	];
 
+	const header = (
+		<PageHeader
+			title={t("community.rank.title")}
+			description={t("community.rank.subtitle")}
+			badge={<TonePill tone="info">{t("community.rank.badge")}</TonePill>}
+			actions={
+				<Toolbar>
+					<Button variant="outline" asChild>
+						<Link to="/solves">
+							<Activity aria-hidden="true" /> {t("community.rank.actions.solves")}
+						</Link>
+					</Button>
+				</Toolbar>
+			}
+		/>
+	);
+
+	if (query.isError) {
+		return (
+			<PageBody>
+				{header}
+				<ErrorBlock
+					error={query.error}
+					title={t("community.rank.loadError")}
+					onRetry={() => void query.refetch()}
+				/>
+			</PageBody>
+		);
+	}
+
 	return (
 		<PageBody>
-			<PageHeader
-				title="排行榜"
-				description="练习赛事按解题数排名的 Top15 选手（30 秒自动刷新）"
-				badge={<TonePill tone="info">Top15</TonePill>}
-				actions={
-					<Toolbar>
-						<Button variant="outline" asChild>
-							<Link to="/solves">
-								<Activity /> 解题流水
-							</Link>
-						</Button>
-					</Toolbar>
-				}
-			/>
+			{header}
 
 			<div className="grid gap-4 sm:grid-cols-3">
 				<StatCard
-					label="上榜选手"
+					label={t("community.rank.stats.usersLabel")}
 					value={query.isPending ? "…" : formatInt(rows.length)}
-					hint="后端返回的 Top15 条目数"
-					icon={<Trophy className="size-5" />}
+					hint={t("community.rank.stats.usersHint")}
+					icon={<Trophy aria-hidden="true" className="size-4" />}
 				/>
 				<StatCard
-					label="榜首"
-					value={leader?.nickname ?? "—"}
-					hint={leader ? `解出 ${formatInt(leader.solved_count)} 题` : "暂无数据"}
-					icon={<Trophy className="size-5" />}
+					label={t("community.rank.stats.leaderLabel")}
+					value={leader?.nickname ?? t("common.empty")}
+					hint={
+						leader
+							? t("community.rank.stats.leaderHint", {
+									count: formatInt(leader.solved_count),
+								})
+							: t("community.rank.stats.leaderEmptyHint")
+					}
+					icon={<Trophy aria-hidden="true" className="size-4" />}
 					tone="success"
 				/>
 				<StatCard
-					label="最近解出"
+					label={t("community.rank.stats.latestLabel")}
 					value={<RelativeTime value={latest} className="text-sm" />}
-					hint="榜单中最后一次解题时间"
-					icon={<Activity className="size-5" />}
+					hint={t("community.rank.stats.latestHint")}
+					icon={<Activity aria-hidden="true" className="size-4" />}
 				/>
 			</div>
 
 			<SectionCard
-				title="Top15"
-				description="按解出题数降序，题数相同者以最近解题时间排序。"
+				title={t("community.rank.section.title")}
+				description={t("community.rank.section.description")}
 				actions={<RefreshingBadge active={query.isFetching && !query.isPending} />}
 				contentClassName="px-0"
 				footer={
@@ -185,16 +211,16 @@ export function RankPage(): ReactNode {
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={4} />}
-					errorTitle="加载排行榜失败"
+					errorTitle={t("community.rank.errors.load")}
 					isEmpty={(list) => list.length === 0}
 					empty={
 						<EmptyBlock
-							title="暂无排行数据"
-							description="练习赛事产生解题记录后，Top15 会出现在这里。"
-							icon={<Trophy className="size-5" />}
+							title={t("community.rank.empty.title")}
+							description={t("community.rank.empty.description")}
+							icon={<Trophy aria-hidden="true" />}
 							action={
 								<Button size="sm" asChild>
-									<Link to="/challenges">去练习题库</Link>
+									<Link to="/challenges">{t("community.rank.empty.action")}</Link>
 								</Button>
 							}
 						/>
@@ -217,7 +243,11 @@ export function RankPage(): ReactNode {
 										<TonePill tone={rankTone(row.no)}>#{row.no}</TonePill>
 									</div>
 									<div className="flex items-center justify-between text-xs text-muted-foreground">
-										<span>解出 {formatInt(row.solved_count)} 题</span>
+										<span>
+											{t("community.rank.mobile.solved", {
+												count: formatInt(row.solved_count),
+											})}
+										</span>
 										<RelativeTime value={row.solved_last_at} />
 									</div>
 								</div>
@@ -232,7 +262,8 @@ export function RankPage(): ReactNode {
 
 /** 解题流水：后端只返回**当前账号**在练习赛事中的解题记录，支持按题目过滤。 */
 export function SolvesPage(): ReactNode {
-	useDocumentTitle("解题流水 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("community.solves.documentTitle"));
 	const client = useClient();
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
@@ -241,8 +272,8 @@ export function SolvesPage(): ReactNode {
 	// 过滤选项：后端 `/solves` 只支持 id / challenge_id / event_id 三个键，
 	// 因此用「自己解题记录里出现过的题目」构造题目下拉（真实数据，不是枚举题库）。
 	const optionsQuery = useQuery({
-		queryKey: qk.solves.list({ limit: 200, purpose: "filter-options" }),
-		queryFn: () => callList<SolveResult>(client.service.solves.fetch({ limit: 200 })),
+		queryKey: qk.solves.list({ page: 1, limit: 200, purpose: "filter-options" }),
+		queryFn: () => callList<SolveResult>(client.service.solves.fetch({ page: 1, limit: 200 })),
 	});
 
 	const filter = challengeId === "all" ? undefined : `challenge_id:${challengeId}`;
@@ -273,7 +304,7 @@ export function SolvesPage(): ReactNode {
 	const columns: DataTableColumn<SolveResult>[] = [
 		{
 			id: "challenge",
-			header: "题目",
+			header: t("community.solves.columns.challenge"),
 			sortValue: (row) => row.challenge_name,
 			cell: (row) => (
 				<Link
@@ -286,7 +317,7 @@ export function SolvesPage(): ReactNode {
 		},
 		{
 			id: "solver",
-			header: "解题者",
+			header: t("community.solves.columns.solver"),
 			hideBelow: "sm",
 			sortValue: (row) => row.nickname,
 			cell: (row) => (
@@ -300,21 +331,25 @@ export function SolvesPage(): ReactNode {
 		},
 		{
 			id: "points",
-			header: "得分",
+			header: t("community.solves.columns.points"),
 			align: "right",
 			sortValue: (row) => row.obtained_points + row.bonus_points,
 			cell: (row) => (
-				<span className="tnum font-mono text-xs">
+				<span className="tnum text-sm">
 					+{formatScore(row.obtained_points)}
 					{row.bonus_points !== 0 ? (
-						<span className="text-muted-foreground"> (奖励 {formatScore(row.bonus_points)})</span>
+						<span className="text-muted-foreground">
+							{t("community.solves.points.bonus", {
+								score: formatScore(row.bonus_points),
+							})}
+						</span>
 					) : null}
 				</span>
 			),
 		},
 		{
 			id: "created_at",
-			header: "提交时间",
+			header: t("community.solves.columns.createdAt"),
 			align: "right",
 			sortValue: (row) => row.created_at,
 			cell: (row) => <RelativeTime value={row.created_at} />,
@@ -324,18 +359,18 @@ export function SolvesPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="解题流水"
-				description="平台按当前账号返回你在练习赛事中的解题记录"
+				title={t("community.solves.title")}
+				description={t("community.solves.subtitle")}
 				actions={
 					<Toolbar>
 						<Button variant="outline" asChild>
 							<Link to="/rank">
-								<Trophy /> 排行榜
+								<Trophy aria-hidden="true" /> {t("community.solves.actions.rank")}
 							</Link>
 						</Button>
 						<Button asChild>
 							<Link to="/challenges">
-								<Puzzle /> 去题库
+								<Puzzle aria-hidden="true" /> {t("community.solves.actions.challenges")}
 							</Link>
 						</Button>
 					</Toolbar>
@@ -344,26 +379,29 @@ export function SolvesPage(): ReactNode {
 
 			<div className="grid gap-4 sm:grid-cols-2">
 				<StatCard
-					label="累计解题记录"
+					label={t("community.solves.stats.totalLabel")}
 					value={query.isPending ? "…" : formatInt(query.data?.meta.total ?? items.length)}
-					hint="后端 pagination meta.total"
-					icon={<Activity className="size-5" />}
+					hint={t("community.solves.stats.totalHint")}
+					icon={<Activity aria-hidden="true" className="size-4" />}
 				/>
 				<StatCard
-					label="本页得分"
+					label={t("community.solves.stats.pageScoreLabel")}
 					value={query.isPending ? "…" : formatScore(pageScore)}
-					hint={`本页 ${items.length} 条记录合计（含奖励分）`}
-					icon={<Trophy className="size-5" />}
+					hint={t("community.solves.stats.pageScoreHint", { count: items.length })}
+					icon={<Trophy aria-hidden="true" className="size-4" />}
 					tone="success"
 				/>
 			</div>
 
 			<SectionCard
-				title="我的解题记录"
-				description="按提交时间倒序，可用题目下拉过滤"
+				title={t("community.solves.section.title")}
+				description={t("community.solves.section.description")}
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
+						{optionsQuery.isError ? (
+							<InlineError error={optionsQuery.error} className="text-xs" />
+						) : null}
 						<Select
 							value={challengeId}
 							disabled={optionsQuery.isPending}
@@ -372,11 +410,15 @@ export function SolvesPage(): ReactNode {
 								setPage(1);
 							}}
 						>
-							<SelectTrigger size="sm" className="w-[220px]" aria-label="按题目筛选">
-								<SelectValue placeholder="全部题目" />
+							<SelectTrigger
+								size="sm"
+								className="w-[220px]"
+								aria-label={t("community.solves.filter.ariaLabel")}
+							>
+								<SelectValue placeholder={t("community.solves.filter.all")} />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value="all">全部题目</SelectItem>
+								<SelectItem value="all">{t("community.solves.filter.all")}</SelectItem>
 								{challengeOptions.map((option) => (
 									<SelectItem key={option.id} value={option.id}>
 										{option.name}
@@ -403,27 +445,32 @@ export function SolvesPage(): ReactNode {
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={4} />}
-					errorTitle="加载解题流水失败"
+					errorTitle={t("community.solves.errors.load")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
 						challengeId === "all" ? (
 							<EmptyBlock
-								title="还没有解题记录"
-								description="在练习题库中解出题目后，记录会出现在这里。"
-								icon={<Activity className="size-5" />}
+								title={t("community.solves.empty.title")}
+								description={t("community.solves.empty.description")}
+								icon={<Activity aria-hidden="true" />}
 								action={
 									<Button size="sm" asChild>
-										<Link to="/challenges">浏览题库</Link>
+										<Link to="/challenges">{t("community.solves.empty.action")}</Link>
 									</Button>
 								}
 							/>
 						) : (
 							<EmptyBlock
 								variant="filtered"
-								description="这道题在你返回的记录范围内没有解题记录。"
+								title={t("community.solves.filtered.title")}
+								description={t("community.solves.filtered.description")}
 								action={
-									<Button size="sm" variant="outline" onClick={() => setChallengeId("all")}>
-										清除筛选
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() => setChallengeId("all")}
+									>
+										{t("community.solves.filtered.clear")}
 									</Button>
 								}
 							/>
@@ -454,7 +501,7 @@ export function SolvesPage(): ReactNode {
 										</span>
 									</div>
 									<div className="flex items-center justify-between text-xs text-muted-foreground">
-										<span className="tnum font-mono">
+										<span className="tnum">
 											+{formatScore(row.obtained_points)}
 										</span>
 										<RelativeTime value={row.created_at} />
@@ -471,7 +518,8 @@ export function SolvesPage(): ReactNode {
 
 /** 全站公告：后端支持 id / title / content 过滤，这里用标题过滤。 */
 export function AnnouncementsPage(): ReactNode {
-	useDocumentTitle("全站公告 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("community.announcements.documentTitle"));
 	const client = useClient();
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
@@ -494,37 +542,37 @@ export function AnnouncementsPage(): ReactNode {
 	const columns: DataTableColumn<Announcements>[] = [
 		{
 			id: "title",
-			header: "标题",
+			header: t("community.announcements.columns.title"),
 			sortValue: (row) => row.title,
 			cell: (row) => <span className="text-sm font-medium">{row.title}</span>,
 		},
 		{
 			id: "publisher",
-			header: "发布者",
+			header: t("community.announcements.columns.publisher"),
 			hideBelow: "sm",
 			sortValue: (row) => row.publisher,
-			cell: (row) => <span className="text-sm">{row.publisher || "—"}</span>,
+			cell: (row) => <span className="text-sm">{row.publisher || t("common.empty")}</span>,
 		},
 		{
 			id: "content",
-			header: "内容",
+			header: t("community.announcements.columns.content"),
 			hideBelow: "md",
 			cell: (row) => (
 				<div className="max-w-2xl text-sm break-words whitespace-pre-wrap text-muted-foreground">
-					{row.content && row.content.trim() !== "" ? row.content : "—"}
+					{row.content && row.content.trim() !== "" ? row.content : t("common.empty")}
 				</div>
 			),
 		},
 		{
 			id: "created_at",
-			header: "发布",
+			header: t("community.announcements.columns.createdAt"),
 			align: "right",
 			sortValue: (row) => row.created_at,
 			cell: (row) => <RelativeTime value={row.created_at} />,
 		},
 		{
 			id: "updated_at",
-			header: "更新",
+			header: t("community.announcements.columns.updatedAt"),
 			align: "right",
 			hideBelow: "lg",
 			sortValue: (row) => row.updated_at,
@@ -535,20 +583,20 @@ export function AnnouncementsPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="全站公告"
-				description="平台与赛事通知（60 秒自动刷新）。"
-				badge={<TonePill tone="info">公告</TonePill>}
+				title={t("community.announcements.title")}
+				description={t("community.announcements.subtitle")}
+				badge={<TonePill tone="info">{t("community.announcements.badge")}</TonePill>}
 			/>
 
 			<SectionCard
-				title="公告列表"
-				description="按最近更新时间排序，支持按标题搜索"
+				title={t("community.announcements.section.title")}
+				description={t("community.announcements.section.description")}
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
 						<SearchField
 							value={search}
-							placeholder="搜索标题…"
+							placeholder={t("community.announcements.search.placeholder")}
 							onChange={(value) => {
 								setSearch(value);
 								setPage(1);
@@ -573,22 +621,25 @@ export function AnnouncementsPage(): ReactNode {
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={4} />}
-					errorTitle="加载公告失败"
+					errorTitle={t("community.announcements.errors.load")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
 						trimmed === "" ? (
 							<EmptyBlock
-								title="暂无公告"
-								description="管理员发布公告后会出现在这里。"
-								icon={<Megaphone className="size-5" />}
+								title={t("community.announcements.empty.title")}
+								description={t("community.announcements.empty.description")}
+								icon={<Megaphone aria-hidden="true" />}
 							/>
 						) : (
 							<EmptyBlock
 								variant="filtered"
-								description={`没有标题包含「${trimmed}」的公告。`}
+								title={t("community.announcements.filtered.title")}
+								description={t("community.announcements.filtered.description", {
+									query: trimmed,
+								})}
 								action={
 									<Button size="sm" variant="outline" onClick={() => setSearch("")}>
-										清除搜索
+										{t("community.announcements.filtered.clear")}
 									</Button>
 								}
 							/>
@@ -604,10 +655,12 @@ export function AnnouncementsPage(): ReactNode {
 								<div className="space-y-1.5">
 									<p className="text-sm font-medium">{row.title}</p>
 									<p className="line-clamp-4 text-xs break-words whitespace-pre-wrap text-muted-foreground">
-										{row.content && row.content.trim() !== "" ? row.content : "—"}
+										{row.content && row.content.trim() !== ""
+											? row.content
+											: t("common.empty")}
 									</p>
 									<div className="flex items-center justify-between text-xs text-muted-foreground">
-										<span>{row.publisher || "—"}</span>
+										<span>{row.publisher || t("common.empty")}</span>
 										<RelativeTime value={row.created_at} />
 									</div>
 								</div>
@@ -622,7 +675,8 @@ export function AnnouncementsPage(): ReactNode {
 
 /** 武器库：只读列表 + 附件下载（`file_url` 是对象存储 key，公网路径为 `/public/<key>`）。 */
 export function ArsenalPage(): ReactNode {
-	useDocumentTitle("武器库 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("community.arsenal.documentTitle"));
 	const client = useClient();
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(20);
@@ -641,43 +695,49 @@ export function ArsenalPage(): ReactNode {
 	const columns: DataTableColumn<Weapons>[] = [
 		{
 			id: "name",
-			header: "名称",
+			header: t("community.arsenal.columns.name"),
 			sortValue: (row) => row.name,
 			cell: (row) => <span className="text-sm font-medium">{row.name}</span>,
 		},
 		{
 			id: "category",
-			header: "分类",
+			header: t("community.arsenal.columns.category"),
 			hideBelow: "sm",
 			sortValue: (row) => row.category,
-			cell: (row) => <TonePill tone="neutral">{row.category || "未分类"}</TonePill>,
+			cell: (row) => (
+				<TonePill tone="neutral">
+					{row.category || t("community.arsenal.uncategorized")}
+				</TonePill>
+			),
 		},
 		{
 			id: "description",
-			header: "描述",
+			header: t("community.arsenal.columns.description"),
 			hideBelow: "md",
 			cell: (row) => (
 				<p className="line-clamp-3 max-w-xl text-sm break-words text-muted-foreground">
-					{row.description && row.description.trim() !== "" ? row.description : "—"}
+					{row.description && row.description.trim() !== ""
+						? row.description
+						: t("common.empty")}
 				</p>
 			),
 		},
 		{
 			id: "file",
-			header: "附件",
+			header: t("community.arsenal.columns.file"),
 			cell: (row) => <WeaponFile row={row} />,
 		},
 		{
 			id: "download_count",
-			header: "下载次数",
+			header: t("community.arsenal.columns.downloadCount"),
 			align: "right",
 			hideBelow: "lg",
 			sortValue: (row) => row.download_count,
-			cell: (row) => <MonoText>{formatInt(row.download_count)}</MonoText>,
+			cell: (row) => <span className="tnum text-sm">{formatInt(row.download_count)}</span>,
 		},
 		{
 			id: "updated_at",
-			header: "更新",
+			header: t("community.arsenal.columns.updatedAt"),
 			align: "right",
 			sortValue: (row) => row.updated_at,
 			cell: (row) => <RelativeTime value={row.updated_at} />,
@@ -687,20 +747,20 @@ export function ArsenalPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="武器库"
-				description="平台共享的工具与脚本附件，按名称搜索"
-				badge={<TonePill tone="info">只读</TonePill>}
+				title={t("community.arsenal.title")}
+				description={t("community.arsenal.subtitle")}
+				badge={<TonePill tone="info">{t("community.arsenal.badge")}</TonePill>}
 			/>
 
 			<SectionCard
-				title="工具列表"
-				description="附件由管理员上传，点击文件名即可下载。"
+				title={t("community.arsenal.section.title")}
+				description={t("community.arsenal.section.description")}
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
 						<SearchField
 							value={search}
-							placeholder="搜索名称…"
+							placeholder={t("community.arsenal.search.placeholder")}
 							onChange={(value) => {
 								setSearch(value);
 								setPage(1);
@@ -725,22 +785,25 @@ export function ArsenalPage(): ReactNode {
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={4} />}
-					errorTitle="加载武器库失败"
+					errorTitle={t("community.arsenal.errors.load")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
 						trimmed === "" ? (
 							<EmptyBlock
-								title="武器库还是空的"
-								description="管理员上传工具后，这里会列出可下载的附件。"
-								icon={<Swords className="size-5" />}
+								title={t("community.arsenal.empty.title")}
+								description={t("community.arsenal.empty.description")}
+								icon={<Swords aria-hidden="true" />}
 							/>
 						) : (
 							<EmptyBlock
 								variant="filtered"
-								description={`没有名称包含「${trimmed}」的工具。`}
+								title={t("community.arsenal.filtered.title")}
+								description={t("community.arsenal.filtered.description", {
+									query: trimmed,
+								})}
 								action={
 									<Button size="sm" variant="outline" onClick={() => setSearch("")}>
-										清除搜索
+										{t("community.arsenal.filtered.clear")}
 									</Button>
 								}
 							/>
@@ -756,7 +819,9 @@ export function ArsenalPage(): ReactNode {
 								<div className="space-y-1.5">
 									<div className="flex items-center justify-between gap-2">
 										<span className="truncate text-sm font-medium">{row.name}</span>
-										<TonePill tone="neutral">{row.category || "未分类"}</TonePill>
+										<TonePill tone="neutral">
+											{row.category || t("community.arsenal.uncategorized")}
+										</TonePill>
 									</div>
 									{row.description ? (
 										<p className="line-clamp-3 text-xs text-muted-foreground">
@@ -765,7 +830,11 @@ export function ArsenalPage(): ReactNode {
 									) : null}
 									<div className="flex items-center justify-between text-xs text-muted-foreground">
 										<WeaponFile row={row} />
-										<span>下载 {formatInt(row.download_count)}</span>
+										<span className="tnum">
+											{t("community.arsenal.mobile.downloads", {
+												count: formatInt(row.download_count),
+											})}
+										</span>
 									</div>
 								</div>
 							)}
@@ -779,8 +848,13 @@ export function ArsenalPage(): ReactNode {
 
 /** 附件下载单元：`file_url` 是对象存储 key，平台公网路径为 `/public/<key>`（与 Default 一致）。 */
 function WeaponFile({ row }: { row: Weapons }) {
+	const { t } = useTranslation();
 	if (!row.has_file || row.file_url.trim() === "") {
-		return <span className="text-xs text-muted-foreground">无附件</span>;
+		return (
+			<TonePill tone="muted">
+				{t("community.arsenal.noFile")}
+			</TonePill>
+		);
 	}
 	const key = row.file_url.replace(/^\/+/, "");
 	const name = key.split("/").pop() ?? key;
@@ -793,7 +867,7 @@ function WeaponFile({ row }: { row: Weapons }) {
 			className="inline-flex items-center gap-1 text-xs hover:underline"
 			title={key}
 		>
-			<Download className="size-3.5" />
+			<Download aria-hidden="true" className="size-4" />
 			{name}
 		</a>
 	);

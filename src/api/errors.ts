@@ -6,6 +6,8 @@
 
 import { FloatCTFError } from "@floatctf/sdk";
 
+import i18n from "~/lib/i18n";
+
 export function isFloatCTFError(error: unknown): error is FloatCTFError {
 	return error instanceof FloatCTFError;
 }
@@ -19,47 +21,56 @@ export function isForbidden(error: unknown): boolean {
 }
 
 export function isNotFound(error: unknown): boolean {
-	return isFloatCTFError(error) && error.httpStatus === 404;
+	if (!isFloatCTFError(error)) return false;
+	if (error.httpStatus === 404) return true;
+	// 路由里的 UUID 格式非法时后端返回 400「路径参数格式错误」；对用户来说
+	// 这等价于“这个资源不存在”，不应展示技术错误 + 重试。
+	return (
+		error.httpStatus === 400 &&
+		/路径参数|path parameter/i.test(error.platformMessage ?? "")
+	);
 }
 
 export function isNetworkError(error: unknown): boolean {
 	return isFloatCTFError(error) && error.kind === "network";
 }
 
-/** 面向用户的错误文案。永远返回一句可以直接显示的话。 */
-export function errorText(error: unknown, fallback = "操作失败，请稍后重试"): string {
+/** 面向用户的错误文案。永远返回一句可以直接显示的话（本地化原因 + 稳定错误码）。 */
+export function errorText(error: unknown, fallback?: string): string {
+	const t = i18n.t.bind(i18n);
+	const generic = fallback ?? t("errors.fallback");
 	if (isFloatCTFError(error)) {
 		if (error.platformMessage && error.platformMessage.trim().length > 0) {
 			return error.platformMessage;
 		}
 		if (error.kind === "network") {
-			return "网络请求失败：无法连接服务器，请检查网络后重试";
+			return t("errors.networkDetail");
 		}
 		switch (error.httpStatus) {
 			case 400:
-				return "请求参数不被接受（400）";
+				return t("errors.badRequest");
 			case 401:
-				return "登录状态已失效，请重新登录";
+				return t("errors.unauthorized");
 			case 403:
-				return "没有权限执行该操作（403）";
+				return t("errors.forbiddenAction");
 			case 404:
-				return "资源不存在或已被删除（404）";
+				return t("errors.notFoundDetail");
 			case 409:
-				return "当前状态与该操作冲突（409），请刷新后重试";
+				return t("errors.conflict");
 			case 429:
-				return "请求过于频繁（429），请稍后再试";
+				return t("errors.tooManyRequests");
 			case 500:
 			case 502:
 			case 503:
 			case 504:
-				return `服务器错误（${error.httpStatus}），请稍后重试`;
+				return t("errors.serverError", { status: error.httpStatus });
 			default:
-				return error.displayMessage || fallback;
+				return error.displayMessage || generic;
 		}
 	}
 	if (error instanceof Error && error.message) return error.message;
 	if (typeof error === "string" && error.length > 0) return error;
-	return fallback;
+	return generic;
 }
 
 /** 诊断用细节（错误页「详情」折叠区）：不含 token，只含状态码与平台码。 */

@@ -72,6 +72,8 @@ export default defineConfig({
 		proxy: {
 			// ws: true 是必需的：管理端 Web 终端要经 /api/admin/terminal/ws 升级协议。
 			"/api": { target: "http://127.0.0.1:7780", changeOrigin: true, ws: true },
+			// 管理端「前端选择器」读取的静态注册表（生产由 Caddy 暴露同一路径）。
+			"/__floatctf": { target: "http://127.0.0.1:7780", changeOrigin: true },
 			"/public": { target: "http://127.0.0.1:7780", changeOrigin: true },
 			"/private": { target: "http://127.0.0.1:7780", changeOrigin: true },
 			"/static": { target: "http://127.0.0.1:7780", changeOrigin: true },

@@ -12,9 +12,12 @@
  */
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ExternalLink,
+	Eye,
+	EyeOff,
 	Lock,
 	MoreHorizontal,
 	Pencil,
@@ -42,6 +45,7 @@ import {
 	PageHeader,
 	PaginationBar,
 	SectionCard,
+	SecretValue,
 	Toolbar,
 } from "~/components/app/page";
 import {
@@ -83,26 +87,42 @@ import {
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 /** 平台关键设置：切换生效前端（只读提示 + 跳转选择器）。 */
+const SENSITIVE_KEY_PATTERN =
+	/(SECRET|PASSWORD|PASSWD|TOKEN|PRIVATE_KEY|API_KEY|PROXY|SMTP_URI|DATABASE_URL|REDIS_URL)/i;
+
+function isSensitiveKey(key: string): boolean {
+	return SENSITIVE_KEY_PATTERN.test(key);
+}
+
 const FRONTEND_ACTIVE_KEY = "FRONTEND_ACTIVE";
 
 /** 覆盖受保护设置值所需的确认词。 */
 const OVERRIDE_PHRASE = "OVERRIDE";
 
-const TYPE_LABEL: Record<string, string> = {
-	[SettingValueType.String]: "字符串",
-	[SettingValueType.Integer]: "整数",
-	[SettingValueType.Boolean]: "布尔",
-	[SettingValueType.Float]: "浮点",
-};
-
 export function AdminSettingsPage(): ReactNode {
-	useDocumentTitle("动态设置 · FloatCTF 控制台");
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminPlatform.settings.documentTitle"));
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const list = useListState(20);
 	const [selected, setSelected] = useState<string[]>([]);
 	const [editing, setEditing] = useState<SettingsDto | null | undefined>(undefined);
+
+	function settingTypeLabel(type: string): string {
+		switch (type) {
+			case SettingValueType.String:
+				return t("adminPlatform.settings.types.string");
+			case SettingValueType.Integer:
+				return t("adminPlatform.settings.types.integer");
+			case SettingValueType.Boolean:
+				return t("adminPlatform.settings.types.boolean");
+			case SettingValueType.Float:
+				return t("adminPlatform.settings.types.float");
+			default:
+				return type;
+		}
+	}
 
 	const query = useQuery({
 		queryKey: qk.admin.settings({ all: true }),
@@ -113,13 +133,13 @@ export function AdminSettingsPage(): ReactNode {
 
 	const removeMutation = useMutation({
 		mutationFn: (ids: string[]) =>
-			callVoid(client.admin.settings.remove(ids), "删除设置"),
+			callVoid(client.admin.settings.remove(ids), t("adminPlatform.settings.requests.delete")),
 		onSuccess: (_data, ids) => {
-			toast.success(`已删除 ${ids.length} 条设置`);
+			toast.success(t("adminPlatform.settings.deleteSuccess", { count: ids.length }));
 			setSelected([]);
 			void queryClient.invalidateQueries({ queryKey: qk.admin.settings() });
 		},
-		onError: (error) => toast.apiError("删除设置失败", error),
+		onError: (error) => toast.apiError(t("adminPlatform.settings.deleteFailed"), error),
 	});
 
 	async function removeRows(rows: SettingsDto[]) {
@@ -127,24 +147,30 @@ export function AdminSettingsPage(): ReactNode {
 		const blocked = rows.filter((row) => row.protected);
 		if (blocked.length > 0) {
 			toast.warning(
-				"受保护设置无法删除",
-				`已跳过：${blocked.map((row) => row.key).join("、")}（后端会拒绝删除 protected 设置）`,
+				t("adminPlatform.settings.confirm.blockedTitle"),
+				t("adminPlatform.settings.confirm.blockedDescription", {
+					keys: blocked
+						.map((row) => row.key)
+						.join(t("adminPlatform.common.listSeparator")),
+				}),
 			);
 		}
 		if (deletable.length === 0) return;
 		const ok = await confirm({
 			title:
 				deletable.length === 1
-					? `删除设置 ${deletable[0].key}？`
-					: `删除 ${deletable.length} 条设置？`,
-			description: deletable.map((row) => row.key).join("、"),
+					? t("adminPlatform.settings.confirm.titleOne", { key: deletable[0].key })
+					: t("adminPlatform.settings.confirm.titleMany", { count: deletable.length }),
+			description: deletable
+				.map((row) => row.key)
+				.join(t("adminPlatform.common.listSeparator")),
 			consequences: [
-				"读取该键的平台功能会立即回落到内建默认值或报错",
-				"若该键被其它设置引用（$KEY 形式），引用方解析结果会一并改变",
-				"删除后不可恢复（需要重新创建并填写正确取值）",
+				t("adminPlatform.settings.confirm.consequence1"),
+				t("adminPlatform.settings.confirm.consequence2"),
+				t("adminPlatform.settings.confirm.consequence3"),
 			],
 			tone: "danger",
-			confirmText: "永久删除",
+			confirmText: t("adminPlatform.settings.confirm.confirmText"),
 			confirmPhrase: "DELETE",
 		});
 		if (!ok) return;
@@ -162,6 +188,10 @@ export function AdminSettingsPage(): ReactNode {
 	);
 	const visible = pageSlice(filtered, list.page, list.pageSize);
 	const protectedCount = all.filter((row) => row.protected).length;
+	const selectedRows = all.filter((row) => selected.includes(row.id));
+	const deletableSelected = selectedRows.filter((row) => !row.protected);
+	const protectedSelected = selectedRows.filter((row) => row.protected);
+
 
 	useEffect(() => {
 		setSelected([]);
@@ -170,49 +200,67 @@ export function AdminSettingsPage(): ReactNode {
 	const columns: DataTableColumn<SettingsDto>[] = [
 		{
 			id: "key",
-			header: "键",
+			header: t("adminPlatform.settings.columns.key"),
 			sortValue: (row) => row.key,
 			cell: (row) => (
 				<span className="inline-flex items-center gap-1.5">
 					<MonoText className="font-medium">{row.key}</MonoText>
 					{row.key === FRONTEND_ACTIVE_KEY ? (
-						<TonePill tone="info">生效前端</TonePill>
+						<TonePill tone="info">{t("adminPlatform.settings.activeFrontend")}</TonePill>
 					) : null}
-					{row.protected ? <Lock className="size-3 text-muted-foreground" /> : null}
+					{row.protected ? (
+						<Lock className="size-3 text-muted-foreground" aria-hidden="true" />
+					) : null}
 				</span>
 			),
 		},
 		{
 			id: "value",
-			header: "值",
-			cell: (row) => <MonoText>{truncate(row.value, 40) || "—"}</MonoText>,
+			header: t("adminPlatform.settings.columns.value"),
+			cell: (row) =>
+				isSensitiveKey(row.key) ? (
+					<SecretValue value={row.value} label={row.key} />
+				) : (
+					<MonoText>{truncate(row.value, 40) || "—"}</MonoText>
+				),
 		},
 		{
 			id: "resolved_value",
-			header: "解析值",
+			header: t("adminPlatform.settings.columns.resolved"),
 			hideBelow: "lg",
-			cell: (row) => (
-				<MonoText className="text-muted-foreground">
-					{truncate(row.resolved_value ?? "", 40) || "—"}
-				</MonoText>
-			),
+			cell: (row) =>
+				isSensitiveKey(row.key) ? (
+					<SecretValue value={row.resolved_value ?? ""} label={row.key} />
+				) : (
+					<MonoText className="text-muted-foreground">
+						{truncate(row.resolved_value ?? "", 40) || "—"}
+					</MonoText>
+				),
 		},
 		{
 			id: "type",
-			header: "类型",
+			header: t("adminPlatform.settings.columns.type"),
 			hideBelow: "sm",
 			sortValue: (row) => row.type,
-			cell: (row) => <TonePill tone="muted">{TYPE_LABEL[row.type] ?? row.type}</TonePill>,
+			cell: (row) => (
+				<TonePill tone="muted">{settingTypeLabel(row.type)}</TonePill>
+			),
 		},
 		{
 			id: "protected",
-			header: "受保护",
+			header: t("adminPlatform.settings.columns.protected"),
 			hideBelow: "md",
-			cell: (row) => <BooleanPill value={row.protected} trueText="受保护" falseText="可删除" />,
+			cell: (row) => (
+				<BooleanPill
+					value={row.protected}
+					trueText={t("adminPlatform.common.protected")}
+					falseText={t("adminPlatform.common.deletable")}
+				/>
+			),
 		},
 		{
 			id: "description",
-			header: "描述",
+			header: t("adminPlatform.settings.columns.description"),
 			hideBelow: "xl",
 			cell: (row) => (
 				<span className="text-muted-foreground">
@@ -222,7 +270,7 @@ export function AdminSettingsPage(): ReactNode {
 		},
 		{
 			id: "updated_at",
-			header: "更新时间",
+			header: t("adminPlatform.settings.columns.updatedAt"),
 			align: "right",
 			sortValue: (row) => Date.parse(row.updated_at),
 			cell: (row) => <AbsoluteTime value={row.updated_at} />,
@@ -232,8 +280,8 @@ export function AdminSettingsPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="动态设置"
-				description="平台运行时配置（动态设置）"
+				title={t("adminPlatform.settings.title")}
+				description={t("adminPlatform.settings.description")}
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
@@ -243,45 +291,55 @@ export function AdminSettingsPage(): ReactNode {
 							onClick={() => void query.refetch()}
 							disabled={query.isFetching}
 						>
-							<RefreshCw />
-							刷新
+							<RefreshCw aria-hidden="true" />
+							{t("adminPlatform.common.refresh")}
 						</Button>
 						<Button size="sm" onClick={() => setEditing(null)}>
-							<Plus />
-							新建设置
+							<Plus aria-hidden="true" />
+							{t("adminPlatform.settings.form.createTitle")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
 			<SectionCard
-				title="设置列表"
-				description={`共 ${all.length} 条（其中受保护 ${protectedCount} 条）。设置接口不接受分页/过滤参数，搜索与分页在本页完成。`}
+				title={t("adminPlatform.settings.section.title")}
+				description={t("adminPlatform.settings.section.description", {
+					total: all.length,
+					protectedCount,
+				})}
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
 						<SearchInput
 							value={list.search}
 							onChange={list.setSearch}
-							placeholder="搜索键 / 值 / 描述"
+							placeholder={t("adminPlatform.settings.searchPlaceholder")}
 						/>
 						<DeleteSelectedButton
-							count={selected.length}
+							count={deletableSelected.length}
 							isPending={removeMutation.isPending}
-							label="删除所选设置"
-							onClick={() => void removeRows(all.filter((row) => selected.includes(row.id)))}
+							label={t("adminPlatform.settings.deleteSelected")}
+							onClick={() => void removeRows(deletableSelected)}
 						/>
+						{protectedSelected.length > 0 ? (
+							<span className="text-xs text-muted-foreground">
+								{t("adminPlatform.settings.protectedSkip", {
+									count: protectedSelected.length,
+								})}
+							</span>
+						) : null}
 					</div>
 				}
 			>
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={8} columns={6} />}
-					errorTitle="加载设置失败"
+					errorTitle={t("adminPlatform.settings.errorTitle")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
 						<EmptyBlock
-							title="暂无设置"
-							description="平台启动时会补种默认设置"
+							title={t("adminPlatform.settings.empty.title")}
+							description={t("adminPlatform.settings.empty.description")}
 						/>
 					}
 				>
@@ -289,8 +347,8 @@ export function AdminSettingsPage(): ReactNode {
 						filtered.length === 0 ? (
 							<EmptyBlock
 								variant="filtered"
-								title="没有匹配的设置"
-								description="试试调整搜索关键字。"
+								title={t("adminPlatform.settings.filtered.title")}
+								description={t("adminPlatform.settings.filtered.description")}
 							/>
 						) : visible.length === 0 ? (
 							<OutOfRangeBlock onReset={() => list.setPage(1)} />
@@ -303,37 +361,60 @@ export function AdminSettingsPage(): ReactNode {
 									selectable
 									selectedIds={selected}
 									onSelectionChange={setSelected}
-									rowActions={(row) => (
-										<DropdownMenu>
-											<DropdownMenuTrigger asChild>
-												<Button variant="ghost" size="icon-sm" aria-label="设置操作">
-													<MoreHorizontal />
-												</Button>
-											</DropdownMenuTrigger>
-											<DropdownMenuContent align="end">
-												<DropdownMenuItem onSelect={() => setEditing(row)}>
-													<Pencil />
-													{row.protected ? "改值（需二次确认）" : "编辑"}
-												</DropdownMenuItem>
-												{row.key === FRONTEND_ACTIVE_KEY ? (
-													<DropdownMenuItem asChild>
-														<Link to="/admin/platform/frontends">
-															<ExternalLink />
-															去前端选择器
-														</Link>
+									rowActions={(row) => {
+										const menuLabel = t(
+											"adminPlatform.settings.menu.ariaLabel",
+											{ key: row.key },
+										);
+										return (
+											<DropdownMenu>
+												<DropdownMenuTrigger asChild>
+													<Button
+														variant="ghost"
+														size="icon-sm"
+														aria-label={menuLabel}
+														title={menuLabel}
+													>
+														<MoreHorizontal aria-hidden="true" />
+													</Button>
+												</DropdownMenuTrigger>
+												<DropdownMenuContent align="end">
+													<DropdownMenuItem
+														onSelect={() => setEditing(row)}
+													>
+														<Pencil aria-hidden="true" />
+														{row.protected
+															? t(
+																	"adminPlatform.settings.menu.overrideEdit",
+																)
+															: t("adminPlatform.settings.menu.edit")}
 													</DropdownMenuItem>
-												) : null}
-												<DropdownMenuItem
-													variant="destructive"
-													disabled={row.protected}
-													onSelect={() => void removeRows([row])}
-												>
-													<Trash2 />
-													{row.protected ? "受保护，不可删除" : "删除"}
-												</DropdownMenuItem>
-											</DropdownMenuContent>
-										</DropdownMenu>
-									)}
+													{row.key === FRONTEND_ACTIVE_KEY ? (
+														<DropdownMenuItem asChild>
+															<Link to="/admin/platform/frontends">
+																<ExternalLink aria-hidden="true" />
+																{t(
+																	"adminPlatform.settings.menu.goFrontends",
+																)}
+															</Link>
+														</DropdownMenuItem>
+													) : null}
+													<DropdownMenuItem
+														variant="destructive"
+														disabled={row.protected}
+														onSelect={() => void removeRows([row])}
+													>
+														<Trash2 aria-hidden="true" />
+														{row.protected
+															? t(
+																	"adminPlatform.settings.menu.protectedDelete",
+																)
+															: t("adminPlatform.settings.menu.delete")}
+													</DropdownMenuItem>
+												</DropdownMenuContent>
+											</DropdownMenu>
+										);
+									}}
 									mobileCard={(row) => (
 										<div className="space-y-2">
 											<div className="flex items-start justify-between gap-2">
@@ -344,17 +425,22 @@ export function AdminSettingsPage(): ReactNode {
 												<MonoText>{truncate(row.value, 40) || "—"}</MonoText>
 												<BooleanPill
 													value={row.protected}
-													trueText="受保护"
-													falseText="可删除"
+													trueText={t("adminPlatform.common.protected")}
+													falseText={t("adminPlatform.common.deletable")}
 												/>
 											</p>
 											<p className="text-xs text-muted-foreground">
-												{truncate(row.description ?? "", 80) || "（无描述）"}
+												{truncate(row.description ?? "", 80) ||
+													t("adminPlatform.common.noDescription")}
 											</p>
-											<div className="flex items-center gap-2">
-												<Button variant="ghost" size="sm" onClick={() => setEditing(row)}>
-													<Pencil />
-													编辑
+											<div className="flex flex-wrap items-center gap-2">
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() => setEditing(row)}
+												>
+													<Pencil aria-hidden="true" />
+													{t("adminPlatform.settings.menu.edit")}
 												</Button>
 												<Button
 													variant="ghost"
@@ -363,8 +449,8 @@ export function AdminSettingsPage(): ReactNode {
 													disabled={row.protected}
 													onClick={() => void removeRows([row])}
 												>
-													<Trash2 />
-													删除
+													<Trash2 aria-hidden="true" />
+													{t("adminPlatform.settings.menu.delete")}
 												</Button>
 											</div>
 										</div>
@@ -404,6 +490,7 @@ function SettingFormSheet({
 	row: SettingsDto | null;
 	onOpenChange: (open: boolean) => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -421,10 +508,12 @@ function SettingFormSheet({
 		protected: false,
 	});
 	const [errors, setErrors] = useState<{ key?: string; value?: string }>({});
+	const [showSecret, setShowSecret] = useState(false);
 
 	useEffect(() => {
 		if (!open) return;
 		setErrors({});
+		setShowSecret(false);
 		setForm({
 			key: row?.key ?? "",
 			value: row?.value ?? "",
@@ -438,26 +527,41 @@ function SettingFormSheet({
 		void queryClient.invalidateQueries({ queryKey: qk.admin.settings() });
 	}
 
+	function settingTypeLabel(type: string): string {
+		switch (type) {
+			case SettingValueType.String:
+				return t("adminPlatform.settings.types.string");
+			case SettingValueType.Integer:
+				return t("adminPlatform.settings.types.integer");
+			case SettingValueType.Boolean:
+				return t("adminPlatform.settings.types.boolean");
+			case SettingValueType.Float:
+				return t("adminPlatform.settings.types.float");
+			default:
+				return type;
+		}
+	}
+
 	const createMutation = useMutation({
 		mutationFn: (input: Partial<SettingsDto>) =>
-			call(client.admin.settings.create(input), "创建设置"),
+			call(client.admin.settings.create(input), t("adminPlatform.settings.requests.create")),
 		onSuccess: () => {
-			toast.success("设置已创建");
+			toast.success(t("adminPlatform.settings.toasts.created"));
 			invalidate();
 			onOpenChange(false);
 		},
-		onError: (error) => toast.apiError("创建设置失败", error),
+		onError: (error) => toast.apiError(t("adminPlatform.settings.toasts.createFailed"), error),
 	});
 
 	const patchMutation = useMutation({
 		mutationFn: (input: Partial<SettingsDto>) =>
-			call(client.admin.settings.patch(input), "更新设置"),
+			call(client.admin.settings.patch(input), t("adminPlatform.settings.requests.update")),
 		onSuccess: () => {
-			toast.success("设置已更新");
+			toast.success(t("adminPlatform.settings.toasts.updated"));
 			invalidate();
 			onOpenChange(false);
 		},
-		onError: (error) => toast.apiError("更新设置失败", error),
+		onError: (error) => toast.apiError(t("adminPlatform.settings.toasts.updateFailed"), error),
 	});
 
 	const isPending = createMutation.isPending || patchMutation.isPending;
@@ -466,8 +570,8 @@ function SettingFormSheet({
 		event.preventDefault();
 		const nextKey = form.key.trim();
 		const nextErrors: { key?: string; value?: string } = {};
-		if (nextKey.length === 0) nextErrors.key = "键不能为空";
-		if (form.value.length === 0) nextErrors.value = "值不能为空";
+		if (nextKey.length === 0) nextErrors.key = t("adminPlatform.settings.field.keyRequired");
+		if (form.value.length === 0) nextErrors.value = t("adminPlatform.settings.field.valueRequired");
 		setErrors(nextErrors);
 		if (nextErrors.key || nextErrors.value) return;
 
@@ -476,21 +580,27 @@ function SettingFormSheet({
 			const changedValue = row.value !== form.value;
 			const changedKey = row.key !== nextKey;
 			const ok = await confirm({
-				title: `覆盖受保护设置 ${row.key}？`,
+				title: t("adminPlatform.settings.override.title", { key: row.key }),
 				description: changedKey
-					? `键名将从 ${row.key} 改为 ${nextKey}`
+					? t("adminPlatform.settings.override.descKey", {
+							from: row.key,
+							to: nextKey,
+						})
 					: changedValue
-						? `值将从「${truncate(row.value, 40)}」改为「${truncate(form.value, 40)}」`
-						: "仅描述 / 类型等元数据变化",
+						? t("adminPlatform.settings.override.descValue", {
+								from: truncate(row.value, 40),
+								to: truncate(form.value, 40),
+							})
+						: t("adminPlatform.settings.override.descMeta"),
 				consequences: [
-					"受保护设置由平台自身依赖，改错会导致对应功能行为异常甚至不可用",
+					t("adminPlatform.settings.override.consequence1"),
 					row.key === FRONTEND_ACTIVE_KEY
-						? "FRONTEND_ACTIVE 决定所有用户下次加载的界面，且值必须是已安装的安全前端 ID"
-						: "修改立即失效缓存并对所有请求生效，不会自动回滚",
-					"后端不会额外拦截受保护键的改值，请确认取值正确",
+						? t("adminPlatform.settings.override.consequenceFrontend")
+						: t("adminPlatform.settings.override.consequence2"),
+					t("adminPlatform.settings.override.consequence3"),
 				],
 				tone: "danger",
-				confirmText: "覆盖",
+				confirmText: t("adminPlatform.settings.override.confirmText"),
 				confirmPhrase: OVERRIDE_PHRASE,
 			});
 			if (!ok) return;
@@ -511,45 +621,74 @@ function SettingFormSheet({
 		<FormSheet
 			open={open}
 			onOpenChange={onOpenChange}
-			title={row ? `编辑设置 ${row.key}` : "新建设置"}
+			title={
+				row
+					? t("adminPlatform.settings.form.editTitle", { key: row.key })
+					: t("adminPlatform.settings.form.createTitle")
+			}
 			description={
 				row?.protected
-					? "这是受保护设置：保存时需要输入确认词，且后端不允许删除。"
-					: "键名唯一；值为字符串，平台按类型解析。"
+					? t("adminPlatform.settings.form.protectedDescription")
+					: t("adminPlatform.settings.form.normalDescription")
 			}
 			width="lg"
 			footer={
 				<FormFooter
 					formId="setting-form"
 					isPending={isPending}
-					submitLabel={row ? "保存" : "创建"}
+					submitLabel={
+						row
+							? t("adminPlatform.settings.form.save")
+							: t("adminPlatform.settings.form.create")
+					}
 					onCancel={() => onOpenChange(false)}
-					hint={row ? `ID ${row.id}` : "键与值为必填项"}
+					hint={
+						row ? (
+							<span>
+								{t("adminPlatform.settings.form.idHint")}{" "}
+								<MonoText>{row.id}</MonoText>
+							</span>
+						) : (
+							t("adminPlatform.settings.field.requiredHint")
+						)
+					}
 				/>
 			}
 		>
 			<form id="setting-form" className="space-y-4" onSubmit={(event) => void submit(event)}>
 				{row?.protected ? (
-					<div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs">
-						<ShieldAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
+					<div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+						<ShieldAlert
+							className="mt-0.5 size-4 shrink-0 text-destructive"
+							aria-hidden="true"
+						/>
 						<span>
-							受保护键（protected=true）：可以改值但**不能删除**；保存前需二次确认并输入{" "}
-							<span className="font-mono">{OVERRIDE_PHRASE}</span>。
+							{t("adminPlatform.settings.warning.protectedNote")}{" "}
+							<MonoText>{OVERRIDE_PHRASE}</MonoText>
 						</span>
 					</div>
 				) : null}
 				<FormGrid columns={2}>
-					<Field label="键" htmlFor="setting-key" required error={errors.key}>
+					<Field
+						label={t("adminPlatform.settings.field.keyLabel")}
+						htmlFor="setting-key"
+						required
+						error={errors.key}
+					>
 						<Input
 							id="setting-key"
 							className="font-mono text-xs"
 							autoComplete="off"
 							value={form.key}
 							onChange={(event) => setForm({ ...form, key: event.target.value })}
-							placeholder="例如 FRONTEND_ACTIVE"
+							placeholder={t("adminPlatform.settings.field.keyPlaceholder")}
 						/>
 					</Field>
-					<Field label="类型" htmlFor="setting-type" hint="平台按该类型解析值。">
+					<Field
+						label={t("adminPlatform.settings.field.typeLabel")}
+						htmlFor="setting-type"
+						hint={t("adminPlatform.settings.field.typeHint")}
+					>
 						<Select
 							value={form.type}
 							onValueChange={(value) =>
@@ -562,7 +701,10 @@ function SettingFormSheet({
 							<SelectContent>
 								{Object.values(SettingValueType).map((type) => (
 									<SelectItem key={type} value={type}>
-										{TYPE_LABEL[type] ?? type}（{type}）
+										{t("adminPlatform.settings.typeOption", {
+											label: settingTypeLabel(type),
+											type,
+										})}
 									</SelectItem>
 								))}
 							</SelectContent>
@@ -570,25 +712,66 @@ function SettingFormSheet({
 					</Field>
 				</FormGrid>
 				<Field
-					label="值"
+					label={t("adminPlatform.settings.field.valueLabel")}
 					htmlFor="setting-value"
 					required
 					error={errors.value}
 					hint={
 						form.key === FRONTEND_ACTIVE_KEY
-							? "FRONTEND_ACTIVE 必须是安全前端 ID：[a-z0-9][a-z0-9._-]*，最长 64；建议用前端选择器。"
-							: "支持 $OTHER_KEY 形式的引用（后端在读取时解析为 resolved_value）。"
+							? t("adminPlatform.settings.field.valueHintFrontend")
+							: isSensitiveKey(form.key)
+								? t("adminPlatform.settings.field.secretHint")
+								: t("adminPlatform.settings.field.valueHint")
 					}
 				>
-					<Textarea
-						id="setting-value"
-						className="font-mono text-sm"
-						style={{ minHeight: 90 }}
-						value={form.value}
-						onChange={(event) => setForm({ ...form, value: event.target.value })}
-					/>
+					{isSensitiveKey(form.key) ? (
+						<div className="flex gap-2">
+							<Input
+								id="setting-value"
+								type={showSecret ? "text" : "password"}
+								className="font-mono text-sm"
+								autoComplete="off"
+								spellCheck={false}
+								value={form.value}
+								onChange={(event) => setForm({ ...form, value: event.target.value })}
+							/>
+							<Button
+								type="button"
+								variant="outline"
+								size="icon"
+								aria-label={
+									showSecret
+										? t("adminPlatform.settings.field.hideSecret")
+										: t("adminPlatform.settings.field.revealSecret")
+								}
+								title={
+									showSecret
+										? t("adminPlatform.settings.field.hideSecret")
+										: t("adminPlatform.settings.field.revealSecret")
+								}
+								onClick={() => setShowSecret((value) => !value)}
+							>
+								{showSecret ? (
+									<EyeOff aria-hidden="true" />
+								) : (
+									<Eye aria-hidden="true" />
+								)}
+							</Button>
+						</div>
+					) : (
+						<Textarea
+							id="setting-value"
+							className="font-mono text-sm"
+							style={{ minHeight: 90 }}
+							value={form.value}
+							onChange={(event) => setForm({ ...form, value: event.target.value })}
+						/>
+					)}
 				</Field>
-				<Field label="描述" htmlFor="setting-description">
+				<Field
+					label={t("adminPlatform.settings.field.descriptionLabel")}
+					htmlFor="setting-description"
+				>
 					<Textarea
 						id="setting-description"
 						style={{ minHeight: 80 }}
@@ -597,9 +780,9 @@ function SettingFormSheet({
 					/>
 				</Field>
 				<Field
-					label="受保护"
+					label={t("adminPlatform.settings.field.protectedLabel")}
 					htmlFor="setting-protected"
-					hint="受保护键不可删除；关闭保护后即可删除，请谨慎操作。"
+					hint={t("adminPlatform.settings.field.protectedHint")}
 				>
 					<div className="flex items-center gap-2">
 						<Switch
@@ -607,13 +790,27 @@ function SettingFormSheet({
 							checked={form.protected}
 							onCheckedChange={(checked) => setForm({ ...form, protected: checked })}
 						/>
-						<BooleanPill value={form.protected} trueText="受保护" falseText="可删除" />
+						<BooleanPill
+							value={form.protected}
+							trueText={t("adminPlatform.common.protected")}
+							falseText={t("adminPlatform.common.deletable")}
+						/>
 					</div>
 				</Field>
 				{row ? (
 					<div className="flex items-center gap-2 text-xs text-muted-foreground">
-						<span>当前解析值：</span>
-						<CopyText value={row.resolved_value ?? ""} label="解析值" />
+						<span>{t("adminPlatform.settings.field.resolvedLabel")}</span>
+						{isSensitiveKey(form.key) ? (
+							<SecretValue
+								value={row.resolved_value ?? ""}
+								label={t("adminPlatform.settings.field.resolvedCopyLabel")}
+							/>
+						) : (
+							<CopyText
+								value={row.resolved_value ?? ""}
+								label={t("adminPlatform.settings.field.resolvedCopyLabel")}
+							/>
+						)}
 					</div>
 				) : null}
 			</form>

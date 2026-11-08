@@ -3,9 +3,12 @@
  *
  * 覆盖：列表（柯里化 `fetch(eventId)({page,limit})`）、从题库勾选加入（`add`）、
  * 批量设分（`setPoints`）、发布 / 隐藏（`open` / `hidden`）、移除（柯里化 `remove(eventId)`）。
+ *
+ * 文案全部走 `adminEvents.challenges` 命名空间；`build_status` 等后端技术标识保持原文。
  */
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, EyeOff, MoreHorizontal, Plus, Target, Trash2 } from "lucide-react";
 
@@ -17,7 +20,7 @@ import { useConfirm } from "~/components/app/confirm";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import { Field, FormFooter, FormSheet } from "~/components/app/form";
 import { MonoText, SectionCard, Toolbar } from "~/components/app/page";
-import { EmptyBlock, InlineError, TableSkeleton } from "~/components/app/states";
+import { EmptyBlock, ErrorBlock, TableSkeleton } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import {
@@ -42,6 +45,7 @@ function buildStatusTone(status: string | undefined): "success" | "warning" | "m
 }
 
 export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -67,38 +71,47 @@ export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode 
 
 	const openChallenges = useMutation({
 		mutationFn: (ids: string[]) =>
-			call(client.admin.event_challenges.open({ event_id: eventId, challenge_id_list: ids }), "发布题目"),
+			call(
+				client.admin.event_challenges.open({ event_id: eventId, challenge_id_list: ids }),
+				t("adminEvents.actions.publishChallenges"),
+			),
 		onSuccess: (_result, ids) => {
-			toast.success(`已发布 ${ids.length} 道题目`, "选手端立即可见（若赛事本身可见）。");
+			toast.success(
+				t("adminEvents.challenges.toast.publishSuccess", { count: ids.length }),
+				t("adminEvents.challenges.toast.publishSuccessDescription"),
+			);
 			setSelectedIds([]);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("发布题目失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.challenges.toast.publishFailed"), error),
 	});
 
 	const hideChallenges = useMutation({
 		mutationFn: (ids: string[]) =>
 			call(
 				client.admin.event_challenges.hidden({ event_id: eventId, challenge_id_list: ids }),
-				"隐藏题目",
+				t("adminEvents.actions.hideChallenges"),
 			),
 		onSuccess: (_result, ids) => {
-			toast.success(`已隐藏 ${ids.length} 道题目`);
+			toast.success(t("adminEvents.challenges.toast.hideSuccess", { count: ids.length }));
 			setSelectedIds([]);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("隐藏题目失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.challenges.toast.hideFailed"), error),
 	});
 
 	const removeChallenges = useMutation({
 		mutationFn: (ids: string[]) =>
-			call<number>(client.admin.event_challenges.remove(eventId)(ids), "移除题目"),
+			call<number>(
+				client.admin.event_challenges.remove(eventId)(ids),
+				t("adminEvents.actions.removeChallenges"),
+			),
 		onSuccess: (count) => {
-			toast.success(`已从赛事移除 ${count} 道题目`);
+			toast.success(t("adminEvents.challenges.toast.removeSuccess", { count }));
 			setSelectedIds([]);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("移除题目失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.challenges.toast.removeFailed"), error),
 	});
 
 	const setPoints = useMutation({
@@ -109,14 +122,17 @@ export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode 
 					challenge_id_list: input.ids,
 					points: input.points,
 				}),
-				"设置分值",
+				t("adminEvents.actions.setChallengePoints"),
 			),
 		onSuccess: () => {
-			toast.success("分值已更新", "之后的解出按新分值结算，已得分不追溯调整。");
+			toast.success(
+				t("adminEvents.challenges.toast.pointsSuccess"),
+				t("adminEvents.challenges.toast.pointsSuccessDescription"),
+			);
 			setPointsTarget(null);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("设置分值失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.challenges.toast.pointsFailed"), error),
 	});
 
 	async function confirmRemove(rows: AdminEventChallengeResult[]) {
@@ -124,16 +140,16 @@ export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode 
 		const single = rows.length === 1 ? rows[0] : null;
 		const ok = await confirm({
 			title: single
-				? `从赛事移除「${single.challenge.name}」？`
-				: `从赛事移除所选 ${rows.length} 道题目？`,
-			description: "仅解除「赛事 ↔ 题目」的挂载关系。",
+				? t("adminEvents.challenges.confirm.singleTitle", { name: single.challenge.name })
+				: t("adminEvents.challenges.confirm.bulkTitle", { count: rows.length }),
+			description: t("adminEvents.challenges.confirm.description"),
 			consequences: [
-				"该题目从赛事题目列表移除，选手端立即不再显示（题目本身仍留在题库中）",
-				"已产生的解题记录（jeopardy_challenge_solves）不会被删除",
-				"如需重新参赛，需再次从题库把题目加入本赛事（分值需重设）",
+				t("adminEvents.challenges.confirm.consequence1"),
+				t("adminEvents.challenges.confirm.consequence2"),
+				t("adminEvents.challenges.confirm.consequence3"),
 			],
 			tone: "danger",
-			confirmText: "移除",
+			confirmText: t("adminEvents.challenges.confirm.confirm"),
 		});
 		if (!ok) return;
 		removeChallenges.mutate(rows.map((row) => row.challenge.id));
@@ -142,38 +158,42 @@ export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode 
 	const columns: DataTableColumn<AdminEventChallengeResult>[] = [
 		{
 			id: "challenge_id",
-			header: "题目 ID",
+			header: t("adminEvents.challenges.columns.challengeId"),
 			cell: (row) => <MonoText>{row.challenge.id}</MonoText>,
 			sortValue: (row) => row.challenge.id,
 			hideBelow: "lg",
 		},
 		{
 			id: "name",
-			header: "题目名称",
+			header: t("adminEvents.challenges.columns.name"),
 			cell: (row) => <span className="font-medium">{row.challenge.name}</span>,
 			sortValue: (row) => row.challenge.name,
 		},
 		{
 			id: "category",
-			header: "分类",
-			cell: (row) => <TonePill tone="neutral">{row.challenge.category}</TonePill>,
+			header: t("adminEvents.challenges.columns.category"),
+			cell: (row) => (
+				<TonePill tone="neutral" title={row.challenge.category}>
+					{row.challenge.category}
+				</TonePill>
+			),
 			sortValue: (row) => row.challenge.category,
 		},
 		{
 			id: "points",
-			header: "分值",
+			header: t("adminEvents.challenges.columns.points"),
 			align: "right",
 			cell: (row) => <MonoText>{row.event_challenge.points.toFixed(2)}</MonoText>,
 			sortValue: (row) => row.event_challenge.points,
 		},
 		{
 			id: "hidden",
-			header: "发布状态",
+			header: t("adminEvents.challenges.columns.publishState"),
 			cell: (row) => (
 				<BooleanPill
 					value={row.event_challenge.hidden}
-					trueText="已隐藏"
-					falseText="已发布"
+					trueText={t("adminEvents.challenges.values.hidden")}
+					falseText={t("adminEvents.challenges.values.published")}
 					trueTone="muted"
 					falseTone="success"
 				/>
@@ -182,10 +202,10 @@ export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode 
 		},
 		{
 			id: "build_status",
-			header: "包状态",
+			header: t("adminEvents.challenges.columns.buildStatus"),
 			cell: (row) => (
 				<TonePill tone={buildStatusTone(row.challenge.build_status)}>
-					{row.challenge.build_status ?? "未知"}
+					{row.challenge.build_status ?? t("common.unknown")}
 				</TonePill>
 			),
 			sortValue: (row) => row.challenge.build_status ?? "",
@@ -193,61 +213,80 @@ export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode 
 		},
 	];
 
-	const rowActions = (row: AdminEventChallengeResult): ReactNode => (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" size="icon-sm" aria-label={`${row.challenge.name} 的操作`}>
-					<MoreHorizontal />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end">
-				<DropdownMenuLabel className="max-w-56 truncate">{row.challenge.name}</DropdownMenuLabel>
-				<DropdownMenuItem onSelect={() => setPointsTarget([row.challenge.id])}>
-					<Target /> 设置分值
-				</DropdownMenuItem>
-				{row.event_challenge.hidden ? (
-					<DropdownMenuItem onSelect={() => openChallenges.mutate([row.challenge.id])}>
-						<Eye /> 发布到选手端
+	const rowActions = (row: AdminEventChallengeResult): ReactNode => {
+		const actionsLabel = t("adminEvents.challenges.row.actions", { name: row.challenge.name });
+		return (
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button variant="ghost" size="icon-sm" aria-label={actionsLabel} title={actionsLabel}>
+						<MoreHorizontal />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuLabel className="max-w-56 truncate">{row.challenge.name}</DropdownMenuLabel>
+					<DropdownMenuItem onSelect={() => setPointsTarget([row.challenge.id])}>
+						<Target /> {t("adminEvents.challenges.row.setPoints")}
 					</DropdownMenuItem>
-				) : (
-					<DropdownMenuItem onSelect={() => hideChallenges.mutate([row.challenge.id])}>
-						<EyeOff /> 从选手端隐藏
+					{row.event_challenge.hidden ? (
+						<DropdownMenuItem onSelect={() => openChallenges.mutate([row.challenge.id])}>
+							<Eye /> {t("adminEvents.challenges.row.publish")}
+						</DropdownMenuItem>
+					) : (
+						<DropdownMenuItem onSelect={() => hideChallenges.mutate([row.challenge.id])}>
+							<EyeOff /> {t("adminEvents.challenges.row.hide")}
+						</DropdownMenuItem>
+					)}
+					<DropdownMenuSeparator />
+					<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove([row])}>
+						<Trash2 /> {t("adminEvents.challenges.row.remove")}
 					</DropdownMenuItem>
-				)}
-				<DropdownMenuSeparator />
-				<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove([row])}>
-					<Trash2 /> 从赛事移除
-				</DropdownMenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
+				</DropdownMenuContent>
+			</DropdownMenu>
+		);
+	};
 
 	const mobileCard = (row: AdminEventChallengeResult): ReactNode => (
-		<MobileFacts
-			items={[
-				{ k: "题目", v: <span className="font-medium">{row.challenge.name}</span> },
-				{ k: "分类", v: <TonePill tone="neutral">{row.challenge.category}</TonePill> },
-				{ k: "分值", v: <MonoText>{row.event_challenge.points.toFixed(2)}</MonoText> },
-				{
-					k: "状态",
-					v: (
-						<BooleanPill
-							value={row.event_challenge.hidden}
-							trueText="已隐藏"
-							falseText="已发布"
-							trueTone="muted"
-							falseTone="success"
-						/>
-					),
-				},
-			]}
-		/>
+		<div className="space-y-2">
+			<MobileFacts
+				items={[
+					{
+						k: t("adminEvents.challenges.mobile.challenge"),
+						v: <span className="font-medium">{row.challenge.name}</span>,
+					},
+					{
+						k: t("adminEvents.challenges.mobile.category"),
+						v: (
+							<TonePill tone="neutral" title={row.challenge.category}>
+								{row.challenge.category}
+							</TonePill>
+						),
+					},
+					{
+						k: t("adminEvents.challenges.mobile.points"),
+						v: <MonoText>{row.event_challenge.points.toFixed(2)}</MonoText>,
+					},
+					{
+						k: t("adminEvents.challenges.mobile.status"),
+						v: (
+							<BooleanPill
+								value={row.event_challenge.hidden}
+								trueText={t("adminEvents.challenges.values.hidden")}
+								falseText={t("adminEvents.challenges.values.published")}
+								trueTone="muted"
+								falseTone="success"
+							/>
+						),
+					},
+				]}
+			/>
+			<div className="flex justify-end">{rowActions(row)}</div>
+		</div>
 	);
 
 	return (
 		<SectionCard
-			title="赛事题目"
-			description="挂载自题库的题目"
+			title={t("adminEvents.challenges.title")}
+			description={t("adminEvents.challenges.description")}
 			actions={
 				<Toolbar>
 					{selectedIds.length > 0 ? (
@@ -258,7 +297,10 @@ export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode 
 								disabled={openChallenges.isPending}
 								onClick={() => openChallenges.mutate(selectedIds)}
 							>
-								<Eye /> 发布所选（{selectedIds.length}）
+								<Eye />{" "}
+								{t("adminEvents.challenges.toolbar.publishSelected", {
+									count: selectedIds.length,
+								})}
 							</Button>
 							<Button
 								variant="outline"
@@ -266,14 +308,14 @@ export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode 
 								disabled={hideChallenges.isPending}
 								onClick={() => hideChallenges.mutate(selectedIds)}
 							>
-								<EyeOff /> 隐藏所选
+								<EyeOff /> {t("adminEvents.challenges.toolbar.hideSelected")}
 							</Button>
 							<Button
 								variant="outline"
 								size="sm"
 								onClick={() => setPointsTarget(selectedIds)}
 							>
-								<Target /> 批量设分
+								<Target /> {t("adminEvents.challenges.toolbar.bulkSetPoints")}
 							</Button>
 							<Button
 								variant="destructive"
@@ -285,12 +327,12 @@ export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode 
 									void confirmRemove(rows);
 								}}
 							>
-								<Trash2 /> 移除所选
+								<Trash2 /> {t("adminEvents.challenges.toolbar.removeSelected")}
 							</Button>
 						</>
 					) : null}
 					<Button size="sm" onClick={() => setAddOpen(true)}>
-						<Plus /> 添加题目
+						<Plus /> {t("adminEvents.challenges.addButton")}
 					</Button>
 				</Toolbar>
 			}
@@ -311,14 +353,14 @@ export function EventChallengesTab({ eventId }: { eventId: string }): ReactNode 
 				selectedIds={selectedIds}
 				onSelectionChange={setSelectedIds}
 				mobileCard={mobileCard}
-				errorTitle="加载赛事题目失败"
+				errorTitle={t("adminEvents.challenges.loadError")}
 				empty={
 					<EmptyBlock
-						title="赛事还没有题目"
-						description="点「添加题目」从题库勾选要挂到本赛事的题目。"
+						title={t("adminEvents.challenges.empty.title")}
+						description={t("adminEvents.challenges.empty.description")}
 						action={
 							<Button size="sm" onClick={() => setAddOpen(true)}>
-								<Plus /> 添加题目
+								<Plus /> {t("adminEvents.challenges.addButton")}
 							</Button>
 						}
 					/>
@@ -352,6 +394,7 @@ function AddChallengesSheet({
 	onClose: () => void;
 	onDone: () => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const [search, setSearch] = useState("");
 	const [page, setPage] = useState(1);
@@ -373,6 +416,20 @@ function AddChallengesSheet({
 			),
 	});
 
+	// 「已在赛事」的题目必须整表判断，而不是只看当前页：
+	// 否则用户选了另一页已挂载的题目，提交后后端会以复合主键冲突拒绝。
+	const attached = useQuery({
+		queryKey: qk.admin.eventChallenges(eventId, { page: 1, limit: 1000 }),
+		queryFn: () =>
+			callList<AdminEventChallengeResult>(
+				client.admin.event_challenges.fetch(eventId)({ page: 1, limit: 1000 }),
+			),
+	});
+	const attachedIds = useMemo(
+		() => new Set((attached.data?.items ?? []).map((item) => item.challenge.id)),
+		[attached.data],
+	);
+
 	const parsedPoints = points.trim() === "" ? undefined : Number(points);
 	const pointsValid =
 		parsedPoints === undefined ||
@@ -386,40 +443,54 @@ function AddChallengesSheet({
 					challenge_id_list: selectedIds,
 					points: parsedPoints,
 				}),
-				"添加题目",
+				t("adminEvents.actions.addChallenges"),
 			),
 		onSuccess: () => {
-			toast.success(`已添加 ${selectedIds.length} 道题目`);
+			toast.success(t("adminEvents.challenges.add.toast.success", { count: selectedIds.length }));
 			onDone();
 			onClose();
 		},
-		onError: (error) => toast.apiError("添加题目失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.challenges.add.toast.failed"), error),
 	});
 
 	const columns: DataTableColumn<ChallengesListItem>[] = [
-		{ id: "name", header: "题目名称", cell: (row) => row.name, sortValue: (row) => row.name },
+		{
+			id: "name",
+			header: t("adminEvents.challenges.add.table.name"),
+			cell: (row) => row.name,
+			sortValue: (row) => row.name,
+		},
 		{
 			id: "category",
-			header: "分类",
-			cell: (row) => <TonePill tone="neutral">{row.category}</TonePill>,
+			header: t("adminEvents.challenges.add.table.category"),
+			cell: (row) => (
+				<TonePill tone="neutral" title={row.category}>
+					{row.category}
+				</TonePill>
+			),
 			sortValue: (row) => row.category,
 		},
 		{
 			id: "build_status",
-			header: "包状态",
+			header: t("adminEvents.challenges.add.table.buildStatus"),
 			cell: (row) => (
-				<TonePill tone={buildStatusTone(row.build_status)}>{row.build_status ?? "未知"}</TonePill>
+				<TonePill tone={buildStatusTone(row.build_status)}>
+					{row.build_status ?? t("common.unknown")}
+				</TonePill>
 			),
 			sortValue: (row) => row.build_status ?? "",
 		},
 		{
 			id: "updated_at",
-			header: "更新时间",
+			header: t("adminEvents.challenges.add.table.updatedAt"),
 			cell: (row) => <MonoText>{formatDateTime(row.updated_at)}</MonoText>,
 			sortValue: (row) => row.updated_at,
 			hideBelow: "md",
 		},
 	];
+
+	const total = query.data?.meta?.total ?? query.data?.items.length ?? 0;
+	const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
 	return (
 		<FormSheet
@@ -428,13 +499,19 @@ function AddChallengesSheet({
 				if (!next) onClose();
 			}}
 			width="xl"
-			title="从题库添加题目"
-			description="只有 build_status = ready 的题目可以被加入赛事"
+			title={t("adminEvents.challenges.add.title")}
+			description={t("adminEvents.challenges.add.description")}
 			footer={
 				<FormFooter
 					formId="add-challenges-form"
 					onCancel={onClose}
-					submitLabel={`添加${selectedIds.length > 0 ? `（${selectedIds.length}）` : ""}`}
+					submitLabel={
+						selectedIds.length > 0
+							? t("adminEvents.challenges.add.submitWithCount", {
+									count: selectedIds.length,
+								})
+							: t("adminEvents.challenges.add.submit")
+					}
 					isPending={add.isPending}
 					disabled={selectedIds.length === 0 || !pointsValid}
 				/>
@@ -450,7 +527,11 @@ function AddChallengesSheet({
 				}}
 			>
 				<div className="flex flex-wrap items-end gap-3">
-					<Field label="搜索题目" htmlFor="challenge-search" className="min-w-52 flex-1">
+					<Field
+						label={t("adminEvents.challenges.add.searchLabel")}
+						htmlFor="challenge-search"
+						className="min-w-52 flex-1"
+					>
 						<Input
 							id="challenge-search"
 							value={search}
@@ -458,14 +539,14 @@ function AddChallengesSheet({
 								setSearch(changeEvent.target.value);
 								setPage(1);
 							}}
-							placeholder="按名称过滤…"
+							placeholder={t("adminEvents.challenges.add.searchPlaceholder")}
 						/>
 					</Field>
 					<Field
-						label="分值（可选）"
+						label={t("adminEvents.challenges.add.pointsLabel")}
 						htmlFor="challenge-points"
-						hint="1 ~ 1000000，留空 = 100"
-						error={pointsValid ? undefined : "分值必须是不大于 1000000 的正数"}
+						hint={t("adminEvents.challenges.add.pointsHint")}
+						error={pointsValid ? undefined : t("adminEvents.challenges.add.pointsError")}
 					>
 						<Input
 							id="challenge-points"
@@ -481,7 +562,11 @@ function AddChallengesSheet({
 				{query.isPending ? (
 					<TableSkeleton rows={6} columns={4} />
 				) : query.isError ? (
-					<InlineError error={query.error} />
+					<ErrorBlock
+						error={query.error}
+						title={t("adminEvents.challenges.loadError")}
+						onRetry={() => void query.refetch()}
+					/>
 				) : (
 					<>
 						<DataTable
@@ -491,16 +576,30 @@ function AddChallengesSheet({
 							selectable
 							selectedIds={selectedIds}
 							onSelectionChange={setSelectedIds}
+							isRowSelectable={(row) => !attachedIds.has(row.id)}
+							empty={
+								<EmptyBlock
+									title={t("adminEvents.challenges.add.emptyTitle")}
+									description={t("adminEvents.challenges.add.emptyDescription")}
+								/>
+							}
 							mobileCard={(row) => (
 								<MobileFacts
 									items={[
-										{ k: "名称", v: row.name },
-										{ k: "分类", v: <TonePill tone="neutral">{row.category}</TonePill> },
+										{ k: t("adminEvents.challenges.add.mobile.name"), v: row.name },
 										{
-											k: "包状态",
+											k: t("adminEvents.challenges.add.mobile.category"),
+											v: (
+												<TonePill tone="neutral" title={row.category}>
+													{row.category}
+												</TonePill>
+											),
+										},
+										{
+											k: t("adminEvents.challenges.add.mobile.buildStatus"),
 											v: (
 												<TonePill tone={buildStatusTone(row.build_status)}>
-													{row.build_status ?? "未知"}
+													{row.build_status ?? t("common.unknown")}
 												</TonePill>
 											),
 										},
@@ -510,8 +609,10 @@ function AddChallengesSheet({
 						/>
 						<div className="flex flex-wrap items-center justify-between gap-2">
 							<p className="tnum text-xs text-muted-foreground">
-								共 {query.data?.meta?.total ?? query.data?.items.length ?? 0} 道题目 · 本页已选{" "}
-								{selectedIds.length} 道
+								{t("adminEvents.challenges.add.selectedSummary", {
+									total,
+									selected: selectedIds.length,
+								})}
 							</p>
 							<div className="flex items-center gap-2">
 								<Button
@@ -521,22 +622,22 @@ function AddChallengesSheet({
 									disabled={page <= 1}
 									onClick={() => setPage((current) => Math.max(1, current - 1))}
 								>
-									上一页
+									{t("common.table.prevPage")}
 								</Button>
 								<span className="tnum text-xs text-muted-foreground">
-									第 {page} / {Math.max(1, Math.ceil((query.data?.meta?.total ?? query.data?.items.length ?? 0) / pageSize))} 页
+									{t("adminEvents.challenges.add.pageInfo", {
+										page,
+										total: totalPages,
+									})}
 								</span>
 								<Button
 									type="button"
 									variant="outline"
 									size="sm"
-									disabled={
-										query.data !== undefined &&
-										page * pageSize >= (query.data.meta?.total ?? query.data.items.length)
-									}
+									disabled={query.data !== undefined && page * pageSize >= total}
 									onClick={() => setPage((current) => current + 1)}
 								>
-									下一页
+									{t("common.table.nextPage")}
 								</Button>
 							</div>
 						</div>
@@ -560,6 +661,7 @@ function SetPointsSheet({
 	onClose: () => void;
 	onSubmit: (points: number) => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const [value, setValue] = useState("100");
 	const parsed = Number(value);
 	const valid = Number.isFinite(parsed) && parsed > 0 && parsed <= 1_000_000;
@@ -570,12 +672,12 @@ function SetPointsSheet({
 			onOpenChange={(next) => {
 				if (!next) onClose();
 			}}
-			title={`设置 ${count} 道题目的分值`}
-			description="提交后新解按新分值结算，已获得的分值不追溯调整。"
+			title={t("adminEvents.challenges.points.title", { count })}
+			description={t("adminEvents.challenges.points.description")}
 			footer={
 				<FormFooter
 					onCancel={onClose}
-					submitLabel="保存分值"
+					submitLabel={t("adminEvents.challenges.points.submit")}
 					isPending={isPending}
 					disabled={!valid}
 					formId="set-points-form"
@@ -590,11 +692,11 @@ function SetPointsSheet({
 				}}
 			>
 				<Field
-					label="分值"
+					label={t("adminEvents.challenges.points.label")}
 					htmlFor="set-points-value"
 					required
-					hint="1 ~ 1000000"
-					error={valid ? undefined : "分值必须是不大于 1000000 的正数"}
+					hint={t("adminEvents.challenges.points.hint")}
+					error={valid ? undefined : t("adminEvents.challenges.points.error")}
 				>
 					<Input
 						id="set-points-value"

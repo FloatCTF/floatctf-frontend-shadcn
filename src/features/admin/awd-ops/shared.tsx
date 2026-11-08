@@ -5,67 +5,148 @@
  * - 状态判定**只**用后端返回的 `status` / `phase` / `final_settlement` / 网络分配结果，
  *   不在前端用时间或本地推导替代后端状态；
  * - 每个动作的禁用原因都写成可直接展示的文案（`title` + 页面提示），不出现「按钮灰着但不知为何」。
+ *
+ * i18n（CONVENTIONS §10.2）：本文件只负责「后端字段 → i18n key」的映射；
+ * 文案由调用方传入的 `t` 现译，语言切换后即时生效。未知枚举值**原样透传**，
+ * 不伪装成已知状态。
  */
 
 import type { ReactNode } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 
 import type { FloatCTFClient } from "@floatctf/sdk";
+import { AwdEventStatus, AwdPhase, GameboxStatus } from "@floatctf/sdk/entity";
 
 import { callVoid } from "~/api/call";
 import { isFloatCTFError } from "~/api/errors";
 import { TonePill, type PillTone } from "~/components/app/badges";
 import type { ConfirmOptions } from "~/components/app/confirm";
+import { EVENT_FAMILY_KEY, EVENT_PURPOSE_KEY } from "~/lib/event-status";
 
-/* ── 状态文案（后端 awd_event_status / awd_phase 的字面值）────────────────── */
+/* ── 状态文案（后端 awd_event_status / awd_phase 的枚举值）────────────────── */
 
-export const AWD_STATUS_LABEL: Record<string, string> = {
-	draft: "草稿",
-	configuring: "配置中",
-	deploying: "部署中",
-	deployed: "已部署",
-	prechecking: "预检中",
-	verified: "预检通过",
-	running: "进行中",
-	paused: "已暂停",
-	network_error: "网络异常",
-	start_blocked: "开赛受阻",
-	finished: "已结束",
-	archived: "已归档",
-	deploy_failed: "部署失败",
-	verification_failed: "预检失败",
+const STATUS_KEYS: Record<AwdEventStatus, string> = {
+	[AwdEventStatus.Draft]: "adminAwdOps.state.status.draft",
+	[AwdEventStatus.Configuring]: "adminAwdOps.state.status.configuring",
+	[AwdEventStatus.Deploying]: "adminAwdOps.state.status.deploying",
+	[AwdEventStatus.Deployed]: "adminAwdOps.state.status.deployed",
+	[AwdEventStatus.Prechecking]: "adminAwdOps.state.status.prechecking",
+	[AwdEventStatus.Verified]: "adminAwdOps.state.status.verified",
+	[AwdEventStatus.Running]: "adminAwdOps.state.status.running",
+	[AwdEventStatus.Paused]: "adminAwdOps.state.status.paused",
+	[AwdEventStatus.NetworkError]: "adminAwdOps.state.status.networkError",
+	[AwdEventStatus.StartBlocked]: "adminAwdOps.state.status.startBlocked",
+	[AwdEventStatus.Finished]: "adminAwdOps.state.status.finished",
+	[AwdEventStatus.Archived]: "adminAwdOps.state.status.archived",
+	[AwdEventStatus.DeployFailed]: "adminAwdOps.state.status.deployFailed",
+	[AwdEventStatus.VerificationFailed]: "adminAwdOps.state.status.verificationFailed",
 };
 
-export const AWD_STATUS_TONE: Record<string, PillTone> = {
-	draft: "muted",
-	configuring: "info",
-	deploying: "info",
-	deployed: "info",
-	prechecking: "info",
-	verified: "success",
-	running: "success",
-	paused: "warning",
-	network_error: "danger",
-	start_blocked: "warning",
-	finished: "neutral",
-	archived: "muted",
-	deploy_failed: "danger",
-	verification_failed: "danger",
+const STATUS_TONES: Record<AwdEventStatus, PillTone> = {
+	[AwdEventStatus.Draft]: "muted",
+	[AwdEventStatus.Configuring]: "info",
+	[AwdEventStatus.Deploying]: "info",
+	[AwdEventStatus.Deployed]: "info",
+	[AwdEventStatus.Prechecking]: "info",
+	[AwdEventStatus.Verified]: "success",
+	[AwdEventStatus.Running]: "success",
+	[AwdEventStatus.Paused]: "warning",
+	[AwdEventStatus.NetworkError]: "danger",
+	[AwdEventStatus.StartBlocked]: "warning",
+	[AwdEventStatus.Finished]: "neutral",
+	[AwdEventStatus.Archived]: "muted",
+	[AwdEventStatus.DeployFailed]: "danger",
+	[AwdEventStatus.VerificationFailed]: "danger",
 };
 
-export const AWD_PHASE_LABEL: Record<string, string> = {
-	hardening: "加固期",
-	attack: "攻击期",
-	pause: "已暂停",
+const PHASE_KEYS: Record<AwdPhase, string> = {
+	[AwdPhase.Hardening]: "adminAwdOps.state.phase.hardening",
+	[AwdPhase.Attack]: "adminAwdOps.state.phase.attack",
+	[AwdPhase.Pause]: "adminAwdOps.state.phase.pause",
 };
 
-export function awdStatusLabel(status: string | null | undefined): string {
-	if (!status) return "未开通";
-	return AWD_STATUS_LABEL[status] ?? status;
+const PHASE_TONES: Record<AwdPhase, PillTone> = {
+	[AwdPhase.Hardening]: "info",
+	[AwdPhase.Attack]: "success",
+	[AwdPhase.Pause]: "warning",
+};
+
+/** 实例运行时状态（`gamebox_status`）；未知值原样展示。 */
+const GAMEBOX_STATUS_KEYS: Record<GameboxStatus, string> = {
+	[GameboxStatus.Pending]: "adminAwdOps.state.gamebox.pending",
+	[GameboxStatus.Creating]: "adminAwdOps.state.gamebox.creating",
+	[GameboxStatus.Running]: "adminAwdOps.state.gamebox.running",
+	[GameboxStatus.Ready]: "adminAwdOps.state.gamebox.ready",
+	[GameboxStatus.Resetting]: "adminAwdOps.state.gamebox.resetting",
+	[GameboxStatus.Missing]: "adminAwdOps.state.gamebox.missing",
+	[GameboxStatus.Orphan]: "adminAwdOps.state.gamebox.orphan",
+	[GameboxStatus.Conflict]: "adminAwdOps.state.gamebox.conflict",
+	[GameboxStatus.StartFailed]: "adminAwdOps.state.gamebox.startFailed",
+	[GameboxStatus.ResetFailed]: "adminAwdOps.state.gamebox.resetFailed",
+	[GameboxStatus.Stopped]: "adminAwdOps.state.gamebox.stopped",
+};
+
+const GAMEBOX_STATUS_TONES: Record<GameboxStatus, PillTone> = {
+	[GameboxStatus.Pending]: "muted",
+	[GameboxStatus.Creating]: "info",
+	[GameboxStatus.Running]: "success",
+	[GameboxStatus.Ready]: "success",
+	[GameboxStatus.Resetting]: "warning",
+	[GameboxStatus.Missing]: "danger",
+	[GameboxStatus.Orphan]: "danger",
+	[GameboxStatus.Conflict]: "danger",
+	[GameboxStatus.StartFailed]: "danger",
+	[GameboxStatus.ResetFailed]: "danger",
+	[GameboxStatus.Stopped]: "danger",
+};
+
+/** 赛事状态：`null` = 尚未开通 AWD；未知值原样透传。 */
+export function awdStatusLabel(status: string | null | undefined, t: TFunction): string {
+	if (!status) return t("adminAwdOps.state.notEnabled");
+	const key = STATUS_KEYS[status as AwdEventStatus];
+	return key ? t(key) : status;
 }
 
 export function awdStatusTone(status: string | null | undefined): PillTone {
 	if (!status) return "muted";
-	return AWD_STATUS_TONE[status] ?? "neutral";
+	return STATUS_TONES[status as AwdEventStatus] ?? "neutral";
+}
+
+/** AWD 阶段：空值用 `—`；未知值原样透传。 */
+export function awdPhaseLabel(phase: string | null | undefined, t: TFunction): string {
+	if (!phase) return "—";
+	const key = PHASE_KEYS[phase as AwdPhase];
+	return key ? t(key) : phase;
+}
+
+export function awdPhaseTone(phase: string | null | undefined): PillTone {
+	if (!phase) return "muted";
+	return PHASE_TONES[phase as AwdPhase] ?? "neutral";
+}
+
+export function gameboxStatusLabel(status: string | null | undefined, t: TFunction): string {
+	if (!status) return "—";
+	const key = GAMEBOX_STATUS_KEYS[status as GameboxStatus];
+	return key ? t(key) : status;
+}
+
+export function gameboxStatusTone(status: string | null | undefined): PillTone {
+	if (!status) return "muted";
+	return GAMEBOX_STATUS_TONES[status as GameboxStatus] ?? "neutral";
+}
+
+/** 赛制 / 用途：使用共享 key 映射；未知值原样透传。 */
+export function eventFamilyLabel(family: string | null | undefined, t: TFunction): string {
+	if (!family) return "—";
+	const key = EVENT_FAMILY_KEY[family];
+	return key ? t(key) : family;
+}
+
+export function eventPurposeLabel(purpose: string | null | undefined, t: TFunction): string {
+	if (!purpose) return "—";
+	const key = EVENT_PURPOSE_KEY[purpose];
+	return key ? t(key) : purpose;
 }
 
 /** 状态 + 阶段徽章；阶段缺失时如实显示「—」。 */
@@ -78,17 +159,18 @@ export function AwdStatusPill({
 	phase?: string | null;
 	finalSettlement?: boolean;
 }): ReactNode {
+	const { t } = useTranslation();
+	// 终态赛事不再有「当前阶段」：archived/finished 还显示「加固期」会误导。
+	const terminal = status === "finished" || status === "archived";
 	return (
 		<span className="inline-flex flex-wrap items-center gap-1.5">
-			<TonePill tone={awdStatusTone(status)}>{awdStatusLabel(status)}</TonePill>
-			{phase ? (
-				<TonePill tone={phase === "pause" ? "warning" : "neutral"}>
-					{AWD_PHASE_LABEL[phase] ?? phase}
-				</TonePill>
+			<TonePill tone={awdStatusTone(status)}>{awdStatusLabel(status, t)}</TonePill>
+			{phase && !terminal ? (
+				<TonePill tone={awdPhaseTone(phase)}>{awdPhaseLabel(phase, t)}</TonePill>
 			) : null}
 			{finalSettlement ? (
-				<TonePill tone="warning" title="最后一轮已完成、判题仍在结算：竞赛操作已关闭">
-					终局结算中
+				<TonePill tone="warning" title={t("adminAwdOps.state.finalSettlementTitle")}>
+					{t("adminAwdOps.state.finalSettlement")}
 				</TonePill>
 			) : null}
 		</span>
@@ -107,139 +189,156 @@ export type AwdAction =
 	| "archive"
 	| "rotateTokens";
 
-export const AWD_ACTION_LABEL: Record<AwdAction, string> = {
-	deploy: "部署",
-	precheck: "预检",
-	start: "开赛",
-	pause: "暂停",
-	resume: "恢复",
-	finish: "结束比赛",
-	archive: "归档",
-	rotateTokens: "轮换内部令牌",
+const ACTION_KEYS: Record<AwdAction, string> = {
+	deploy: "adminAwdOps.actions.deploy",
+	precheck: "adminAwdOps.actions.precheck",
+	start: "adminAwdOps.actions.start",
+	pause: "adminAwdOps.actions.pause",
+	resume: "adminAwdOps.actions.resume",
+	finish: "adminAwdOps.actions.finish",
+	archive: "adminAwdOps.actions.archive",
+	rotateTokens: "adminAwdOps.actions.rotateTokens",
 };
+
+export function awdActionLabel(action: AwdAction, t: TFunction): string {
+	return t(ACTION_KEYS[action]);
+}
 
 /** 调用后端生命周期接口（返回 null 的动作统一走 `callVoid`）。 */
 export async function runAwdAction(
 	client: FloatCTFClient,
 	eventId: string,
 	action: AwdAction,
+	t: TFunction,
 ): Promise<void> {
 	const awd = client.awd.admin;
+	const label = awdActionLabel(action, t);
 	switch (action) {
 		case "deploy":
-			return callVoid(awd.deploy(eventId), "部署");
+			return callVoid(awd.deploy(eventId), label);
 		case "precheck":
-			return callVoid(awd.precheck(eventId), "预检");
+			return callVoid(awd.precheck(eventId), label);
 		case "start":
-			return callVoid(awd.start(eventId), "开赛");
+			return callVoid(awd.start(eventId), label);
 		case "pause":
-			return callVoid(awd.pause(eventId), "暂停");
+			return callVoid(awd.pause(eventId), label);
 		case "resume":
-			return callVoid(awd.resume(eventId), "恢复");
+			return callVoid(awd.resume(eventId), label);
 		case "finish":
-			return callVoid(awd.finish(eventId), "结束比赛");
+			return callVoid(awd.finish(eventId), label);
 		case "archive":
-			return callVoid(awd.archive(eventId), "归档");
+			return callVoid(awd.archive(eventId), label);
 		case "rotateTokens":
-			return callVoid(awd.rotateTokens(eventId), "轮换内部令牌");
+			return callVoid(awd.rotateTokens(eventId), label);
 	}
 }
 
 /**
  * 破坏性 / 不可逆操作的真实后果（逐条对应后端实现，不编造）。
+ * 返回 `ConfirmOptions`，由 `useConfirm()` 的 `AlertDialog` 渲染。
  */
-export const AWD_ACTION_CONFIRM: Record<AwdAction, ConfirmOptions> = {
-	deploy: {
-		title: "部署 AWD 运行时？",
-		description: "按当前配置编排赛事运行时（幂等，可重复执行）。",
-		consequences: [
-			"创建赛事 Docker 网络、FlagServer / JudgeServer 容器与各战队 GameBox 实例容器",
-			"为各战队分配网段并写入 WireGuard 对端，同时锁定赛事网络地址（锁定后不可再改分配）",
-			"应用加固期防火墙策略；失败会进入 deploy_failed，可修复后重试",
-		],
-		tone: "danger",
-		confirmText: "部署",
-	},
-	precheck: {
-		title: "运行 AWD 预检？",
-		description: "对配置 / 容器 / WireGuard / 网络 / flag / 判题链路做一次结构性与连通性检查。",
-		consequences: [
-			"预检期间赛事进入 prechecking，选手端操作不可用",
-			"通过则状态变为 verified 并记录配置代数；失败则为 verification_failed 并落库失败原因",
-		],
-		confirmText: "开始预检",
-	},
-	start: {
-		title: "开始 AWD 比赛？",
-		description: "仅在预检通过（verified）且配置代数未被修改时可执行。",
-		consequences: [
-			"状态变为 running：加固时长为 0 时立即开始第 1 轮，否则先进入加固期",
-			"为所有参赛战队写入初始分数账本（幂等，重复开赛不会重复加分）",
-			"切换为攻防期防火墙策略；开赛后 AWD 运行时配置锁定",
-		],
-		tone: "danger",
-		confirmText: "开赛",
-	},
-	pause: {
-		title: "暂停比赛？",
-		description: "冻结当前阶段并清理该赛事的活跃连接。",
-		consequences: [
-			"保存加固期 / 当前轮次的剩余时间，取消已排期的定时任务",
-			"清理该赛事网段的连接（conntrack），选手端攻防操作中止",
-			"恢复（resume）后从剩余时间继续，不会重开轮次",
-		],
-		confirmText: "暂停",
-	},
-	resume: {
-		title: "恢复比赛？",
-		description: "从 paused / network_error 回到进行中。",
-		consequences: [
-			"还原暂停前的阶段与剩余时间（加固剩余为 0 时直接进入攻击期）",
-			"恢复活跃轮次与防火墙策略",
-		],
-		confirmText: "恢复",
-	},
-	finish: {
-		title: "结束比赛？",
-		description: "结束只在「终局结算」成立时生效；否则接口成功但赛事保持进行中。",
-		consequences: [
-			"仅在最后一轮已完成且全部判题任务处于终态时，状态才会变为 finished（积分定稿）",
-			"未完成结算时不会被强制结束，也不会中断仍在跑的判题任务",
-		],
-		tone: "danger",
-		confirmText: "结束比赛",
-	},
-	archive: {
-		title: "归档赛事？（不可逆）",
-		description: "归档会销毁运行时并锁定赛事。若赛事尚未结束，会先尝试走一次结束流程。",
-		consequences: [
-			"停止并删除该赛事全部容器：GameBox 实例、FlagServer、JudgeServer",
-			"释放宿主 WireGuard 对端、防火墙策略与网段分配；赛事网络行保留为历史",
-			"赛事状态变为 archived（终态），之后无法再修改、部署或重开",
-			"数据库中的历史记录与积分保留；归档不可逆",
-		],
-		tone: "danger",
-		confirmText: "归档",
-		confirmPhrase: "archive",
-	},
-	rotateTokens: {
-		title: "轮换内部令牌？（高危）",
-		description: "key_version +1，重新加密并替换 FlagServer / JudgeServer 的内部调用令牌。",
-		consequences: [
-			"会原地重建 FlagServer / JudgeServer 容器（同网络 / 固定 IP）以加载新令牌",
-			"重建期间判题与 flag 结算短暂不可用",
-			"不改变题目 flag 本身（赛事密钥未变），选手已提交的 flag 不受影响",
-			"写入内部令牌轮换审计记录",
-		],
-		tone: "danger",
-		confirmText: "轮换",
-		confirmPhrase: "rotate",
-	},
-};
+export function awdActionConfirm(t: TFunction, action: AwdAction): ConfirmOptions {
+	switch (action) {
+		case "deploy":
+			return {
+				title: t("adminAwdOps.confirm.deploy.title"),
+				description: t("adminAwdOps.confirm.deploy.description"),
+				consequences: [
+					t("adminAwdOps.confirm.deploy.consequence1"),
+					t("adminAwdOps.confirm.deploy.consequence2"),
+					t("adminAwdOps.confirm.deploy.consequence3"),
+				],
+				tone: "danger",
+				confirmText: t("adminAwdOps.confirm.deploy.confirm"),
+			};
+		case "precheck":
+			return {
+				title: t("adminAwdOps.confirm.precheck.title"),
+				description: t("adminAwdOps.confirm.precheck.description"),
+				consequences: [
+					t("adminAwdOps.confirm.precheck.consequence1"),
+					t("adminAwdOps.confirm.precheck.consequence2"),
+				],
+				confirmText: t("adminAwdOps.confirm.precheck.confirm"),
+			};
+		case "start":
+			return {
+				title: t("adminAwdOps.confirm.start.title"),
+				description: t("adminAwdOps.confirm.start.description"),
+				consequences: [
+					t("adminAwdOps.confirm.start.consequence1"),
+					t("adminAwdOps.confirm.start.consequence2"),
+					t("adminAwdOps.confirm.start.consequence3"),
+				],
+				tone: "danger",
+				confirmText: t("adminAwdOps.confirm.start.confirm"),
+			};
+		case "pause":
+			return {
+				title: t("adminAwdOps.confirm.pause.title"),
+				description: t("adminAwdOps.confirm.pause.description"),
+				consequences: [
+					t("adminAwdOps.confirm.pause.consequence1"),
+					t("adminAwdOps.confirm.pause.consequence2"),
+					t("adminAwdOps.confirm.pause.consequence3"),
+				],
+				confirmText: t("adminAwdOps.confirm.pause.confirm"),
+			};
+		case "resume":
+			return {
+				title: t("adminAwdOps.confirm.resume.title"),
+				description: t("adminAwdOps.confirm.resume.description"),
+				consequences: [
+					t("adminAwdOps.confirm.resume.consequence1"),
+					t("adminAwdOps.confirm.resume.consequence2"),
+				],
+				confirmText: t("adminAwdOps.confirm.resume.confirm"),
+			};
+		case "finish":
+			return {
+				title: t("adminAwdOps.confirm.finish.title"),
+				description: t("adminAwdOps.confirm.finish.description"),
+				consequences: [
+					t("adminAwdOps.confirm.finish.consequence1"),
+					t("adminAwdOps.confirm.finish.consequence2"),
+				],
+				tone: "danger",
+				confirmText: t("adminAwdOps.confirm.finish.confirm"),
+			};
+		case "archive":
+			return {
+				title: t("adminAwdOps.confirm.archive.title"),
+				description: t("adminAwdOps.confirm.archive.description"),
+				consequences: [
+					t("adminAwdOps.confirm.archive.consequence1"),
+					t("adminAwdOps.confirm.archive.consequence2"),
+					t("adminAwdOps.confirm.archive.consequence3"),
+					t("adminAwdOps.confirm.archive.consequence4"),
+				],
+				tone: "danger",
+				confirmText: t("adminAwdOps.confirm.archive.confirm"),
+				confirmPhrase: "archive",
+			};
+		case "rotateTokens":
+			return {
+				title: t("adminAwdOps.confirm.rotateTokens.title"),
+				description: t("adminAwdOps.confirm.rotateTokens.description"),
+				consequences: [
+					t("adminAwdOps.confirm.rotateTokens.consequence1"),
+					t("adminAwdOps.confirm.rotateTokens.consequence2"),
+					t("adminAwdOps.confirm.rotateTokens.consequence3"),
+					t("adminAwdOps.confirm.rotateTokens.consequence4"),
+				],
+				tone: "danger",
+				confirmText: t("adminAwdOps.confirm.rotateTokens.confirm"),
+				confirmPhrase: "rotate",
+			};
+	}
+}
 
 export interface AwdActionGate {
 	enabled: boolean;
-	/** 不可用时的原因（直接展示给管理员）。 */
+	/** 不可用时的原因（已翻译，直接展示给管理员）。 */
 	reason: string | null;
 }
 
@@ -250,55 +349,66 @@ export interface AwdGateInput {
 	finalSettlement: boolean;
 }
 
-/** 后端 `AwdEventStatus::is_configurable()` 的字面值集合。 */
-const CONFIGURABLE_STATUSES = [
-	"draft",
-	"configuring",
-	"deployed",
-	"prechecking",
-	"verified",
-	"start_blocked",
-	"deploy_failed",
-	"verification_failed",
+/** 可（重新）部署的状态：只有 Configuring 能合法转移到 Deploying。 */
+// 后端 is_configurable() 比状态机宽：Draft / Deployed / DeployFailed / VerificationFailed
+// 直接转 Deploying 都会被 "Invalid transition" 拒绝。前端必须按真实状态机收紧，
+// 否则按钮看起来可用，点下去才失败。
+const DEPLOYABLE_STATUSES: string[] = [AwdEventStatus.Configuring];
+
+/** 可预检的状态：与 precheck_service 的真实转移一致（Draft/DeployFailed 不能直接转 Prechecking）。 */
+const PRECHECKABLE_STATUSES: string[] = [
+	AwdEventStatus.Configuring,
+	AwdEventStatus.Deployed,
+	AwdEventStatus.Prechecking,
+	AwdEventStatus.Verified,
+	AwdEventStatus.StartBlocked,
+	AwdEventStatus.VerificationFailed,
 ];
 
-/** 可（重新）部署的状态：处于运行前的配置态，允许修复后重试。 */
-const DEPLOYABLE_STATUSES = [
-	"draft",
-	"configuring",
-	"deployed",
-	"deploy_failed",
-	"verification_failed",
-];
-
-const TERMINAL_STATUSES = ["finished", "archived"];
-
-function statusText(status: string | null): string {
-	return status ? `当前状态为「${awdStatusLabel(status)}」` : "尚未开通 AWD";
-}
+const TERMINAL_STATUSES: string[] = [AwdEventStatus.Finished, AwdEventStatus.Archived];
 
 /** 不可部署时的**逐状态**原因（比一句笼统的「当前状态不支持」更有用）。 */
-const DEPLOY_BLOCK_REASON: Record<string, string> = {
-	deploying: "部署正在进行中（deploying），请等待本次部署结束",
-	prechecking: "预检进行中（prechecking），请等待预检结束",
-	verified: "已通过预检：运行时已就绪，无需重新部署；修改配置后可再次部署",
-	start_blocked: "开赛受阻（start_blocked）：请先重新预检通过",
-	running: "比赛进行中：不能重新部署",
-	paused: "比赛已暂停：请先恢复或结束比赛",
-	network_error: "网络异常：请先恢复赛事",
-	finished: "赛事已结束：不能重新部署",
-	archived: "赛事已归档：不能重新部署",
+const DEPLOY_BLOCK_KEYS: Record<string, string> = {
+	[AwdEventStatus.Draft]: "adminAwdOps.gates.deployBlock.draft",
+	[AwdEventStatus.Deploying]: "adminAwdOps.gates.deployBlock.deploying",
+	[AwdEventStatus.Deployed]: "adminAwdOps.gates.deployBlock.deployed",
+	[AwdEventStatus.Prechecking]: "adminAwdOps.gates.deployBlock.prechecking",
+	[AwdEventStatus.Verified]: "adminAwdOps.gates.deployBlock.verified",
+	[AwdEventStatus.StartBlocked]: "adminAwdOps.gates.deployBlock.startBlocked",
+	[AwdEventStatus.Running]: "adminAwdOps.gates.deployBlock.running",
+	[AwdEventStatus.Paused]: "adminAwdOps.gates.deployBlock.paused",
+	[AwdEventStatus.NetworkError]: "adminAwdOps.gates.deployBlock.networkError",
+	[AwdEventStatus.DeployFailed]: "adminAwdOps.gates.deployBlock.deployFailed",
+	[AwdEventStatus.VerificationFailed]: "adminAwdOps.gates.deployBlock.verificationFailed",
+	[AwdEventStatus.Finished]: "adminAwdOps.gates.deployBlock.finished",
+	[AwdEventStatus.Archived]: "adminAwdOps.gates.deployBlock.archived",
 };
 
 /** 不可预检时的逐状态原因。 */
-const PRECHECK_BLOCK_REASON: Record<string, string> = {
-	deploying: "部署进行中：请等待部署结束",
-	running: "比赛已开始：仅运行前的配置态可预检",
-	paused: "比赛已暂停：仅运行前的配置态可预检",
-	network_error: "网络异常：请先恢复赛事",
-	finished: "赛事已结束：不能预检",
-	archived: "赛事已归档：不能预检",
+const PRECHECK_BLOCK_KEYS: Record<string, string> = {
+	[AwdEventStatus.Draft]: "adminAwdOps.gates.precheckBlock.draft",
+	[AwdEventStatus.Deploying]: "adminAwdOps.gates.precheckBlock.deploying",
+	[AwdEventStatus.DeployFailed]: "adminAwdOps.gates.precheckBlock.deployFailed",
+	[AwdEventStatus.Running]: "adminAwdOps.gates.precheckBlock.running",
+	[AwdEventStatus.Paused]: "adminAwdOps.gates.precheckBlock.paused",
+	[AwdEventStatus.NetworkError]: "adminAwdOps.gates.precheckBlock.networkError",
+	[AwdEventStatus.Finished]: "adminAwdOps.gates.precheckBlock.finished",
+	[AwdEventStatus.Archived]: "adminAwdOps.gates.precheckBlock.archived",
 };
+
+function deployReason(status: string, t: TFunction): string {
+	const key = DEPLOY_BLOCK_KEYS[status];
+	return key
+		? t(key)
+		: t("adminAwdOps.gates.deployBlocked", { status: awdStatusLabel(status, t) });
+}
+
+function precheckReason(status: string, t: TFunction): string {
+	const key = PRECHECK_BLOCK_KEYS[status];
+	return key
+		? t(key)
+		: t("adminAwdOps.gates.precheckBlocked", { status: awdStatusLabel(status, t) });
+}
 
 /**
  * 依据后端状态判定每个动作可用性。
@@ -311,95 +421,105 @@ const PRECHECK_BLOCK_REASON: Record<string, string> = {
  * - archive：`archive_service` 要求 status == Finished；
  * - rotateTokens：需要已配置且赛事网络已分配（要重建 infra 容器）。
  */
-export function buildAwdGates({
-	status,
-	networkAllocated,
-	finalSettlement,
-}: AwdGateInput): Record<AwdAction, AwdActionGate> {
+export function buildAwdGates(input: AwdGateInput, t: TFunction): Record<AwdAction, AwdActionGate> {
+	const { status, networkAllocated, finalSettlement } = input;
 	const unknown = status === null;
-	const networkReason = "赛事网络尚未分配（「网络」标签页）：该操作需要赛事网络与基础设施地址";
+	const networkReason = t("adminAwdOps.gates.networkNotAllocated");
+
 	const deploy: AwdActionGate = unknown
-		? { enabled: false, reason: "尚未开通 AWD：请先创建 AWD 赛事配置" }
+		? { enabled: false, reason: t("adminAwdOps.gates.notEnabled") }
 		: !DEPLOYABLE_STATUSES.includes(status)
-			? {
-					enabled: false,
-					reason:
-						DEPLOY_BLOCK_REASON[status] ??
-						`${statusText(status)}，不可部署；仅运行前的配置态可部署`,
-				}
+			? { enabled: false, reason: deployReason(status, t) }
 			: !networkAllocated
 				? { enabled: false, reason: networkReason }
 				: { enabled: true, reason: null };
 
 	const precheck: AwdActionGate = unknown
-		? { enabled: false, reason: "尚未开通 AWD：请先创建 AWD 赛事配置" }
-		: !CONFIGURABLE_STATUSES.includes(status)
-			? {
-					enabled: false,
-					reason:
-						PRECHECK_BLOCK_REASON[status] ??
-						`${statusText(status)}，不可预检；仅运行前的配置态可预检`,
-				}
+		? { enabled: false, reason: t("adminAwdOps.gates.notEnabled") }
+		: !PRECHECKABLE_STATUSES.includes(status)
+			? { enabled: false, reason: precheckReason(status, t) }
 			: !networkAllocated
 				? { enabled: false, reason: networkReason }
 				: { enabled: true, reason: null };
 
 	const start: AwdActionGate = unknown
-		? { enabled: false, reason: "尚未开通 AWD" }
-		: status !== "verified"
+		? { enabled: false, reason: t("adminAwdOps.gates.notEnabledShort") }
+		: status !== AwdEventStatus.Verified
 			? {
 					enabled: false,
 					reason:
-						status === "start_blocked"
-							? "开赛受阻（start_blocked）：验证通过后配置又被修改，需重新预检通过再开赛"
-							: `${statusText(status)}，不可开赛；后端要求预检通过（verified）`,
+						status === AwdEventStatus.StartBlocked
+							? t("adminAwdOps.gates.startBlocked")
+							: t("adminAwdOps.gates.startNotVerified", {
+									status: awdStatusLabel(status, t),
+								}),
 				}
 			: { enabled: true, reason: null };
 
 	const pause: AwdActionGate =
-		status === "running"
+		status === AwdEventStatus.Running
 			? finalSettlement
-				? {
-						enabled: false,
-						reason: "终局结算中：最后一轮已完成，竞赛操作已关闭（等待判题结算后自动结束）",
-					}
+				? { enabled: false, reason: t("adminAwdOps.gates.pauseSettlement") }
 				: { enabled: true, reason: null }
-			: { enabled: false, reason: `${statusText(status)}，只有进行中的比赛可以暂停` };
+			: {
+					enabled: false,
+					reason: t("adminAwdOps.gates.pauseNotRunning", {
+						status: awdStatusLabel(status, t),
+					}),
+				};
 
 	const resume: AwdActionGate =
-		status === "paused" || status === "network_error"
+		status === AwdEventStatus.Paused || status === AwdEventStatus.NetworkError
 			? { enabled: true, reason: null }
-			: { enabled: false, reason: `${statusText(status)}，只有已暂停或网络异常的赛事可以恢复` };
+			: {
+					enabled: false,
+					reason: t("adminAwdOps.gates.resumeNotPaused", {
+						status: awdStatusLabel(status, t),
+					}),
+				};
 
 	const finish: AwdActionGate = unknown
-		? { enabled: false, reason: "尚未开通 AWD" }
+		? { enabled: false, reason: t("adminAwdOps.gates.notEnabledShort") }
 		: TERMINAL_STATUSES.includes(status)
-			? { enabled: false, reason: `${statusText(status)}，已是终态` }
-			: status !== "running"
-				? { enabled: false, reason: `${statusText(status)}，只有进行中的比赛可以结束` }
+			? {
+					enabled: false,
+					reason: t("adminAwdOps.gates.finishTerminal", {
+						status: awdStatusLabel(status, t),
+					}),
+				}
+			: status !== AwdEventStatus.Running
+				? {
+						enabled: false,
+						reason: t("adminAwdOps.gates.finishNotRunning", {
+							status: awdStatusLabel(status, t),
+						}),
+					}
 				: !finalSettlement
-					? {
-							enabled: false,
-							reason:
-								"尚未进入终局结算：需最后一轮已完成且全部判题任务终态；此时调用不会结束赛事",
-						}
+					? { enabled: false, reason: t("adminAwdOps.gates.finishNoSettlement") }
 					: { enabled: true, reason: null };
 
 	const archive: AwdActionGate =
-		status === "finished"
+		status === AwdEventStatus.Finished
 			? { enabled: true, reason: null }
-			: status === "archived"
-				? { enabled: false, reason: "已归档（终态），无需重复归档" }
+			: status === AwdEventStatus.Archived
+				? { enabled: false, reason: t("adminAwdOps.gates.archiveArchived") }
 				: {
 						enabled: false,
-						reason: `${statusText(status)}，不可归档；归档要求赛事已结束（finished），未通过终局结算时不会成功`,
+						reason: t("adminAwdOps.gates.archiveBlocked", {
+							status: awdStatusLabel(status, t),
+						}),
 					};
 
 	const rotateTokens: AwdActionGate =
 		status === null
-			? { enabled: false, reason: "尚未开通 AWD：无内部令牌可轮换" }
+			? { enabled: false, reason: t("adminAwdOps.gates.rotateNotEnabled") }
 			: TERMINAL_STATUSES.includes(status)
-				? { enabled: false, reason: `${statusText(status)}，不再轮换内部令牌` }
+				? {
+						enabled: false,
+						reason: t("adminAwdOps.gates.rotateTerminal", {
+							status: awdStatusLabel(status, t),
+						}),
+					}
 				: !networkAllocated
 					? { enabled: false, reason: networkReason }
 					: { enabled: true, reason: null };
@@ -435,19 +555,29 @@ export function parsePrecheckReport(raw?: string | null): PrecheckReport {
 	}
 }
 
-export const PRECHECK_STATUS_LABEL: Record<string, string> = {
-	pending: "排队中",
-	running: "执行中",
-	passed: "通过",
-	failed: "未通过",
-	error: "执行出错",
+const PRECHECK_STATUS_KEYS: Record<string, string> = {
+	pending: "adminAwdOps.precheck.status.pending",
+	running: "adminAwdOps.precheck.status.running",
+	passed: "adminAwdOps.precheck.status.passed",
+	failed: "adminAwdOps.precheck.status.failed",
+	error: "adminAwdOps.precheck.status.error",
 };
+
+/** 预检结果：已知状态走 i18n，未知值原样透传。 */
+export function precheckStatusLabel(status: string | null | undefined, t: TFunction): string {
+	if (!status) return "—";
+	// 后端历史记录用 `format!("{:?}")`（"Passed"），POST 响应却是小写 —— 统一归一化。
+	const normalized = status.trim().toLowerCase();
+	const key = PRECHECK_STATUS_KEYS[normalized];
+	return key ? t(key) : status;
+}
 
 export function precheckStatusTone(status: string | null | undefined): PillTone {
 	if (!status) return "muted";
-	if (status === "passed") return "success";
-	if (status === "failed" || status === "error") return "danger";
-	if (status === "running") return "info";
+	const normalized = status.trim().toLowerCase();
+	if (normalized === "passed") return "success";
+	if (normalized === "failed" || normalized === "error") return "danger";
+	if (normalized === "running") return "info";
 	return "neutral";
 }
 

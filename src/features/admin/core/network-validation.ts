@@ -10,7 +10,10 @@
  *   （后端 `is_valid_public_endpoint` 就是可选的，比 Default 前端更宽松）。
  *
  * 这里只是「尽早发现明显错误」；最终判定永远由后端做（错误文案来自后端）。
+ * 校验文案由调用方注入 `t()`，资源在 `adminCore.validation.*`。
  */
+
+import type { TFunction } from "i18next";
 
 import type { PlatformNetworkSettings } from "@floatctf/sdk";
 
@@ -139,34 +142,49 @@ export function formFromSettings(settings: PlatformNetworkSettings): PlatformNet
 	};
 }
 
-const HOST_BITS_MESSAGE = "应为网络地址（主机位为 0），例如 10.10.0.0/16。";
-
 /** 前缀字段校验：必填、0–32 整数、不小于下限、赛事网段不得大于 /16。 */
-function prefixError(value: string, required: string, lowerBound?: number): string | undefined {
+function prefixError(
+	value: string,
+	required: string,
+	t: TFunction,
+	lowerBound?: number,
+): string | undefined {
 	if (!value.trim()) return required;
 	const parsed = parseBoundedInt(value, 0, MAX_PREFIX);
-	if (parsed === null) return `应为 0–${MAX_PREFIX} 的整数。`;
-	if (lowerBound !== undefined && parsed < lowerBound) return `不得小于地址池长度 /${lowerBound}。`;
+	if (parsed === null) return t("adminCore.validation.prefixRange", { max: MAX_PREFIX });
+	if (lowerBound !== undefined && parsed < lowerBound) {
+		return t("adminCore.validation.prefixLowerBound", { prefix: lowerBound });
+	}
 	return undefined;
 }
 
-export function validatePlatformNetworkForm(form: PlatformNetworkForm): PlatformNetworkErrors {
+export function validatePlatformNetworkForm(
+	form: PlatformNetworkForm,
+	t: TFunction,
+): PlatformNetworkErrors {
 	const errors: PlatformNetworkErrors = {};
 
 	const gamebox = parseIpv4Cidr(form.gamebox_pool);
-	if (!form.gamebox_pool.trim()) errors.gamebox_pool = "请填写 GameBox 地址池，例如 10.10.0.0/16。";
-	else if (!gamebox) errors.gamebox_pool = "格式不正确，应为 CIDR（例如 10.10.0.0/16）。";
-	else if (gamebox.hasHostBits) errors.gamebox_pool = HOST_BITS_MESSAGE;
+	if (!form.gamebox_pool.trim()) {
+		errors.gamebox_pool = t("adminCore.validation.requiredGameboxPool");
+	} else if (!gamebox) {
+		errors.gamebox_pool = t("adminCore.validation.invalidCidr");
+	} else if (gamebox.hasHostBits) {
+		errors.gamebox_pool = t("adminCore.validation.hostBits");
+	}
 
 	const wireguard = parseIpv4Cidr(form.wireguard_pool);
 	if (!form.wireguard_pool.trim()) {
-		errors.wireguard_pool = "请填写 WireGuard 地址池，例如 10.20.0.0/16。";
-	} else if (!wireguard) errors.wireguard_pool = "格式不正确，应为 CIDR（例如 10.20.0.0/16）。";
-	else if (wireguard.hasHostBits) errors.wireguard_pool = HOST_BITS_MESSAGE;
+		errors.wireguard_pool = t("adminCore.validation.requiredWireguardPool");
+	} else if (!wireguard) {
+		errors.wireguard_pool = t("adminCore.validation.invalidCidr");
+	} else if (wireguard.hasHostBits) {
+		errors.wireguard_pool = t("adminCore.validation.hostBits");
+	}
 
 	if (gamebox && wireguard && !gamebox.hasHostBits && !wireguard.hasHostBits) {
 		if (cidrOverlaps(gamebox, wireguard)) {
-			const message = "两个地址池不允许重叠，请改用相互独立的网段。";
+			const message = t("adminCore.validation.poolsOverlap");
 			errors.gamebox_pool = message;
 			errors.wireguard_pool = message;
 		}
@@ -174,7 +192,8 @@ export function validatePlatformNetworkForm(form: PlatformNetworkForm): Platform
 
 	const gameboxEventPrefix = prefixError(
 		form.gamebox_event_prefix,
-		"请填写 GameBox 赛事子网长度。",
+		t("adminCore.validation.requiredGameboxEventPrefix"),
+		t,
 		gamebox?.prefix,
 	);
 	if (gameboxEventPrefix) {
@@ -182,21 +201,25 @@ export function validatePlatformNetworkForm(form: PlatformNetworkForm): Platform
 	} else {
 		const parsed = parseBoundedInt(form.gamebox_event_prefix, 0, MAX_PREFIX);
 		if (parsed !== null && parsed > AWD_MAX_EVENT_PREFIX) {
-			errors.gamebox_event_prefix = `不得超过 ${AWD_MAX_EVENT_PREFIX}：AWD 运行时要求赛事网段为 /${AWD_MAX_EVENT_PREFIX} 或更大。`;
+			errors.gamebox_event_prefix = t("adminCore.validation.gameboxPrefixMax", {
+				max: AWD_MAX_EVENT_PREFIX,
+			});
 		}
 	}
 
 	const eventPrefixValue = parseBoundedInt(form.gamebox_event_prefix, 0, MAX_PREFIX) ?? undefined;
 	const gameboxTeamPrefix = prefixError(
 		form.gamebox_team_prefix,
-		"请填写 GameBox 队伍子网长度。",
+		t("adminCore.validation.requiredGameboxTeamPrefix"),
+		t,
 		eventPrefixValue,
 	);
 	if (gameboxTeamPrefix) errors.gamebox_team_prefix = gameboxTeamPrefix;
 
 	const wireguardEventPrefix = prefixError(
 		form.wireguard_event_prefix,
-		"请填写 WireGuard 赛事子网长度。",
+		t("adminCore.validation.requiredWireguardEventPrefix"),
+		t,
 		wireguard?.prefix,
 	);
 	if (wireguardEventPrefix) errors.wireguard_event_prefix = wireguardEventPrefix;
@@ -204,24 +227,37 @@ export function validatePlatformNetworkForm(form: PlatformNetworkForm): Platform
 	const wgEventValue = parseBoundedInt(form.wireguard_event_prefix, 0, MAX_PREFIX) ?? undefined;
 	const wireguardTeamPrefix = prefixError(
 		form.wireguard_team_prefix,
-		"请填写 WireGuard 队伍子网长度。",
+		t("adminCore.validation.requiredWireguardTeamPrefix"),
+		t,
 		wgEventValue,
 	);
 	if (wireguardTeamPrefix) errors.wireguard_team_prefix = wireguardTeamPrefix;
 
 	const portMin = parseBoundedInt(form.wireguard_port_min, 1, MAX_PORT);
-	if (!form.wireguard_port_min.trim()) errors.wireguard_port_min = "请填写起始端口。";
-	else if (portMin === null) errors.wireguard_port_min = `应为 1–${MAX_PORT} 的整数。`;
+	if (!form.wireguard_port_min.trim()) {
+		errors.wireguard_port_min = t("adminCore.validation.requiredPortMin");
+	} else if (portMin === null) {
+		errors.wireguard_port_min = t("adminCore.validation.portRange", {
+			min: 1,
+			max: MAX_PORT,
+		});
+	}
 
 	const portMax = parseBoundedInt(form.wireguard_port_max, 1, MAX_PORT);
-	if (!form.wireguard_port_max.trim()) errors.wireguard_port_max = "请填写结束端口。";
-	else if (portMax === null) errors.wireguard_port_max = `应为 1–${MAX_PORT} 的整数。`;
-	else if (portMin !== null && portMax < portMin) errors.wireguard_port_max = "不得小于起始端口。";
+	if (!form.wireguard_port_max.trim()) {
+		errors.wireguard_port_max = t("adminCore.validation.requiredPortMax");
+	} else if (portMax === null) {
+		errors.wireguard_port_max = t("adminCore.validation.portRange", {
+			min: 1,
+			max: MAX_PORT,
+		});
+	} else if (portMin !== null && portMax < portMin) {
+		errors.wireguard_port_max = t("adminCore.validation.portMaxLower");
+	}
 
 	const endpoint = form.wireguard_public_endpoint.trim();
 	if (endpoint && !isValidPublicEndpoint(endpoint)) {
-		errors.wireguard_public_endpoint =
-			"格式不正确，应为「IP 或域名[:端口]」，例如 vpn.example.com:51820。";
+		errors.wireguard_public_endpoint = t("adminCore.validation.endpointInvalid");
 	}
 
 	return errors;

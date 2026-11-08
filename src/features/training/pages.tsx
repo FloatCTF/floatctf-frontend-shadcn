@@ -4,12 +4,24 @@
  * - `/training/runs/:runId` run 工作台（生命周期 / 实例 / Break·Fix / 轮次评测 / 积分 / Writeup）
  *
  * 数据全部来自 `client.awdp.runs.*`；实时用 `useAwdpRunStream`。
+ * 用户可见文案一律走 training 命名空间，技术标识（run / endpoint / ID）保持原文。
  */
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Dumbbell, Play, RefreshCw, Square, StopCircle, Trophy } from "lucide-react";
+import {
+	ArrowRight,
+	Dumbbell,
+	Loader2,
+	Play,
+	RefreshCw,
+	Search,
+	Square,
+	StopCircle,
+	Trophy,
+} from "lucide-react";
 
 import type { AwdpInstance, AwdpRunDto, GameBoxCatalogDto } from "@floatctf/sdk";
 
@@ -22,6 +34,7 @@ import { useConfirm } from "~/components/app/confirm";
 import { DataTable } from "~/components/app/data-table";
 import {
 	KeyValueList,
+	MonoText,
 	PageBody,
 	PageHeader,
 	PaginationBar,
@@ -40,7 +53,8 @@ import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { formatBytes, formatDateTime, formatDuration, formatInt, formatScore } from "~/lib/format";
+import { formatBytes, formatDateTime, formatDuration, formatInt, formatPoints } from "~/lib/format";
+import { useCommands } from "~/app/command-palette";
 import { useDebouncedValue, useDocumentTitle } from "~/lib/hooks";
 
 import {
@@ -52,19 +66,21 @@ import {
 	TrainingInstancePanel,
 } from "./components";
 import {
-	RUN_END_CONSEQUENCES,
-	RUN_INSTANCE_RESET_CONSEQUENCES,
-	RUN_RESET_CONSEQUENCES,
-	RUN_RESTART_CONSEQUENCES,
-	RUN_SET_PHASE_BREAK_CONSEQUENCES,
-	RUN_SET_PHASE_FIX_CONSEQUENCES,
-	RUN_STOP_CONSEQUENCES,
 	endRunGate,
 	restartTrainingGate,
+	runEndConsequences,
+	runInstanceResetConsequences,
 	runPhaseLabel,
 	runPhaseTone,
+	runResetConsequences,
+	runRestartConsequences,
+	runSetPhaseBreakConsequences,
+	runSetPhaseFixConsequences,
+	runStopConsequences,
+	resetRunGate,
 	setPhaseGate,
 	startRunGate,
+	stopRunGate,
 } from "./domain";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -72,7 +88,8 @@ import {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function TrainingCatalogPage(): ReactNode {
-	useDocumentTitle("AWDP 训练场 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("training.catalog.documentTitle"));
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
@@ -97,48 +114,90 @@ export function TrainingCatalogPage(): ReactNode {
 		mutationFn: (gameboxId: string) =>
 			call<AwdpRunDto>(client.awdp.runs.startTraining(gameboxId), "开始训练"),
 		onSuccess: (run) => {
-			toast.success("训练已就绪", "进入 run 工作台开始 Break 阶段。");
+			toast.success(
+				t("training.catalog.toast.started"),
+				t("training.catalog.toast.startedDescription"),
+			);
 			void queryClient.invalidateQueries({ queryKey: qk.runs.catalog(params) });
 			void navigate(`/training/runs/${run.run_id}`);
 		},
-		onError: (error) => toast.apiError("开始训练失败", error),
+		onError: (error) => toast.apiError(t("training.catalog.toast.startFailed"), error),
 	});
 
 	const result = query.data;
+	const startingGameboxId = startMutation.isPending ? startMutation.variables : undefined;
+
+	const runActionLabel = (row: GameBoxCatalogDto): string =>
+		row.active_training?.phase === "ended"
+			? t("training.catalog.actions.viewRun")
+			: row.active_training?.phase === "pending"
+				? t("training.catalog.actions.enter")
+				: t("training.catalog.actions.continue");
+
+	const startButton = (row: GameBoxCatalogDto): ReactNode =>
+		row.active_training ? (
+			<Button size="sm" asChild>
+				<Link to={`/training/runs/${row.active_training.run_id}`}>
+					<Play aria-hidden="true" />
+					{runActionLabel(row)}
+				</Link>
+			</Button>
+		) : (
+			<Button
+				size="sm"
+				disabled={startMutation.isPending}
+				onClick={() => startMutation.mutate(row.id)}
+			>
+				{startingGameboxId === row.id ? (
+					<Loader2 className="animate-spin" aria-hidden="true" />
+				) : (
+					<Dumbbell aria-hidden="true" />
+				)}
+				{t("training.catalog.actions.start")}
+			</Button>
+		);
 
 	return (
 		<PageBody>
 			<PageHeader
-				title="AWDP 训练场"
-				description="选择一个 AWDP 靶机开始练习：Break 破题 → Fix 修复 → 回合判定。"
+				title={t("training.catalog.title")}
+				description={t("training.catalog.description")}
 				actions={
 					<Button variant="outline" asChild>
 						<Link to="/events">
-							<ArrowRight /> 去赛事
+							{t("training.catalog.eventsAction")}
+							<ArrowRight aria-hidden="true" />
 						</Link>
 					</Button>
 				}
 			/>
 
 			<SectionCard
-				title="练习靶机目录"
-				description="目录只暴露安全展示字段（不含 exploit / 源码 / 凭据）"
+				title={t("training.catalog.section.title")}
+				description={t("training.catalog.section.description")}
 				actions={
 					<div className="flex items-center gap-2">
-						<Input
-							value={search}
-							placeholder="按名称筛选…"
-							aria-label="按名称筛选靶机"
-							className="w-48"
-							onChange={(event) => {
-								setSearch(event.target.value);
-								setPage(1);
-							}}
-						/>
+						<div className="relative w-44 sm:w-56">
+							<Search
+								className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+								aria-hidden="true"
+							/>
+							<Input
+								value={search}
+								placeholder={t("training.catalog.search.placeholder")}
+								aria-label={t("training.catalog.search.ariaLabel")}
+								className="pl-8"
+								onChange={(event) => {
+									setSearch(event.target.value);
+									setPage(1);
+								}}
+							/>
+						</div>
 						<Button
 							variant="ghost"
 							size="icon-sm"
-							aria-label="刷新目录"
+							aria-label={t("training.catalog.refresh")}
+							title={t("training.catalog.refresh")}
 							onClick={() => void query.refetch()}
 						>
 							<RefreshCw />
@@ -156,6 +215,8 @@ export function TrainingCatalogPage(): ReactNode {
 								setPageSize(size);
 								setPage(1);
 							}}
+							// 默认每页 12 条（卡片目录三列布局），选项必须包含当前值，否则下拉显示空白。
+							pageSizeOptions={[12, 24, 48]}
 						/>
 					) : null
 				}
@@ -163,21 +224,25 @@ export function TrainingCatalogPage(): ReactNode {
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={6} columns={5} />}
-					errorTitle="加载练习目录失败"
+					errorTitle={t("training.catalog.loadError")}
 					isEmpty={(data) => data.items.length === 0}
 					empty={
 						<EmptyBlock
-							title={filter ? "没有匹配的靶机" : "暂无可练习靶机"}
+							title={
+								filter
+									? t("training.catalog.filtered.title")
+									: t("training.catalog.empty.title")
+							}
 							description={
 								filter
-									? "换个关键词试试，或清空筛选。"
-									: "目录里还没有 AWDP-capable 且构建完成的 GameBox。"
+									? t("training.catalog.filtered.description")
+									: t("training.catalog.empty.description")
 							}
 							variant={filter ? "filtered" : "empty"}
 							action={
 								filter ? (
 									<Button size="sm" variant="outline" onClick={() => setSearch("")}>
-										清空筛选
+										{t("training.catalog.filtered.clear")}
 									</Button>
 								) : undefined
 							}
@@ -191,26 +256,28 @@ export function TrainingCatalogPage(): ReactNode {
 							columns={[
 								{
 									id: "name",
-									header: "靶机",
+									header: t("training.catalog.columns.gamebox"),
 									sortValue: (row) => row.name,
 									cell: (row) => (
 										<div className="min-w-0">
 											<p className="truncate text-sm font-medium">{row.name}</p>
 											<p className="line-clamp-1 text-xs text-muted-foreground">
-												{row.description || "无描述"}
+												{row.description || t("training.catalog.noDescription")}
 											</p>
 										</div>
 									),
 								},
 								{
 									id: "category",
-									header: "分类",
+									header: t("training.catalog.columns.category"),
 									sortValue: (row) => row.category,
-									cell: (row) => <span className="text-sm">{row.category || "—"}</span>,
+									cell: (row) => (
+										<span className="text-sm">{row.category || "—"}</span>
+									),
 								},
 								{
 									id: "author",
-									header: "作者",
+									header: t("training.catalog.columns.author"),
 									hideBelow: "md",
 									sortValue: (row) => row.author ?? "",
 									cell: (row) => (
@@ -221,36 +288,67 @@ export function TrainingCatalogPage(): ReactNode {
 								},
 								{
 									id: "resources",
-									header: "推荐资源",
+									header: t("training.catalog.columns.resources"),
 									hideBelow: "lg",
 									cell: (row) => (
 										<span className="tnum font-mono text-xs text-muted-foreground">
-											{row.recommended_cpu_millis} mCPU · {formatBytes(row.recommended_memory_bytes)} ·{" "}
-											{row.recommended_pids_limit} pids
+											{t("training.catalog.resourcesValue", {
+												cpu: row.recommended_cpu_millis,
+												memory: formatBytes(row.recommended_memory_bytes),
+												pids: row.recommended_pids_limit,
+											})}
 										</span>
 									),
 								},
 								{
 									id: "state",
-									header: "训练状态",
+									header: t("training.catalog.columns.state"),
 									cell: (row) => (
 										<span className="flex flex-wrap items-center gap-1">
-											{row.solved ? <TonePill tone="success">已训练</TonePill> : null}
+											{row.solved ? (
+												<TonePill tone="success">
+													{t("training.catalog.state.trained")}
+												</TonePill>
+											) : null}
 											{row.active_training ? (
-												<TonePill tone="info">
-													进行中 · {runPhaseLabel(row.active_training.phase)} ·{" "}
-													{formatScore(row.active_training.score)}
+												<TonePill
+													tone={
+														row.active_training.phase === "ended"
+															? "muted"
+															: "info"
+													}
+													className="tnum"
+												>
+													{row.active_training.phase === "ended"
+														? t("training.catalog.state.ended", {
+																score: formatPoints(
+																	row.active_training.score,
+																),
+															})
+														: row.active_training.phase === "pending"
+															? t("training.catalog.state.notStarted")
+															: t("training.catalog.state.active", {
+																phase: runPhaseLabel(
+																	row.active_training.phase,
+																	t,
+																),
+																score: formatPoints(
+																	row.active_training.score,
+																),
+															})}
 												</TonePill>
 											) : null}
 											{!row.solved && !row.active_training ? (
-												<TonePill tone="muted">未开始</TonePill>
+												<TonePill tone="muted">
+													{t("training.catalog.state.notStarted")}
+												</TonePill>
 											) : null}
 										</span>
 									),
 								},
 								{
 									id: "updated",
-									header: "更新时间",
+									header: t("training.catalog.columns.updated"),
 									hideBelow: "md",
 									sortValue: (row) => row.updated_at ?? "",
 									cell: (row) => (
@@ -262,43 +360,57 @@ export function TrainingCatalogPage(): ReactNode {
 									),
 								},
 							]}
-							rowActions={(row) =>
-								row.active_training ? (
-									<Button size="sm" asChild>
-										<Link to={`/training/runs/${row.active_training.run_id}`}>
-											<Play /> 继续训练
-										</Link>
-									</Button>
-								) : (
-									<Button
-										size="sm"
-										disabled={startMutation.isPending}
-										onClick={() => startMutation.mutate(row.id)}
-									>
-										<Dumbbell /> 开始训练
-									</Button>
-								)
-							}
+							rowActions={(row) => startButton(row)}
 							mobileCard={(row) => (
-								<div className="space-y-2 rounded-md border p-3">
+								<div className="space-y-2">
 									<div className="flex items-center justify-between gap-2">
-										<span className="truncate text-sm font-medium">{row.name}</span>
-										<TonePill tone={row.solved ? "success" : "muted"}>
+										<span className="min-w-0 truncate text-sm font-medium">
+											{row.name}
+										</span>
+										<TonePill
+											tone={
+												row.active_training
+													? row.active_training.phase === "ended"
+														? "muted"
+														: row.active_training.phase === "pending"
+															? "warning"
+															: "info"
+													: row.solved
+														? "success"
+														: "muted"
+											}
+										>
 											{row.active_training
-												? `进行中 · ${runPhaseLabel(row.active_training.phase)}`
+												? row.active_training.phase === "ended"
+													? t("training.catalog.state.ended", {
+															score: formatPoints(
+																row.active_training.score,
+															),
+														})
+													: row.active_training.phase === "pending"
+														? t("training.catalog.state.notStarted")
+														: t("training.catalog.state.activeShort", {
+																phase: runPhaseLabel(
+																	row.active_training.phase,
+																	t,
+																),
+															})
 												: row.solved
-													? "已训练"
-													: "未开始"}
+													? t("training.catalog.state.trained")
+													: t("training.catalog.state.notStarted")}
 										</TonePill>
 									</div>
 									<p className="line-clamp-2 text-xs text-muted-foreground">
-										{row.description || "无描述"}
+										{row.description || t("training.catalog.noDescription")}
 									</p>
 									<div className="flex justify-end">
 										{row.active_training ? (
 											<Button size="sm" asChild>
-												<Link to={`/training/runs/${row.active_training.run_id}`}>
-													继续训练
+												<Link
+													to={`/training/runs/${row.active_training.run_id}`}
+												>
+													<Play aria-hidden="true" />
+													{t("training.catalog.actions.continue")}
 												</Link>
 											</Button>
 										) : (
@@ -307,7 +419,15 @@ export function TrainingCatalogPage(): ReactNode {
 												disabled={startMutation.isPending}
 												onClick={() => startMutation.mutate(row.id)}
 											>
-												开始训练
+												{startingGameboxId === row.id ? (
+													<Loader2
+														className="animate-spin"
+														aria-hidden="true"
+													/>
+												) : (
+													<Dumbbell aria-hidden="true" />
+												)}
+												{t("training.catalog.actions.start")}
 											</Button>
 										)}
 									</div>
@@ -326,6 +446,7 @@ export function TrainingCatalogPage(): ReactNode {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function TrainingRunPage(): ReactNode {
+	const { t } = useTranslation();
 	const { runId = "" } = useParams<{ runId: string }>();
 	const client = useClient();
 	const queryClient = useQueryClient();
@@ -342,7 +463,11 @@ export function TrainingRunPage(): ReactNode {
 	});
 
 	const run = runQuery.data;
-	useDocumentTitle(run ? `${run.gamebox_name} · AWDP 训练 · FloatCTF` : "AWDP 训练 · FloatCTF");
+	useDocumentTitle(
+		run
+			? t("training.run.documentTitle", { name: run.gamebox_name })
+			: t("training.run.documentTitleFallback"),
+	);
 
 	const gameboxId = run?.gamebox_id ?? "";
 
@@ -372,6 +497,22 @@ export function TrainingRunPage(): ReactNode {
 			? (instanceQuery.data ?? null)
 			: instanceFromRun;
 
+	useCommands(
+		[
+			{
+				id: "training-run-refresh",
+				label: t("shell.commands.refresh"),
+				keywords: "refresh reload 刷新",
+				run: () => {
+					for (const key of [qk.runs.run(runId), qk.runs.instance(runId), qk.runs.scores(runId)]) {
+						void queryClient.invalidateQueries({ queryKey: key });
+					}
+				},
+			},
+		],
+		[runId],
+	);
+
 	const refreshAll = useCallback(() => {
 		for (const key of [
 			qk.runs.run(runId),
@@ -388,58 +529,65 @@ export function TrainingRunPage(): ReactNode {
 	const startMutation = useMutation({
 		mutationFn: () => call<AwdpRunDto>(client.awdp.runs.startRun(runId), "开始训练"),
 		onSuccess: () => {
-			toast.success("训练已开始（实例已启动）");
+			toast.success(t("training.run.toasts.started"));
 			refreshAll();
 		},
-		onError: (error) => toast.apiError("开始训练失败", error),
+		onError: (error) => toast.apiError(t("training.run.toasts.startFailed"), error),
 	});
 
 	const stopMutation = useMutation({
 		mutationFn: () => callVoid(client.awdp.runs.stopRun(runId), "停止实例"),
 		onSuccess: () => {
-			toast.success("实例已停止");
+			toast.success(t("training.run.toasts.stopped"));
 			refreshAll();
 		},
-		onError: (error) => toast.apiError("停止实例失败", error),
+		onError: (error) => toast.apiError(t("training.run.toasts.stopFailed"), error),
 	});
 
 	const resetMutation = useMutation({
 		mutationFn: () => call<AwdpRunDto>(client.awdp.runs.resetRun(runId), "重置 run"),
 		onSuccess: () => {
-			toast.success("run 内实例已重置为原始状态");
+			toast.success(t("training.run.toasts.reset"));
 			refreshAll();
 		},
-		onError: (error) => toast.apiError("重置 run 失败", error),
+		onError: (error) => toast.apiError(t("training.run.toasts.resetFailed"), error),
 	});
 
 	const endMutation = useMutation({
 		mutationFn: () => call<AwdpRunDto>(client.awdp.runs.endRun(runId), "结束训练"),
 		onSuccess: () => {
-			toast.success("训练已结束", "得分与历史保留；可「再次训练」新建 run。");
+			toast.success(
+				t("training.run.toasts.ended"),
+				t("training.run.toasts.endedDescription"),
+			);
 			refreshAll();
 		},
-		onError: (error) => toast.apiError("结束训练失败", error),
+		onError: (error) => toast.apiError(t("training.run.toasts.endFailed"), error),
 	});
 
 	const restartMutation = useMutation({
 		mutationFn: () => call<AwdpRunDto>(client.awdp.runs.restartTraining(runId), "再次训练"),
 		onSuccess: (next) => {
-			toast.success("已创建新的训练 run");
+			toast.success(t("training.run.toasts.restarted"));
 			void navigate(`/training/runs/${next.run_id}`);
 		},
-		onError: (error) => toast.apiError("再次训练失败", error),
+		onError: (error) => toast.apiError(t("training.run.toasts.restartFailed"), error),
 	});
 
 	const phaseMutation = useMutation({
 		mutationFn: (target: "break" | "fix") =>
 			call<AwdpRunDto>(client.awdp.runs.setPhase(runId, target), "切换阶段"),
 		onSuccess: (next, target) => {
-			toast.success(target === "fix" ? "已进入 Fix 阶段" : "已回到 Break 阶段");
+			toast.success(
+				target === "fix"
+					? t("training.run.toasts.phaseFix")
+					: t("training.run.toasts.phaseBreak"),
+			);
 			// 切换阶段可能新建/回卷 run 数据，直接以返回值刷新缓存。
 			queryClient.setQueryData(qk.runs.run(runId), next);
 			refreshAll();
 		},
-		onError: (error) => toast.apiError("切换阶段失败", error),
+		onError: (error) => toast.apiError(t("training.run.toasts.phaseFailed"), error),
 	});
 
 	const instanceMutation = useMutation({
@@ -461,17 +609,24 @@ export function TrainingRunPage(): ReactNode {
 		},
 		onSuccess: (_result, action) => {
 			toast.success(
-				action === "start" ? "实例已启动" : action === "stop" ? "实例已停止" : "实例已重置",
+				action === "start"
+					? t("training.run.toasts.instanceStarted")
+					: action === "stop"
+						? t("training.run.toasts.instanceStopped")
+						: t("training.run.toasts.instanceReset"),
 			);
 			refreshAll();
 		},
-		onError: (error) => toast.apiError("实例操作失败", error),
+		onError: (error) => toast.apiError(t("training.run.toasts.instanceFailed"), error),
 	});
 
 	if (!runId) {
 		return (
 			<PageBody>
-				<EmptyBlock title="缺少 run 标识" description="请从训练场目录进入一个练习 run。" />
+				<EmptyBlock
+					title={t("training.run.missing.title")}
+					description={t("training.run.missing.description")}
+				/>
 			</PageBody>
 		);
 	}
@@ -479,18 +634,26 @@ export function TrainingRunPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title={run ? run.gamebox_name : "AWDP 训练 run"}
-				description={run?.gamebox_description || "练习 Run 工作台：Break / Fix / 回合判定 / 积分 / Writeup。"}
+				title={run ? run.gamebox_name : t("training.run.titleFallback")}
+				description={run?.gamebox_description || t("training.run.descriptionFallback")}
 				breadcrumbs={
 					<nav className="flex items-center gap-1.5">
 						<Link to="/training" className="hover:underline">
-							训练场
+							{t("training.run.breadcrumb.training")}
 						</Link>
 						<span>/</span>
-						<span className="text-foreground">run {runId.slice(0, 8)}</span>
+						<span className="text-foreground">
+							{t("training.run.breadcrumb.run", { id: runId.slice(0, 8) })}
+						</span>
 					</nav>
 				}
-				badge={run ? <TonePill tone={runPhaseTone(run.phase)}>{runPhaseLabel(run.phase)}</TonePill> : null}
+				badge={
+					run ? (
+						<TonePill tone={runPhaseTone(run.phase)}>
+							{runPhaseLabel(run.phase, t)}
+						</TonePill>
+					) : null
+				}
 				actions={
 					<RealtimePill
 						state={stream.connectionState}
@@ -503,34 +666,37 @@ export function TrainingRunPage(): ReactNode {
 			/>
 
 			{runQuery.isPending ? (
-				<LoadingBlock label="加载训练 run…" />
+				<LoadingBlock label={t("training.run.loading")} />
 			) : runQuery.isError ? (
 				isForbidden(runQuery.error) ? (
-					<PermissionDeniedBlock description="该训练 run 不属于当前账号，无法查看。" />
+					<PermissionDeniedBlock description={t("training.run.forbidden")} />
 				) : isNotFound(runQuery.error) ? (
 					<EmptyBlock
-						title="未找到该训练 run"
-						description="它可能已被删除，或者链接已失效。"
+						title={t("training.run.notFound.title")}
+						description={t("training.run.notFound.description")}
 						action={
 							<Button variant="outline" size="sm" asChild>
-								<Link to="/training">返回训练场</Link>
+								<Link to="/training">{t("training.run.notFound.back")}</Link>
 							</Button>
 						}
 					/>
 				) : (
 					<ErrorBlock
 						error={runQuery.error}
-						title="加载训练 run 失败"
+						title={t("training.run.loadError")}
 						onRetry={() => void runQuery.refetch()}
 					/>
 				)
 			) : run ? (
 				(() => {
-					const startGate = startRunGate(run.phase);
-					const endGate = endRunGate(run.phase);
-					const restartGate = restartTrainingGate(run.phase);
-					const toFixGate = setPhaseGate(run.phase, "fix");
-					const toBreakGate = setPhaseGate(run.phase, "break");
+					const instanceRunning = instance?.runtime_state === "running";
+					const startGate = startRunGate(run.phase, t, instanceRunning);
+					const endGate = endRunGate(run.phase, t);
+					const restartGate = restartTrainingGate(run.phase, t);
+					const stopGate = stopRunGate(run.phase, instanceRunning, t);
+					const resetGate = resetRunGate(run.phase, t);
+					const toFixGate = setPhaseGate(run.phase, "fix", t);
+					const toBreakGate = setPhaseGate(run.phase, "break", t);
 					const lifecycleBusy =
 						startMutation.isPending ||
 						stopMutation.isPending ||
@@ -543,12 +709,16 @@ export function TrainingRunPage(): ReactNode {
 					return (
 						<div className="space-y-5">
 							<SectionCard
-								title="训练阶段与生命周期"
-								description="练习 run 可以手动控阶段"
+								title={t("training.run.phaseSection.title")}
+								description={t("training.run.phaseSection.description")}
 								actions={
 									run.next_action_at ? (
 										<span className="tnum text-xs text-muted-foreground">
-											下一动作 {formatDateTime(run.next_action_at, { seconds: true })}
+											{t("training.run.phaseSection.nextAction", {
+												time: formatDateTime(run.next_action_at, {
+													seconds: true,
+												}),
+											})}
 										</span>
 									) : null
 								}
@@ -562,26 +732,28 @@ export function TrainingRunPage(): ReactNode {
 
 								<div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 									<StatCard
-										label="我的分数"
-										value={formatScore(run.my_score)}
-										hint="Break + Fix 累计"
-										icon={<Trophy className="size-5" />}
+										label={t("training.run.stats.myScore")}
+										value={formatPoints(run.my_score)}
+										hint={t("training.run.stats.myScoreHint")}
+										icon={<Trophy className="size-4" aria-hidden="true" />}
 										tone="success"
 									/>
 									<StatCard
-										label="当前回合"
+										label={t("training.run.stats.currentRound")}
 										value={`${formatInt(run.current_round)} / ${formatInt(run.total_rounds)}`}
-										hint="Fix 回合"
+										hint={t("training.run.stats.currentRoundHint")}
 									/>
 									<StatCard
-										label="每回合失败扣分"
-										value={formatScore(run.fix_round_penalty)}
-										hint="练习模式 History 展示用"
+										label={t("training.run.stats.penalty")}
+										value={formatPoints(run.fix_round_penalty)}
+										hint={t("training.run.stats.penaltyHint")}
 									/>
 									<StatCard
-										label="Break / Fix 时长"
+										label={t("training.run.stats.durations")}
 										value={`${formatDuration(run.break_duration_secs)} / ${formatDuration(run.fix_duration_secs)}`}
-										hint={`回合间隔 ${formatDuration(run.fix_round_interval_secs)}`}
+										hint={t("training.run.stats.durationsHint", {
+											duration: formatDuration(run.fix_round_interval_secs),
+										})}
 									/>
 								</div>
 
@@ -590,52 +762,70 @@ export function TrainingRunPage(): ReactNode {
 									columns={3}
 									items={[
 										{
-											key: "Break 单题得分",
-											value: <span className="tnum">{formatScore(run.break_score)}</span>,
-										},
-										{
-											key: "Fix 每回合得分",
+											key: t("training.run.fields.breakScore"),
 											value: (
-												<span className="tnum">{formatScore(run.fix_round_score)}</span>
+												<span className="tnum">
+													{formatPoints(run.break_score)}
+												</span>
 											),
 										},
 										{
-											key: "开始时间",
+											key: t("training.run.fields.fixRoundScore"),
+											value: (
+												<span className="tnum">
+													{formatPoints(run.fix_round_score)}
+												</span>
+											),
+										},
+										{
+											key: t("training.run.fields.startedAt"),
 											value: run.started_at ? (
 												<span className="tnum">
-													{formatDateTime(run.started_at, { seconds: true })}
+													{formatDateTime(run.started_at, {
+														seconds: true,
+													})}
 												</span>
-											) : (
-												<span className="text-muted-foreground">未开始</span>
-											),
-										},
-										{
-											key: "Fix 开始时间",
-											value: run.fix_started_at ? (
-												<span className="tnum">
-													{formatDateTime(run.fix_started_at, { seconds: true })}
-												</span>
-											) : (
-												<span className="text-muted-foreground">未开始</span>
-											),
-										},
-										{
-											key: "结束时间",
-											value: run.finished_at ? (
-												<span className="tnum">
-													{formatDateTime(run.finished_at, { seconds: true })}
-												</span>
-											) : (
-												<span className="text-muted-foreground">未结束</span>
-											),
-										},
-										{
-											key: "源码目录",
-											value: run.source_code_dir ? (
-												<MonoTextValue value={run.source_code_dir} />
 											) : (
 												<span className="text-muted-foreground">
-													Fix 阶段才下发
+													{t("training.run.fields.notStarted")}
+												</span>
+											),
+										},
+										{
+											key: t("training.run.fields.fixStartedAt"),
+											value: run.fix_started_at ? (
+												<span className="tnum">
+													{formatDateTime(run.fix_started_at, {
+														seconds: true,
+													})}
+												</span>
+											) : (
+												<span className="text-muted-foreground">
+													{t("training.run.fields.notStarted")}
+												</span>
+											),
+										},
+										{
+											key: t("training.run.fields.finishedAt"),
+											value: run.finished_at ? (
+												<span className="tnum">
+													{formatDateTime(run.finished_at, {
+														seconds: true,
+													})}
+												</span>
+											) : (
+												<span className="text-muted-foreground">
+													{t("training.run.fields.notFinished")}
+												</span>
+											),
+										},
+										{
+											key: t("training.run.fields.sourceDir"),
+											value: run.source_code_dir ? (
+												<MonoText>{run.source_code_dir}</MonoText>
+											) : (
+												<span className="text-muted-foreground">
+													{t("training.run.fields.sourceDirHint")}
 												</span>
 											),
 										},
@@ -643,150 +833,255 @@ export function TrainingRunPage(): ReactNode {
 								/>
 
 								<div className="mt-4 flex flex-wrap items-center gap-2">
+									{run.phase !== "pending" ? null : (
 									<Button
 										size="sm"
 										disabled={!startGate.allowed || lifecycleBusy}
-										title={startGate.allowed ? "启动实例并进入会话" : startGate.reason}
+										title={
+											startGate.allowed
+												? t("training.run.lifecycle.startTitle")
+												: startGate.reason
+										}
 										onClick={() => startMutation.mutate()}
 									>
-										<Play /> 开始训练
+										{startMutation.isPending ? (
+											<Loader2 className="animate-spin" aria-hidden="true" />
+										) : (
+											<Play aria-hidden="true" />
+										)}
+										{t("training.run.lifecycle.start")}
 									</Button>
+									)}
 									<Button
 										variant="outline"
 										size="sm"
-										disabled={lifecycleBusy}
-										title="停止 run 内全部实例（保留 run 与端点）"
+										disabled={!stopGate.allowed || lifecycleBusy}
+										title={stopGate.allowed ? t("training.run.lifecycle.stopTitle") : stopGate.reason}
 										onClick={async () => {
 											const ok = await confirm({
-												title: "停止 run 内全部实例？",
-												description: "停止后端点不再可用，官方回合判定无法执行。",
-												consequences: RUN_STOP_CONSEQUENCES,
+												title: t("training.confirm.stopRun.title"),
+												description: t(
+													"training.confirm.stopRun.description",
+												),
+												consequences: runStopConsequences(t),
 												tone: "danger",
-												confirmText: "停止",
+												confirmText: t(
+													"training.confirm.stopRun.confirmText",
+												),
 											});
 											if (ok) stopMutation.mutate();
 										}}
 									>
-										<Square /> 停止实例
+										{stopMutation.isPending ? (
+											<Loader2 className="animate-spin" aria-hidden="true" />
+										) : (
+											<Square aria-hidden="true" />
+										)}
+										{t("training.run.lifecycle.stop")}
 									</Button>
 									<Button
 										variant="outline"
 										size="sm"
-										disabled={lifecycleBusy}
-										title="重置 run 内全部实例为原始状态（破坏性）"
+										disabled={!resetGate.allowed || lifecycleBusy}
+										title={resetGate.allowed ? t("training.run.lifecycle.resetTitle") : resetGate.reason}
 										onClick={async () => {
 											const ok = await confirm({
-												title: "重置 run 内全部实例？",
-												description: "实例会被销毁并按原始镜像重建。",
-												consequences: RUN_RESET_CONSEQUENCES,
+												title: t("training.confirm.resetRun.title"),
+												description: t(
+													"training.confirm.resetRun.description",
+												),
+												consequences: runResetConsequences(t),
 												tone: "danger",
-												confirmText: "重置",
+												confirmText: t(
+													"training.confirm.resetRun.confirmText",
+												),
 											});
 											if (ok) resetMutation.mutate();
 										}}
 									>
-										<RefreshCw /> 重置 run
+										{resetMutation.isPending ? (
+											<Loader2 className="animate-spin" aria-hidden="true" />
+										) : (
+											<RefreshCw aria-hidden="true" />
+										)}
+										{t("training.run.lifecycle.reset")}
 									</Button>
 									<Button
 										variant="outline"
 										size="sm"
 										disabled={!endGate.allowed || lifecycleBusy}
-										title={endGate.allowed ? "结束本次训练" : endGate.reason}
+										title={
+											endGate.allowed
+												? t("training.run.lifecycle.endTitle")
+												: endGate.reason
+										}
 										onClick={async () => {
 											const ok = await confirm({
-												title: "结束本次训练？",
-												description: "训练会话结束，实例被停止。",
-												consequences: RUN_END_CONSEQUENCES,
+												title: t("training.confirm.endRun.title"),
+												description: t(
+													"training.confirm.endRun.description",
+												),
+												consequences: runEndConsequences(t),
 												tone: "danger",
-												confirmText: "结束训练",
+												confirmText: t(
+													"training.confirm.endRun.confirmText",
+												),
 											});
 											if (ok) endMutation.mutate();
 										}}
 									>
-										<StopCircle /> 结束训练
+										{endMutation.isPending ? (
+											<Loader2 className="animate-spin" aria-hidden="true" />
+										) : (
+											<StopCircle aria-hidden="true" />
+										)}
+										{t("training.run.lifecycle.end")}
 									</Button>
 									<Button
 										variant="outline"
 										size="sm"
 										disabled={!restartGate.allowed || lifecycleBusy}
-										title={restartGate.allowed ? "基于同一 GameBox 新建 run" : restartGate.reason}
+										title={
+											restartGate.allowed
+												? t("training.run.lifecycle.restartTitle")
+												: restartGate.reason
+										}
 										onClick={async () => {
 											const ok = await confirm({
-												title: "再次训练（新建 run）？",
-												description: "会创建一个从 0 计分的新 run，并跳转到它的页面。",
-												consequences: RUN_RESTART_CONSEQUENCES,
-												confirmText: "再次训练",
+												title: t("training.confirm.restart.title"),
+												description: t(
+													"training.confirm.restart.description",
+												),
+												consequences: runRestartConsequences(t),
+												confirmText: t(
+													"training.confirm.restart.confirmText",
+												),
 											});
 											if (ok) restartMutation.mutate();
 										}}
 									>
-										<Dumbbell /> 再次训练
+										{restartMutation.isPending ? (
+											<Loader2 className="animate-spin" aria-hidden="true" />
+										) : (
+											<Dumbbell aria-hidden="true" />
+										)}
+										{t("training.run.lifecycle.restart")}
 									</Button>
-									{endGate.allowed ? (
-										<Button
-											variant="ghost"
-											size="sm"
-											asChild
-											title="不结束 run，只查看历史"
-										>
-											<Link to="/training">返回目录</Link>
-										</Button>
-									) : null}
+									{/* 返回训练场不是破坏性动作：任何阶段（含已结束）都应可用。 */}
+									<Button
+										variant="ghost"
+										size="sm"
+										asChild
+										title={t("training.run.lifecycle.backTitle")}
+									>
+										<Link to="/training">
+											{t("training.run.lifecycle.back")}
+										</Link>
+									</Button>
 								</div>
 
-								{!startGate.allowed || !endGate.allowed || !restartGate.allowed ? (
+								{!startGate.allowed ||
+								!endGate.allowed ||
+								!restartGate.allowed ? (
 									<ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-										{!startGate.allowed ? <li>开始训练：{startGate.reason}</li> : null}
-										{!endGate.allowed ? <li>结束训练：{endGate.reason}</li> : null}
-										{!restartGate.allowed ? <li>再次训练：{restartGate.reason}</li> : null}
+										{!startGate.allowed ? (
+											<li>
+												{t("training.run.lifecycle.blocked.start", {
+													reason: startGate.reason,
+												})}
+											</li>
+										) : null}
+										{!endGate.allowed ? (
+											<li>
+												{t("training.run.lifecycle.blocked.end", {
+													reason: endGate.reason,
+												})}
+											</li>
+										) : null}
+										{!restartGate.allowed ? (
+											<li>
+												{t("training.run.lifecycle.blocked.restart", {
+													reason: restartGate.reason,
+												})}
+											</li>
+										) : null}
 									</ul>
 								) : null}
 
 								<div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
-									<span className="text-xs text-muted-foreground">手动切换阶段：</span>
+									<span className="text-xs text-muted-foreground">
+										{t("training.run.phaseSwitch.label")}
+									</span>
 									<Button
 										variant="outline"
 										size="sm"
 										disabled={!toFixGate.allowed || lifecycleBusy}
-										title={toFixGate.allowed ? "进入 Fix 阶段（重置实例）" : toFixGate.reason}
+										title={
+											toFixGate.allowed
+												? t("training.run.phaseSwitch.toFixTitle")
+												: toFixGate.reason
+										}
 										onClick={async () => {
 											const ok = await confirm({
-												title: "进入 Fix 阶段？",
-												description: "实例会被重置为原始状态，开始物化回合时间线。",
-												consequences: RUN_SET_PHASE_FIX_CONSEQUENCES,
-												confirmText: "进入 Fix",
+												title: t("training.confirm.toFix.title"),
+												description: t(
+													"training.confirm.toFix.description",
+												),
+												consequences: runSetPhaseFixConsequences(t),
+												tone: "danger",
+												confirmText: t(
+													"training.confirm.toFix.confirmText",
+												),
 											});
 											if (ok) phaseMutation.mutate("fix");
 										}}
 									>
-										进入 Fix
+										{phaseMutation.isPending &&
+										phaseMutation.variables === "fix" ? (
+											<Loader2 className="animate-spin" aria-hidden="true" />
+										) : null}
+										{t("training.run.phaseSwitch.toFix")}
 									</Button>
 									<Button
 										variant="outline"
 										size="sm"
 										disabled={!toBreakGate.allowed || lifecycleBusy}
-										title={toBreakGate.allowed ? "回到 Break 阶段（撤销 Fix 会话）" : toBreakGate.reason}
+										title={
+											toBreakGate.allowed
+												? t("training.run.phaseSwitch.toBreakTitle")
+												: toBreakGate.reason
+										}
 										onClick={async () => {
 											const ok = await confirm({
-												title: "回到 Break 阶段？",
-												description:
-													"这会撤销整个 Fix 会话：回合、评估与 Fix 计分全部清零。",
-												consequences: RUN_SET_PHASE_BREAK_CONSEQUENCES,
+												title: t("training.confirm.toBreak.title"),
+												description: t(
+													"training.confirm.toBreak.description",
+												),
+												consequences: runSetPhaseBreakConsequences(t),
 												tone: "danger",
-												confirmText: "回到 Break",
+												confirmText: t(
+													"training.confirm.toBreak.confirmText",
+												),
 											});
 											if (ok) phaseMutation.mutate("break");
 										}}
 									>
-										回到 Break
+										{phaseMutation.isPending &&
+										phaseMutation.variables === "break" ? (
+											<Loader2 className="animate-spin" aria-hidden="true" />
+										) : null}
+										{t("training.run.phaseSwitch.toBreak")}
 									</Button>
 									{!toFixGate.allowed ? (
-										<span className="text-xs text-muted-foreground">{toFixGate.reason}</span>
+										<span className="text-xs text-muted-foreground">
+											{toFixGate.reason}
+										</span>
 									) : null}
 								</div>
 							</SectionCard>
 
-							<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.2fr)]">
+							{/* 1280 下三列会把评测表压到 320px：宽屏才三列。 */}
+							<div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.2fr)]">
 								<TrainingInstancePanel
 									gameboxName={run.gamebox_name}
 									broken={runInstance?.broken ?? false}
@@ -796,25 +1091,39 @@ export function TrainingRunPage(): ReactNode {
 									error={instanceQuery.error}
 									judgeEndpoint={run.judge_endpoint}
 									busy={instanceBusy}
+									pendingAction={
+										instanceMutation.isPending
+											? (instanceMutation.variables ?? null)
+											: null
+									}
+									refreshing={instanceQuery.isFetching && !instanceQuery.isPending}
 									phase={run.phase}
 									onStart={() => instanceMutation.mutate("start")}
 									onStop={async () => {
 										const ok = await confirm({
-											title: "停止实例？",
-											description: "停止后端点不再可用，官方回合判定无法执行。",
-											consequences: RUN_STOP_CONSEQUENCES,
+											title: t("training.confirm.stopInstance.title"),
+											description: t(
+												"training.confirm.stopInstance.description",
+											),
+											consequences: runStopConsequences(t),
 											tone: "danger",
-											confirmText: "停止",
+											confirmText: t(
+												"training.confirm.stopInstance.confirmText",
+											),
 										});
 										if (ok) instanceMutation.mutate("stop");
 									}}
 									onReset={async () => {
 										const ok = await confirm({
-											title: "重置实例？",
-											description: "实例会被销毁并按原始镜像重建（pristine）。",
-											consequences: RUN_INSTANCE_RESET_CONSEQUENCES,
+											title: t("training.confirm.resetInstance.title"),
+											description: t(
+												"training.confirm.resetInstance.description",
+											),
+											consequences: runInstanceResetConsequences(t),
 											tone: "danger",
-											confirmText: "重置",
+											confirmText: t(
+												"training.confirm.resetInstance.confirmText",
+											),
 										});
 										if (ok) instanceMutation.mutate("reset");
 									}}
@@ -829,17 +1138,23 @@ export function TrainingRunPage(): ReactNode {
 									onChanged={refreshAll}
 								/>
 
-								<RunRoundsEvaluationsPanel runId={runId} />
+								<div className="lg:col-span-2 2xl:col-span-1">
+									<RunRoundsEvaluationsPanel runId={runId} />
+								</div>
 							</div>
 
 							<SectionCard
-								title="积分明细与 Writeup"
-								description="ALL Check 通过会结束 run，并在积分明细里出现扫尾计分记录。"
+								title={t("training.run.scoresSection.title")}
+								description={t("training.run.scoresSection.description")}
 							>
 								<Tabs defaultValue="scores">
 									<TabsList>
-										<TabsTrigger value="scores">积分明细</TabsTrigger>
-										<TabsTrigger value="writeup">Writeup</TabsTrigger>
+										<TabsTrigger value="scores">
+											{t("training.run.scoresSection.scoresTab")}
+										</TabsTrigger>
+										<TabsTrigger value="writeup">
+											{t("training.run.scoresSection.writeupTab")}
+										</TabsTrigger>
 									</TabsList>
 									<TabsContent value="scores" className="pt-3">
 										<RunScoresPanel runId={runId} />
@@ -849,16 +1164,10 @@ export function TrainingRunPage(): ReactNode {
 									</TabsContent>
 								</Tabs>
 							</SectionCard>
-
 						</div>
 					);
 				})()
 			) : null}
 		</PageBody>
 	);
-}
-
-/** 源码目录用等宽展示（避免在 KeyValueList 里塞长文本时换行错乱）。 */
-function MonoTextValue({ value }: { value: string }): ReactNode {
-	return <code className="tnum font-mono text-xs break-all">{value}</code>;
 }

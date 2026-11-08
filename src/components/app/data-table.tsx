@@ -7,6 +7,7 @@
  */
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
 	flexRender,
 	getCoreRowModel,
@@ -38,7 +39,7 @@ export interface DataTableColumn<T> {
 	className?: string;
 	headerClassName?: string;
 	/** 在窄屏隐藏该列（表格视图）。 */
-	hideBelow?: "sm" | "md" | "lg" | "xl";
+	hideBelow?: "sm" | "md" | "lg" | "xl" | "2xl";
 }
 
 export interface DataTableProps<T> {
@@ -50,6 +51,8 @@ export interface DataTableProps<T> {
 	selectable?: boolean;
 	selectedIds?: string[];
 	onSelectionChange?: (ids: string[]) => void;
+	/** 单行是否可勾选（默认全部可选）；用于禁用「已在赛事中」这类行。 */
+	isRowSelectable?: (row: T) => boolean;
 	mobileCard?: (row: T) => ReactNode;
 	className?: string;
 	/** 表格主体为空时的展示（通常由外部 `QueryState` 处理，这里做兜底）。 */
@@ -61,6 +64,7 @@ const hideClass: Record<NonNullable<DataTableColumn<unknown>["hideBelow"]>, stri
 	md: "hidden md:table-cell",
 	lg: "hidden lg:table-cell",
 	xl: "hidden xl:table-cell",
+	"2xl": "hidden 2xl:table-cell",
 };
 
 const alignClass = {
@@ -78,10 +82,12 @@ export function DataTable<T>({
 	selectable = false,
 	selectedIds,
 	onSelectionChange,
+	isRowSelectable,
 	mobileCard,
 	className,
 	empty,
 }: DataTableProps<T>) {
+	const { t } = useTranslation();
 	const [sorting, setSorting] = useState<SortingState>([]);
 
 	const tableColumns = useMemo<ColumnDef<T>[]>(() => {
@@ -100,14 +106,15 @@ export function DataTable<T>({
 									: false
 						}
 						onCheckedChange={(value) => table.toggleAllPageRowsSelected(value === true)}
-						aria-label="全选本页"
+						aria-label={t("common.table.selectAll")}
 					/>
 				),
 				cell: ({ row }) => (
 					<Checkbox
 						checked={row.getIsSelected()}
+						disabled={!row.getCanSelect()}
 						onCheckedChange={(value) => row.toggleSelected(value === true)}
-						aria-label="选择该行"
+						aria-label={t("common.table.selectRow")}
 						onClick={(event) => event.stopPropagation()}
 					/>
 				),
@@ -130,7 +137,7 @@ export function DataTable<T>({
 		if (rowActions) {
 			defs.push({
 				id: "__actions",
-				header: () => <span className="sr-only">操作</span>,
+				header: () => <span className="sr-only">{t("common.actions")}</span>,
 				cell: ({ row }) => (
 					<div
 						className="flex items-center justify-end gap-1"
@@ -155,7 +162,7 @@ export function DataTable<T>({
 		getCoreRowModel: getCoreRowModel(),
 		getSortedRowModel: getSortedRowModel(),
 		getRowId: (row, index) => getRowId(row, index),
-		enableRowSelection: selectable,
+		enableRowSelection: isRowSelectable ? (row) => isRowSelectable(row.original) : selectable,
 		...(selectable && selectedIds && onSelectionChange
 			? {
 					state: { sorting, rowSelection: Object.fromEntries(selectedIds.map((id) => [id, true])) },
@@ -181,11 +188,40 @@ export function DataTable<T>({
 			{mobileCard ? (
 				<div className="space-y-2 p-3 md:hidden">
 					{rows.length === 0 ? (
-						(empty ?? <p className="py-6 text-center text-sm text-muted-foreground">暂无数据</p>)
+						(empty ?? <p className="py-6 text-center text-sm text-muted-foreground">{t("common.table.emptyTitle")}</p>)
 					) : (
 						rows.map((row) => (
 							<div key={row.id} className="rounded-lg border p-3">
-								{mobileCard(row.original)}
+								<div className="flex items-start gap-2">
+									{selectable ? (
+										<Checkbox
+											className="mt-0.5"
+											checked={row.getIsSelected()}
+											disabled={!row.getCanSelect()}
+											onCheckedChange={(value) => row.toggleSelected(value === true)}
+											aria-label={t("common.table.selectRow")}
+											onClick={(event) => event.stopPropagation()}
+										/>
+									) : null}
+									<div
+										className={cn("min-w-0 flex-1", onRowClick && "cursor-pointer")}
+										role={onRowClick ? "button" : undefined}
+										tabIndex={onRowClick ? 0 : undefined}
+										onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+										onKeyDown={
+											onRowClick
+												? (event) => {
+														if (event.key === "Enter" || event.key === " ") {
+															event.preventDefault();
+															onRowClick(row.original);
+														}
+													}
+												: undefined
+										}
+									>
+										{mobileCard(row.original)}
+									</div>
+								</div>
 							</div>
 						))
 					)}
@@ -207,6 +243,15 @@ export function DataTable<T>({
 									return (
 										<TableHead
 											key={header.id}
+											aria-sort={
+												canSort
+													? sorted === "asc"
+														? "ascending"
+														: sorted === "desc"
+															? "descending"
+															: "none"
+													: undefined
+											}
 											className={cn(
 												column?.align ? alignClass[column.align] : "text-left",
 												column?.hideBelow ? hideClass[column.hideBelow] : "",
@@ -218,6 +263,10 @@ export function DataTable<T>({
 													type="button"
 													className="inline-flex items-center gap-1 text-xs font-medium hover:text-foreground"
 													onClick={header.column.getToggleSortingHandler()}
+													aria-label={t("common.table.sortColumn", {
+														column: typeof column?.header === "string" ? column.header : header.id,
+													})}
+													title={t("common.table.sortScopeHint")}
 												>
 													{flexRender(header.column.columnDef.header, header.getContext())}
 													{sorted === "asc" ? (
@@ -241,7 +290,7 @@ export function DataTable<T>({
 						{rows.length === 0 ? (
 							<TableRow>
 								<TableCell colSpan={tableColumns.length} className="h-24 text-center">
-									{empty ?? <span className="text-sm text-muted-foreground">暂无数据</span>}
+									{empty ?? <span className="text-sm text-muted-foreground">{t("common.table.emptyTitle")}</span>}
 								</TableCell>
 							</TableRow>
 						) : (
@@ -251,6 +300,20 @@ export function DataTable<T>({
 									data-state={row.getIsSelected() ? "selected" : undefined}
 									className={cn(onRowClick && "cursor-pointer")}
 									onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+									tabIndex={onRowClick ? 0 : undefined}
+									onKeyDown={
+										onRowClick
+											? (event) => {
+													// 行内还有复选框 / 操作按钮：只有焦点在行本身时才响应，
+													// 否则在复选框上按 Space 会同时触发“打开行”。
+													if (event.target !== event.currentTarget) return;
+													if (event.key === "Enter" || event.key === " ") {
+														event.preventDefault();
+														onRowClick(row.original);
+													}
+												}
+											: undefined
+									}
 								>
 									{row.getVisibleCells().map((cell) => {
 										const meta = cell.column.columnDef.meta as

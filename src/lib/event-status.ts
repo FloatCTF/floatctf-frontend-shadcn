@@ -6,7 +6,7 @@
  * 不替代后端判定：任何写操作仍由后端拒绝越界的请求。
  */
 
-import type { Events } from "@floatctf/sdk/entity";
+import { EventPurpose, type Events } from "@floatctf/sdk/entity";
 
 export type EventStatus = "upcoming" | "ongoing" | "ended" | "unknown";
 
@@ -34,11 +34,33 @@ export function eventStatusOf(event: Events, nowMs?: number): EventStatus {
 	return computeEventStatus(event.start_time, event.end_time ?? null, nowMs);
 }
 
-export const EVENT_STATUS_LABEL: Record<EventStatus, string> = {
-	upcoming: "未开始",
-	ongoing: "进行中",
-	ended: "已结束",
-	unknown: "时间未知",
+/**
+ * 状态 / 赛制 / 参赛模式 / 目的 → i18n key。
+ *
+ * 界面必须用这些 key + `t()` 渲染；不要再新增在模块加载时求值的文案常量
+ * （那样语言切换后不会更新，且把单一语言写死进共享层）。
+ */
+export const EVENT_STATUS_KEY: Record<EventStatus, string> = {
+	upcoming: "common.eventStatus.upcoming",
+	ongoing: "common.eventStatus.ongoing",
+	ended: "common.eventStatus.ended",
+	unknown: "common.eventStatus.unknown",
+};
+
+export const EVENT_FAMILY_KEY: Record<string, string> = {
+	jeopardy: "common.eventFamily.jeopardy",
+	awd: "common.eventFamily.awd",
+	awdp: "common.eventFamily.awdp",
+};
+
+export const PARTICIPANT_MODE_KEY: Record<string, string> = {
+	individual: "common.participantMode.individual",
+	team: "common.participantMode.team",
+};
+
+export const EVENT_PURPOSE_KEY: Record<string, string> = {
+	competition: "common.eventPurpose.competition",
+	practice: "common.eventPurpose.practice",
 };
 
 export const EVENT_STATUS_TONE: Record<EventStatus, StatusTone> = {
@@ -48,21 +70,25 @@ export const EVENT_STATUS_TONE: Record<EventStatus, StatusTone> = {
 	unknown: "warning",
 };
 
-export const EVENT_FAMILY_LABEL: Record<string, string> = {
-	jeopardy: "Jeopardy 解题",
-	awd: "AWD 攻防",
-	awdp: "AWDP 攻防",
-};
+/**
+ * 参赛闸门 —— 与后端 `join_event` / `leave_event` / `submit_writeup` 的判定逐条对齐：
+ * 只有**正式赛**（purpose=competition）、非系统托管、`allow_join=true`、且**尚未开始**时
+ * 才允许自助加入 / 退出。练习赛走题库 / 训练场，不通过赛事报名。
+ */
+export type ParticipationGate =
+	| { kind: "open" }
+	| { kind: "not-competition" }
+	| { kind: "system-managed" }
+	| { kind: "closed" }
+	| { kind: "started" };
 
-export const PARTICIPANT_MODE_LABEL: Record<string, string> = {
-	individual: "个人赛",
-	team: "战队赛",
-};
-
-export const EVENT_PURPOSE_LABEL: Record<string, string> = {
-	competition: "正式赛",
-	practice: "练习",
-};
+export function participationGate(event: Events, nowMs: number = Date.now()): ParticipationGate {
+	if (event.purpose !== EventPurpose.Competition) return { kind: "not-competition" };
+	if (event.system_key) return { kind: "system-managed" };
+	if (!event.allow_join) return { kind: "closed" };
+	if (eventStatusOf(event, nowMs) !== "upcoming") return { kind: "started" };
+	return { kind: "open" };
+}
 
 export interface EventCapabilities {
 	/** 是否有题目集合（Jeopardy / AWDP）。 */
@@ -95,6 +121,12 @@ export interface EventCapabilities {
  * 由赛事本身推导能力位（与后端 `EventCapabilities::for_mode` 同构）。
  * 不使用 `GET /events/{id}/capabilities` 逃生舱：`family` / `participant_mode` 已在
  * `EventInfo.event` 里，语义完全一致。
+ *
+ * 注意 `challenges` / `instances` / `scoreboard` / `trend` 描述的是**赛事工作区标签**
+ * 是否可用，不是「这个赛制有没有类似概念」：AWD/AWDP 的积分榜、趋势与实例在各自的
+ * 驾驶舱 / 工作台里（`awd.player.*` / `awdp.player.*`），而 `/events/{id}/scoreboard`
+ * 等通用端点在后端会因 `require_jeopardy_family` 返回 400。把它们标成 true 会渲染出
+ * 一点开必失败的标签。
  */
 export function eventCapabilities(event: Events): EventCapabilities {
 	const team = event.participant_mode === "team";
@@ -104,8 +136,9 @@ export function eventCapabilities(event: Events): EventCapabilities {
 			instances: false,
 			arena: true,
 			lab: false,
-			scoreboard: true,
-			trend: true,
+			// AWD 的实时积分榜在驾驶舱里；通用 Jeopardy 端点不适用。
+			scoreboard: false,
+			trend: false,
 			wireguard: true,
 			gameboxes: true,
 			rounds: true,
@@ -116,12 +149,13 @@ export function eventCapabilities(event: Events): EventCapabilities {
 	}
 	if (event.family === "awdp") {
 		return {
-			challenges: true,
-			instances: true,
+			// AWDP 的靶机、积分与趋势都在 `/lab/:eventId`（`awdp.player.*`）。
+			challenges: false,
+			instances: false,
 			arena: false,
 			lab: true,
-			scoreboard: true,
-			trend: true,
+			scoreboard: false,
+			trend: false,
 			wireguard: false,
 			gameboxes: true,
 			rounds: true,

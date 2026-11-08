@@ -1,16 +1,19 @@
 /**
  * 应用外壳（选手端 Field / 管理端 Control Room 共用一套实现，靠导航配置区分）。
  *
- * 交互模型：左侧可折叠导航（图标态保留）→ 顶栏（命令面板 / 主题 / 账号）→ 主区；
+ * 交互模型：左侧可折叠导航（图标态保留）→ 顶栏（命令面板 / 语言 / 主题 / 账号）→ 主区；
  * 移动端侧边栏收进 Sheet，另有底部导航。主区永远由 `<Outlet/>` 渲染当前页面。
+ * 版式对齐 docs/theme.md §6.1（侧栏 256/48、顶栏 sticky、面包屑式当前页标题）。
  */
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun, UserCircle } from "lucide-react";
+import { ChevronsUpDown, Languages, LogOut, Moon, Search, Sun, UserCircle } from "lucide-react";
 
 import { useAuthStore, useMe } from "~/auth/store";
-import { CommandTrigger } from "~/app/command-palette";
+import { CommandTrigger, useCommandPalette } from "~/app/command-palette";
+import { BrandMark } from "~/components/app/brand";
 import { UserAvatar } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
 import {
@@ -37,6 +40,7 @@ import {
 	SidebarRail,
 	SidebarTrigger,
 } from "~/components/ui/sidebar";
+import { getLocale, setLocale, type Locale } from "~/lib/i18n";
 import { setThemePreference, useTheme } from "~/lib/theme";
 import { cn } from "~/lib/utils";
 
@@ -50,9 +54,6 @@ import {
 } from "./nav";
 
 export interface AppShellProps {
-	/** 品牌标题 / 副标题。 */
-	brand: string;
-	brandSubtitle: string;
 	navGroups: NavGroup[];
 	mobileNav: NavItem[];
 	/** 账号作用域：决定登出清哪个 token、在哪看资料。 */
@@ -60,22 +61,36 @@ export interface AppShellProps {
 	children?: ReactNode;
 }
 
+/**
+ * AWD 驾驶舱（/arena/:id）与 AWDP 工作台（/lab/:id）是赛事的子工作区，
+ * 但路由并不挂在 /events 下 —— 侧边栏仍应高亮父级「赛事」。
+ */
+const NAV_ALIASES: Record<string, string> = {
+	"/arena": "/events",
+	"/lab": "/events",
+};
+
 function isActivePath(pathname: string, item: NavItem): boolean {
 	if (item.end) return pathname === item.to;
-	return pathname === item.to || pathname.startsWith(`${item.to}/`);
+	const alias = Object.keys(NAV_ALIASES).find(
+		(prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+	);
+	const target = alias ? NAV_ALIASES[alias] : pathname;
+	return target === item.to || target.startsWith(`${item.to}/`);
 }
 
-function currentTitle(groups: NavGroup[], pathname: string): string {
+function currentItem(groups: NavGroup[], pathname: string): NavItem | undefined {
 	const items = groups.flatMap((group) => group.items);
 	// 取最长匹配（最具体的路径优先）。
-	const match = items
+	return items
 		.filter((item) => isActivePath(pathname, item))
 		.sort((a, b) => b.to.length - a.to.length)[0];
-	return match?.label ?? "";
 }
 
-export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: AppShellProps) {
+export function AppShell({ navGroups, mobileNav, scope }: AppShellProps) {
+	const { t } = useTranslation();
 	const location = useLocation();
+	const setPaletteOpen = useCommandPalette().setOpen;
 	const navigate = useNavigate();
 	const theme = useTheme();
 	const me = useMe();
@@ -83,8 +98,16 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 	const clearAll = useAuthStore((state) => state.clearAll);
 	const adminToken = useAuthStore((state) => state.adminToken);
 
-	const title = currentTitle(navGroups, location.pathname);
-	const identity = scope === "admin" ? "管理端会话" : (me?.nickname ?? me?.username ?? "选手会话");
+	const active = currentItem(navGroups, location.pathname);
+	const title = active ? t(active.labelKey) : "";
+	const identity =
+		scope === "admin"
+			? t("shell.adminSession")
+			: (me?.nickname ?? me?.username ?? t("shell.playerSession"));
+
+	const brand = "FloatCTF";
+	const brandSubtitle =
+		scope === "admin" ? t("shell.adminSubtitle") : t("shell.playerSubtitle");
 
 	function logout() {
 		if (scope === "admin") clearScope("admin");
@@ -92,16 +115,32 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 		void navigate(scope === "admin" ? "/admin/login" : "/login", { replace: true });
 	}
 
+	async function changeLocale(next: Locale) {
+		await setLocale(next);
+	}
+
+	// shadcn 的 SidebarProvider 会把状态写进 cookie，但不会自己读回：
+	// 首次挂载时按 cookie 初始化，刷新后保持折叠/展开。
+	const sidebarDefaultOpen = useState(() => {
+		const match = document.cookie.match(/(?:^|;\s*)sidebar_state=(true|false)/);
+		return match ? match[1] === "true" : true;
+	})[0];
+
 	return (
-		<SidebarProvider>
+		<SidebarProvider defaultOpen={sidebarDefaultOpen}>
+			{/* 键盘用户先到主内容：Tab 第一站，Enter 跳过侧栏与顶栏。 */}
+			<a
+				href="#main-content"
+				className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:border focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-sm"
+			>
+				{t("shell.skipToContent")}
+			</a>
 			<Sidebar collapsible="icon">
 				<SidebarHeader>
 					<div className="flex items-center gap-2 px-1 py-1.5">
-						<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
-							{brand.slice(0, 1)}
-						</div>
+						<BrandMark />
 						<div className="grid min-w-0 flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
-							<span className="truncate text-sm font-semibold">{brand}</span>
+							<span className="truncate text-sm font-semibold tracking-tight">{brand}</span>
 							<span className="truncate text-xs text-muted-foreground">{brandSubtitle}</span>
 						</div>
 					</div>
@@ -109,8 +148,8 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 
 				<SidebarContent>
 					{navGroups.map((group) => (
-						<SidebarGroup key={group.label}>
-							<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+						<SidebarGroup key={group.labelKey}>
+							<SidebarGroupLabel>{t(group.labelKey)}</SidebarGroupLabel>
 							<SidebarGroupContent>
 								<SidebarMenu>
 									{group.items.map((item) => {
@@ -120,11 +159,11 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 												<SidebarMenuButton
 													asChild
 													isActive={isActivePath(location.pathname, item)}
-													tooltip={item.label}
+													tooltip={t(item.labelKey)}
 												>
 													<NavLink to={item.to} end={item.end} reloadDocument={item.reloadDocument}>
-														<Icon />
-														<span>{item.label}</span>
+														<Icon aria-hidden="true" />
+														<span>{t(item.labelKey)}</span>
 													</NavLink>
 												</SidebarMenuButton>
 											</SidebarMenuItem>
@@ -141,35 +180,65 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 						<span className="truncate text-xs text-muted-foreground">{identity}</span>
 					</div>
 				</SidebarFooter>
-				<SidebarRail />
+				<SidebarRail label={t("shell.toggleNav")} />
 			</Sidebar>
 
 			<SidebarInset className="min-w-0">
-				<header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-3 backdrop-blur lg:px-4">
-					<SidebarTrigger aria-label="切换导航" />
+				<header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur lg:px-6">
+					<SidebarTrigger aria-label={t("shell.toggleNav")} />
 					<div className="min-w-0 flex-1">
 						<p className="truncate text-sm font-medium">{title}</p>
 					</div>
 
-					<CommandTrigger className="hidden h-9 items-center justify-between gap-2 rounded-md border bg-muted/40 px-2.5 text-sm text-muted-foreground hover:bg-muted md:inline-flex md:w-56" />
+					<CommandTrigger className="hidden h-8 items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted md:inline-flex md:w-56 md:min-w-56 max-md:w-auto" />
+					{/* 移动端没有 ⌘K：给一个图标入口，别让命令面板在手机上不可达。 */}
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						className="md:hidden"
+						aria-label={t("shell.command.openPalette")}
+						title={t("shell.command.openPalette")}
+						onClick={() => setPaletteOpen(true)}
+					>
+						<Search className="size-4" aria-hidden="true" />
+					</Button>
+
+					{/* 单键切换亮/暗（theme.md §2.4 ThemeToggle）：一次点击即生效，不藏在菜单里。 */}
+					<Button
+						variant="outline"
+						size="icon-sm"
+						className="bg-background/80 backdrop-blur"
+						aria-label={
+							theme === "dark" ? t("common.theme.toggleToLight") : t("common.theme.toggleToDark")
+						}
+						title={theme === "dark" ? t("common.theme.toggleToLight") : t("common.theme.toggleToDark")}
+						onClick={() => setThemePreference(theme === "dark" ? "light" : "dark")}
+					>
+						{theme === "dark" ? <Sun /> : <Moon />}
+					</Button>
 
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
-							<Button variant="ghost" size="icon-sm" aria-label="切换主题">
-								{theme === "dark" ? <Moon /> : theme === "light" ? <Sun /> : <Monitor />}
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label={t("common.language")}
+								title={t("common.language")}
+							>
+								<Languages />
 							</Button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">
-							<DropdownMenuLabel>外观</DropdownMenuLabel>
-							<DropdownMenuItem onClick={() => setThemePreference("dark")}>
-								<Moon /> 暗色
-							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => setThemePreference("light")}>
-								<Sun /> 亮色
-							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => setThemePreference("system")}>
-								<Monitor /> 跟随系统
-							</DropdownMenuItem>
+							<DropdownMenuLabel>{t("common.language")}</DropdownMenuLabel>
+							{(["zh-CN", "en"] as const).map((locale) => (
+								<DropdownMenuItem
+									key={locale}
+									onClick={() => void changeLocale(locale)}
+									aria-current={getLocale() === locale ? "true" : undefined}
+								>
+									{locale === "zh-CN" ? "简体中文" : "English"}
+								</DropdownMenuItem>
+							))}
 						</DropdownMenuContent>
 					</DropdownMenu>
 
@@ -179,41 +248,41 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 								{scope === "user" ? (
 									<UserAvatar name={identity} avatar={me?.avatar ?? null} size="sm" />
 								) : (
-									<span className="flex size-6 items-center justify-center rounded-md bg-muted text-[10px] font-semibold">
+									<span className="flex size-6 items-center justify-center rounded-full bg-muted text-[10px] font-semibold">
 										ADM
 									</span>
 								)}
 								<span className="hidden max-w-32 truncate text-sm sm:inline">{identity}</span>
-								<ChevronsUpDown className="size-3.5 text-muted-foreground" />
+								<ChevronsUpDown className="size-3.5 text-muted-foreground" aria-hidden="true" />
 							</Button>
 						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end" className="w-52">
+						<DropdownMenuContent align="end" className="w-56">
 							<DropdownMenuLabel className="truncate">
 								{scope === "admin"
 									? adminToken
-										? "管理员"
-										: "未登录"
-									: (me?.username ?? "未登录")}
+										? t("shell.adminLabel")
+										: t("shell.notSignedIn")
+									: (me?.username ?? t("shell.notSignedIn"))}
 							</DropdownMenuLabel>
 							<DropdownMenuSeparator />
 							{scope === "user" ? (
 								<DropdownMenuItem onClick={() => void navigate("/profile")}>
-									<UserCircle /> 我的资料
+									<UserCircle /> {t("nav.items.profile")}
 								</DropdownMenuItem>
 							) : (
 								<DropdownMenuItem onClick={() => void navigate("/")}>
-									<UserCircle /> 前往选手端
+									<UserCircle /> {t("shell.goPlayer")}
 								</DropdownMenuItem>
 							)}
 							<DropdownMenuSeparator />
 							<DropdownMenuItem variant="destructive" onClick={logout}>
-								<LogOut /> 退出登录
+								<LogOut /> {t("common.logout")}
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
 				</header>
 
-				<main className="min-w-0 flex-1 pb-16 md:pb-0">
+				<main id="main-content" tabIndex={-1} className="min-w-0 flex-1 pb-16 md:pb-0 outline-none">
 					<Outlet />
 				</main>
 			</SidebarInset>
@@ -222,20 +291,21 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 			<nav className="fixed inset-x-0 bottom-0 z-30 flex border-t bg-background/95 backdrop-blur md:hidden">
 				{mobileNav.map((item) => {
 					const Icon = item.icon;
-					const active = isActivePath(location.pathname, item);
+					const itemActive = isActivePath(location.pathname, item);
 					return (
 						<NavLink
 							key={item.to}
 							to={item.to}
 							end={item.end}
 							reloadDocument={item.reloadDocument}
+							aria-current={itemActive ? "page" : undefined}
 							className={cn(
 								"flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px]",
-								active ? "text-foreground" : "text-muted-foreground",
+								itemActive ? "text-foreground" : "text-muted-foreground",
 							)}
 						>
-							<Icon className="size-4" />
-							{item.label}
+							<Icon className="size-4" aria-hidden="true" />
+							{t(item.labelKey)}
 						</NavLink>
 					);
 				})}
@@ -247,25 +317,11 @@ export function AppShell({ brand, brandSubtitle, navGroups, mobileNav, scope }: 
 /** 选手端外壳。 */
 export function PlayerShell() {
 	return (
-		<AppShell
-			brand="FloatCTF"
-			brandSubtitle="Field · 选手工作区"
-			navGroups={playerNavGroups}
-			mobileNav={playerMobileNav}
-			scope="user"
-		/>
+		<AppShell navGroups={playerNavGroups} mobileNav={playerMobileNav} scope="user" />
 	);
 }
 
 /** 管理端外壳。 */
 export function AdminShell() {
-	return (
-		<AppShell
-			brand="FloatCTF"
-			brandSubtitle="Control Room · 运维控制台"
-			navGroups={adminNavGroups}
-			mobileNav={adminMobileNav}
-			scope="admin"
-		/>
-	);
+	return <AppShell navGroups={adminNavGroups} mobileNav={adminMobileNav} scope="admin" />;
 }

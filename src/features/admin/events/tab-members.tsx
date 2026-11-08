@@ -3,13 +3,16 @@
  *
  * `fetch` / `delete` 是柯里化方法（`fetch(eventId)({page,limit})`、`delete(eventId)(id_list)`）；
  * `banned` / `unbanned` 是普通方法。`add` 运行时返回 AxiosResponse —— 用 `call` 助手解包即可。
+ *
+ * 文案全部走 `adminEvents.members` 命名空间。
  */
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, MoreHorizontal, Plus, ShieldCheck, Trash2, UserMinus } from "lucide-react";
 
-import { call, callList } from "~/api/call";
+import { call, callList, callVoid } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { BooleanPill } from "~/components/app/badges";
@@ -17,7 +20,7 @@ import { useConfirm } from "~/components/app/confirm";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import { Field, FormFooter, FormSheet } from "~/components/app/form";
 import { MonoText, SectionCard, Toolbar } from "~/components/app/page";
-import { EmptyBlock, InlineError, TableSkeleton } from "~/components/app/states";
+import { EmptyBlock, ErrorBlock, TableSkeleton } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { UserCell } from "~/components/app/user-cell";
 import { Button } from "~/components/ui/button";
@@ -48,6 +51,7 @@ export function EventMembersTab({
 	eventId: string;
 	participantMode: string;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -73,60 +77,63 @@ export function EventMembersTab({
 	const ban = useMutation({
 		mutationFn: async (userIds: string[]) => {
 			for (const userId of userIds) {
-				await call(
+				await callVoid(
 					client.admin.event_users.banned({ event_id: eventId, user_id: userId }),
-					"封禁成员",
+					t("adminEvents.actions.banMember"),
 				);
 			}
 		},
 		onSuccess: (_result, userIds) => {
-			toast.success(`已封禁 ${userIds.length} 名成员`);
+			toast.success(t("adminEvents.members.toast.banSuccess", { count: userIds.length }));
 			setSelectedIds([]);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("封禁失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.members.toast.banFailed"), error),
 	});
 
 	const unban = useMutation({
 		mutationFn: async (userIds: string[]) => {
 			for (const userId of userIds) {
-				await call(
+				await callVoid(
 					client.admin.event_users.unbanned({ event_id: eventId, user_id: userId }),
-					"解除封禁",
+					t("adminEvents.actions.unbanMember"),
 				);
 			}
 		},
 		onSuccess: (_result, userIds) => {
-			toast.success(`已解除 ${userIds.length} 名成员的封禁`);
+			toast.success(t("adminEvents.members.toast.unbanSuccess", { count: userIds.length }));
 			setSelectedIds([]);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("解除封禁失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.members.toast.unbanFailed"), error),
 	});
 
 	const remove = useMutation({
 		mutationFn: (ids: string[]) =>
-			call<number>(client.admin.event_users.delete(eventId)(ids), "移出赛事"),
+			call<number>(
+				client.admin.event_users.delete(eventId)(ids),
+				t("adminEvents.actions.removeMember"),
+			),
 		onSuccess: (count) => {
-			toast.success(`已将 ${count} 名成员移出赛事`);
+			toast.success(t("adminEvents.members.toast.removeSuccess", { count }));
 			setSelectedIds([]);
 			invalidate();
 		},
-		onError: (error) => toast.apiError("移出成员失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.members.toast.removeFailed"), error),
 	});
 
 	async function confirmBan(row: EventUserResult) {
 		const name = displayName(row.user);
 		const ok = await confirm({
-			title: `封禁「${name}」？`,
-			description: "封禁在本赛事范围内生效，不影响该账号在其他赛事的使用。",
+			title: t("adminEvents.members.confirmBan.title", { name }),
+			description: t("adminEvents.members.confirmBan.description"),
 			consequences: [
-				"该选手在本赛事提交 flag 会被后端拒绝（User is banned from this event）",
-				"该选手从赛事积分榜中移除（后端按 event_users.banned = false 过滤）",
-				"账号本身、参赛记录与已提交的解题记录不会被删除；可随时「解除封禁」恢复",
+				t("adminEvents.members.confirmBan.consequence1"),
+				t("adminEvents.members.confirmBan.consequence2"),
+				t("adminEvents.members.confirmBan.consequence3"),
 			],
 			tone: "danger",
-			confirmText: "封禁",
+			confirmText: t("adminEvents.members.confirmBan.confirm"),
 			confirmPhrase: row.user.username,
 		});
 		if (!ok) return;
@@ -137,15 +144,19 @@ export function EventMembersTab({
 		if (rows.length === 0) return;
 		const single = rows.length === 1 ? rows[0] : null;
 		const ok = await confirm({
-			title: single ? `将「${displayName(single.user)}」移出赛事？` : `将所选 ${rows.length} 名成员移出赛事？`,
-			description: "移除的是赛事参赛记录（event_users），不是平台账号。",
+			title: single
+				? t("adminEvents.members.confirmRemove.singleTitle", {
+						name: displayName(single.user),
+					})
+				: t("adminEvents.members.confirmRemove.bulkTitle", { count: rows.length }),
+			description: t("adminEvents.members.confirmRemove.description"),
 			consequences: [
-				"该选手在本赛事的参赛记录被删除，赛事积分榜不再显示该选手（积分榜以 event_users 为准）",
-				"平台账号与其解题记录不会被删除",
-				"如需重新参赛需再次添加；重新加入后此前的积分不会自动恢复显示",
+				t("adminEvents.members.confirmRemove.consequence1"),
+				t("adminEvents.members.confirmRemove.consequence2"),
+				t("adminEvents.members.confirmRemove.consequence3"),
 			],
 			tone: "danger",
-			confirmText: "移出",
+			confirmText: t("adminEvents.members.confirmRemove.confirm"),
 		});
 		if (!ok) return;
 		remove.mutate(rows.map((row) => row.user.id));
@@ -154,7 +165,7 @@ export function EventMembersTab({
 	const columns: DataTableColumn<EventUserResult>[] = [
 		{
 			id: "user",
-			header: "选手",
+			header: t("adminEvents.members.columns.user"),
 			cell: (row) => (
 				<UserCell
 					username={row.user.username}
@@ -166,19 +177,19 @@ export function EventMembersTab({
 		},
 		{
 			id: "points",
-			header: "赛事积分",
+			header: t("adminEvents.members.columns.points"),
 			align: "right",
 			cell: (row) => <MonoText>{row.event_user.points.toFixed(2)}</MonoText>,
 			sortValue: (row) => row.event_user.points,
 		},
 		{
 			id: "banned",
-			header: "状态",
+			header: t("adminEvents.members.columns.status"),
 			cell: (row) => (
 				<BooleanPill
 					value={row.event_user.banned}
-					trueText="已封禁"
-					falseText="正常"
+					trueText={t("adminEvents.members.values.banned")}
+					falseText={t("adminEvents.members.values.normal")}
 					trueTone="danger"
 					falseTone="success"
 				/>
@@ -187,84 +198,97 @@ export function EventMembersTab({
 		},
 		{
 			id: "joined_at",
-			header: "加入时间",
-			cell: (row) => <MonoText>{formatDateTime(row.event_user.joined_at, { seconds: true })}</MonoText>,
+			header: t("adminEvents.members.columns.joinedAt"),
+			cell: (row) => <MonoText className="whitespace-nowrap">
+				{formatDateTime(row.event_user.joined_at, { seconds: true })}
+			</MonoText>,
 			sortValue: (row) => row.event_user.joined_at,
 			hideBelow: "md",
 		},
 	];
 
-	const rowActions = (row: EventUserResult): ReactNode => (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" size="icon-sm" aria-label={`${displayName(row.user)} 的操作`}>
-					<MoreHorizontal />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end">
-				<DropdownMenuLabel className="max-w-56 truncate">{displayName(row.user)}</DropdownMenuLabel>
-				{row.event_user.banned ? (
-					<DropdownMenuItem onSelect={() => unban.mutate([row.user.id])}>
-						<ShieldCheck /> 解除封禁
-					</DropdownMenuItem>
-				) : (
-					<DropdownMenuItem variant="destructive" onSelect={() => void confirmBan(row)}>
-						<Ban /> 封禁
-					</DropdownMenuItem>
-				)}
-				<DropdownMenuSeparator />
-				{participantMode === "team" ? (
-					<DropdownMenuItem disabled>
-						<UserMinus /> 战队赛请通过「战队」标签管理成员
-					</DropdownMenuItem>
-				) : (
-					<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove([row])}>
-						<UserMinus /> 移出赛事
-					</DropdownMenuItem>
-				)}
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
+	const rowActions = (row: EventUserResult): ReactNode => {
+		const actionsLabel = t("adminEvents.members.row.actions", { name: displayName(row.user) });
+		return (
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button variant="ghost" size="icon-sm" aria-label={actionsLabel} title={actionsLabel}>
+						<MoreHorizontal />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuLabel className="max-w-56 truncate">
+						{displayName(row.user)}
+					</DropdownMenuLabel>
+					{row.event_user.banned ? (
+						<DropdownMenuItem onSelect={() => unban.mutate([row.user.id])}>
+							<ShieldCheck /> {t("adminEvents.members.row.unban")}
+						</DropdownMenuItem>
+					) : (
+						<DropdownMenuItem variant="destructive" onSelect={() => void confirmBan(row)}>
+							<Ban /> {t("adminEvents.members.row.ban")}
+						</DropdownMenuItem>
+					)}
+					<DropdownMenuSeparator />
+					{participantMode === "team" ? (
+						<DropdownMenuItem disabled>
+							<UserMinus /> {t("adminEvents.members.row.teamManaged")}
+						</DropdownMenuItem>
+					) : (
+						<DropdownMenuItem variant="destructive" onSelect={() => void confirmRemove([row])}>
+							<UserMinus /> {t("adminEvents.members.row.remove")}
+						</DropdownMenuItem>
+					)}
+				</DropdownMenuContent>
+			</DropdownMenu>
+		);
+	};
 
 	const mobileCard = (row: EventUserResult): ReactNode => (
-		<MobileFacts
-			items={[
-				{
-					k: "选手",
-					v: (
-						<UserCell
-							username={row.user.username}
-							nickname={row.user.nickname}
-							avatar={row.user.avatar}
-						/>
-					),
-				},
-				{ k: "积分", v: <MonoText>{row.event_user.points.toFixed(2)}</MonoText> },
-				{
-					k: "状态",
-					v: (
-						<BooleanPill
-							value={row.event_user.banned}
-							trueText="已封禁"
-							falseText="正常"
-							trueTone="danger"
-							falseTone="success"
-						/>
-					),
-				},
-			]}
-		/>
+		<div className="space-y-2">
+			<MobileFacts
+				items={[
+					{
+						k: t("adminEvents.members.mobile.user"),
+						v: (
+							<UserCell
+								username={row.user.username}
+								nickname={row.user.nickname}
+								avatar={row.user.avatar}
+							/>
+						),
+					},
+					{
+						k: t("adminEvents.members.mobile.points"),
+						v: <MonoText>{row.event_user.points.toFixed(2)}</MonoText>,
+					},
+					{
+						k: t("adminEvents.members.mobile.status"),
+						v: (
+							<BooleanPill
+								value={row.event_user.banned}
+								trueText={t("adminEvents.members.values.banned")}
+								falseText={t("adminEvents.members.values.normal")}
+								trueTone="danger"
+								falseTone="success"
+							/>
+						),
+					},
+				]}
+			/>
+			<div className="flex justify-end">{rowActions(row)}</div>
+		</div>
 	);
 
 	const selectedRows = (query.data?.items ?? []).filter((item) => selectedIds.includes(item.user.id));
 
 	return (
 		<SectionCard
-			title="赛事成员"
+			title={t("adminEvents.members.title")}
 			description={
 				participantMode === "team"
-					? "战队赛：这里是赛事的参赛账号池；成员的战队归属请在「战队」标签查看。"
-					: "个人赛：这里的成员即赛事参赛者，可在此封禁 / 移出。"
+					? t("adminEvents.members.descriptionTeam")
+					: t("adminEvents.members.descriptionIndividual")
 			}
 			actions={
 				<Toolbar>
@@ -276,7 +300,7 @@ export function EventMembersTab({
 								disabled={unban.isPending}
 								onClick={() => unban.mutate(selectedRows.map((row) => row.user.id))}
 							>
-								<ShieldCheck /> 解除封禁
+								<ShieldCheck /> {t("adminEvents.members.toolbar.unban")}
 							</Button>
 							<Button
 								variant="destructive"
@@ -286,23 +310,25 @@ export function EventMembersTab({
 									// 批量封禁沿用单条确认词（逐条输入用户名）不可行，这里统一确认一次。
 									void (async () => {
 										const ok = await confirm({
-											title: `封禁所选 ${selectedRows.length} 名成员？`,
-											description: "封禁在本赛事范围内生效。",
+											title: t("adminEvents.members.confirmBulkBan.title", {
+												count: selectedRows.length,
+											}),
+											description: t("adminEvents.members.confirmBulkBan.description"),
 											consequences: [
-												"这些选手在本赛事提交 flag 会被后端拒绝",
-												"他们会从赛事积分榜中移除（后端按 banned=false 过滤）",
-												"账号与解题记录保留，可随时解除封禁",
+												t("adminEvents.members.confirmBulkBan.consequence1"),
+												t("adminEvents.members.confirmBulkBan.consequence2"),
+												t("adminEvents.members.confirmBulkBan.consequence3"),
 											],
 											tone: "danger",
-											confirmText: "全部封禁",
-											confirmPhrase: "ban",
+											confirmText: t("adminEvents.members.confirmBulkBan.confirm"),
+											confirmPhrase: t("adminEvents.members.confirmBulkBan.phrase"),
 										});
 										if (!ok) return;
 										ban.mutate(selectedRows.map((row) => row.user.id));
 									})();
 								}}
 							>
-								<Ban /> 封禁所选
+								<Ban /> {t("adminEvents.members.toolbar.banSelected")}
 							</Button>
 							{participantMode === "team" ? null : (
 								<Button
@@ -311,13 +337,13 @@ export function EventMembersTab({
 									disabled={remove.isPending}
 									onClick={() => void confirmRemove(selectedRows)}
 								>
-									<Trash2 /> 移出所选
+									<Trash2 /> {t("adminEvents.members.toolbar.removeSelected")}
 								</Button>
 							)}
 						</>
 					) : null}
 					<Button size="sm" onClick={() => setAddOpen(true)}>
-						<Plus /> 添加成员
+						<Plus /> {t("adminEvents.members.addButton")}
 					</Button>
 				</Toolbar>
 			}
@@ -338,14 +364,14 @@ export function EventMembersTab({
 				selectedIds={selectedIds}
 				onSelectionChange={setSelectedIds}
 				mobileCard={mobileCard}
-				errorTitle="加载赛事成员失败"
+				errorTitle={t("adminEvents.members.loadError")}
 				empty={
 					<EmptyBlock
-						title="赛事还没有成员"
-						description="点「添加成员」从平台账号里勾选参赛者。"
+						title={t("adminEvents.members.empty.title")}
+						description={t("adminEvents.members.empty.description")}
 						action={
 							<Button size="sm" onClick={() => setAddOpen(true)}>
-								<Plus /> 添加成员
+								<Plus /> {t("adminEvents.members.addButton")}
 							</Button>
 						}
 					/>
@@ -377,6 +403,7 @@ function AddMembersSheet({
 	onClose: () => void;
 	onDone: () => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const [search, setSearch] = useState("");
 	const [page, setPage] = useState(1);
@@ -386,7 +413,8 @@ function AddMembersSheet({
 
 	const filter = useMemo(() => {
 		const cleaned = keyword.replace(/[&|]/g, " ").trim();
-		return cleaned === "" ? undefined : `nickname:${cleaned}`;
+		// 后端 users 列表支持多个 OR 条件：按昵称或账号搜索，否则输入学号/用户名时搜不到人。
+		return cleaned === "" ? undefined : `nickname:${cleaned} | username:${cleaned}`;
 	}, [keyword]);
 
 	const query = useQuery({
@@ -394,33 +422,58 @@ function AddMembersSheet({
 		queryFn: () => callList<Users>(client.admin.users.fetch({ page, limit: pageSize, filter })),
 	});
 
+	// 「已在赛事」必须按全量成员判断，而不是只看当前页；否则跨页选择已参赛账号，
+	// 提交后会被后端以重复成员拒绝。
+	const membersQuery = useQuery({
+		queryKey: qk.admin.eventUsers(eventId, { page: 1, limit: 1000 }),
+		queryFn: () =>
+			callList<EventUserResult>(
+				client.admin.event_users.fetch(eventId)({ page: 1, limit: 1000 }),
+			),
+	});
+	const attachedIds = useMemo(
+		() => new Set((membersQuery.data?.items ?? []).map((row) => row.user.id)),
+		[membersQuery.data],
+	);
+
 	const add = useMutation({
+		// 后端该接口返回 data:null（UniResponse<null>），必须用 callVoid，不能用 call。
 		mutationFn: () =>
-			call(client.admin.event_users.add({ event_id: eventId, user_id_list: selectedIds }), "添加成员"),
+			callVoid(
+				client.admin.event_users.add({ event_id: eventId, user_id_list: selectedIds }),
+				t("adminEvents.actions.addMember"),
+			),
 		onSuccess: () => {
-			toast.success(`已添加 ${selectedIds.length} 名成员`);
+			toast.success(t("adminEvents.members.add.toast.success", { count: selectedIds.length }));
 			onDone();
 			onClose();
 		},
-		onError: (error) => toast.apiError("添加成员失败", error),
+		onError: (error) => toast.apiError(t("adminEvents.members.add.toast.failed"), error),
 	});
 
 	const columns: DataTableColumn<Users>[] = [
 		{
 			id: "username",
-			header: "用户名",
+			header: t("adminEvents.members.add.table.username"),
 			cell: (row) => <MonoText>{row.username}</MonoText>,
 			sortValue: (row) => row.username,
 		},
-		{ id: "nickname", header: "昵称", cell: (row) => row.nickname, sortValue: (row) => row.nickname },
+		{
+			id: "nickname",
+			header: t("adminEvents.members.add.table.nickname"),
+			cell: (row) => row.nickname,
+			sortValue: (row) => row.nickname,
+		},
 		{
 			id: "created_at",
-			header: "注册时间",
+			header: t("adminEvents.members.add.table.createdAt"),
 			cell: (row) => <MonoText>{formatDateTime(row.created_at)}</MonoText>,
 			sortValue: (row) => row.created_at,
 			hideBelow: "md",
 		},
 	];
+
+	const total = query.data?.meta?.total ?? query.data?.items.length ?? 0;
 
 	return (
 		<FormSheet
@@ -429,17 +482,24 @@ function AddMembersSheet({
 				if (!next) onClose();
 			}}
 			width="lg"
-			title="添加赛事成员"
-			description={
+			title={t("adminEvents.members.add.title")}
+			description={[
 				participantMode === "team"
-					? "战队赛：这里只把账号加入赛事参赛池，不会自动加入任何战队（战队归属由队长 / 平台管理）。"
-					: "从平台账号中勾选参赛者；重复添加会被后端拒绝。"
-			}
+					? t("adminEvents.members.add.descriptionTeam")
+					: t("adminEvents.members.add.descriptionIndividual"),
+				t("adminEvents.members.add.alreadyMemberHint"),
+			].join(" ")}
 			footer={
 				<FormFooter
 					formId="add-members-form"
 					onCancel={onClose}
-					submitLabel={`添加${selectedIds.length > 0 ? `（${selectedIds.length}）` : ""}`}
+					submitLabel={
+						selectedIds.length > 0
+							? t("adminEvents.members.add.submitWithCount", {
+									count: selectedIds.length,
+								})
+							: t("adminEvents.members.add.submit")
+					}
 					isPending={add.isPending}
 					disabled={selectedIds.length === 0}
 				/>
@@ -454,7 +514,11 @@ function AddMembersSheet({
 					add.mutate();
 				}}
 			>
-				<Field label="搜索账号" htmlFor="member-search" hint="按昵称过滤">
+				<Field
+					label={t("adminEvents.members.add.searchLabel")}
+					htmlFor="member-search"
+					hint={t("adminEvents.members.add.searchHint")}
+				>
 					<Input
 						id="member-search"
 						value={search}
@@ -462,14 +526,18 @@ function AddMembersSheet({
 							setSearch(changeEvent.target.value);
 							setPage(1);
 						}}
-						placeholder="昵称关键字…"
+						placeholder={t("adminEvents.members.add.searchPlaceholder")}
 					/>
 				</Field>
 
 				{query.isPending ? (
 					<TableSkeleton rows={6} columns={3} />
 				) : query.isError ? (
-					<InlineError error={query.error} />
+					<ErrorBlock
+						error={query.error}
+						title={t("adminEvents.members.loadError")}
+						onRetry={() => void query.refetch()}
+					/>
 				) : (
 					<>
 						<DataTable
@@ -477,21 +545,38 @@ function AddMembersSheet({
 							columns={columns}
 							getRowId={(row) => row.id}
 							selectable
+							isRowSelectable={(row) =>
+								!membersQuery.isPending && !attachedIds.has(row.id)
+							}
 							selectedIds={selectedIds}
 							onSelectionChange={setSelectedIds}
+							empty={
+								<EmptyBlock
+									title={t("adminEvents.members.add.emptyTitle")}
+									description={t("adminEvents.members.add.emptyDescription")}
+								/>
+							}
 							mobileCard={(row) => (
 								<MobileFacts
 									items={[
-										{ k: "用户名", v: <MonoText>{row.username}</MonoText> },
-										{ k: "昵称", v: row.nickname },
+										{
+											k: t("adminEvents.members.add.mobile.username"),
+											v: <MonoText>{row.username}</MonoText>,
+										},
+										{
+											k: t("adminEvents.members.add.mobile.nickname"),
+											v: row.nickname,
+										},
 									]}
 								/>
 							)}
 						/>
 						<div className="flex flex-wrap items-center justify-between gap-2">
 							<p className="tnum text-xs text-muted-foreground">
-								共 {query.data?.meta?.total ?? query.data?.items.length ?? 0} 个账号 · 本页已选{" "}
-								{selectedIds.length} 个
+								{t("adminEvents.members.add.selectedSummary", {
+									total,
+									selected: selectedIds.length,
+								})}
 							</p>
 							<div className="flex items-center gap-2">
 								<Button
@@ -501,20 +586,19 @@ function AddMembersSheet({
 									disabled={page <= 1}
 									onClick={() => setPage((current) => Math.max(1, current - 1))}
 								>
-									上一页
+									{t("common.table.prevPage")}
 								</Button>
-								<span className="tnum text-xs text-muted-foreground">第 {page} 页</span>
+								<span className="tnum text-xs text-muted-foreground">
+									{t("common.table.page", { page })}
+								</span>
 								<Button
 									type="button"
 									variant="outline"
 									size="sm"
-									disabled={
-										query.data !== undefined &&
-										page * pageSize >= (query.data.meta?.total ?? query.data.items.length)
-									}
+									disabled={query.data !== undefined && page * pageSize >= total}
 									onClick={() => setPage((current) => current + 1)}
 								>
-									下一页
+									{t("common.table.nextPage")}
 								</Button>
 							</div>
 						</div>

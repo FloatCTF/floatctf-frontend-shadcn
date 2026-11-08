@@ -15,7 +15,8 @@
  *   把实体字段声明成 `string`（见报告中的 SDK GAP），因此本页不提供 payload 编辑。
  */
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
 	keepPreviousData,
 	useMutation,
@@ -40,7 +41,7 @@ import { qk } from "~/api/keys";
 import { BooleanPill, TonePill, type PillTone } from "~/components/app/badges";
 import { useConfirm } from "~/components/app/confirm";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
-import { Field, FormFooter, FormGrid, FormSheet } from "~/components/app/form";
+import { Field, FormFooter, FormGrid, FormSheet, LocalTimeHint } from "~/components/app/form";
 import {
 	CopyText,
 	KeyValueList,
@@ -50,6 +51,7 @@ import {
 	PaginationBar,
 	ReadonlyBlock,
 	SectionCard,
+	FilterChips,
 	Toolbar,
 } from "~/components/app/page";
 import {
@@ -102,18 +104,8 @@ const DELETE_PHRASE = "DELETE";
 type Kind = "all" | "service" | "system" | "event";
 type SearchField = "task_name" | "task_key" | "status";
 
-const SEARCH_FIELDS: Array<{ value: SearchField; label: string }> = [
-	{ value: "task_name", label: "任务名称" },
-	{ value: "task_key", label: "任务键" },
-	{ value: "status", label: "状态" },
-];
-
-const KINDS: Array<{ value: Kind; label: string }> = [
-	{ value: "all", label: "全部分组" },
-	{ value: "service", label: "ServiceTasks（管理员自建）" },
-	{ value: "system", label: "SystemTask（平台内置）" },
-	{ value: "event", label: "EventTasks（赛事运行时）" },
-];
+const KINDS: Kind[] = ["all", "service", "system", "event"];
+const SEARCH_FIELD_VALUES: SearchField[] = ["task_name", "task_key", "status"];
 
 const TRIGGER_TYPES = ["once", "cron", "startup"] as const;
 
@@ -133,7 +125,8 @@ function statusTone(status: string): PillTone {
 }
 
 export function AdminScheduledTasksPage(): ReactNode {
-	useDocumentTitle("计划任务 · FloatCTF 控制台");
+	const { t } = useTranslation();
+	useDocumentTitle(t("adminPlatform.tasks.documentTitle"));
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
@@ -143,6 +136,52 @@ export function AdminScheduledTasksPage(): ReactNode {
 	const [selected, setSelected] = useState<string[]>([]);
 	const [editing, setEditing] = useState<ScheduledTasks | null | undefined>(undefined);
 	const [openTask, setOpenTask] = useState<ScheduledTasks | null>(null);
+
+	function statusLabel(status: string): string {
+		switch (status) {
+			case "pending":
+				return t("adminPlatform.tasks.status.pending");
+			case "running":
+				return t("adminPlatform.tasks.status.running");
+			case "completed":
+				return t("adminPlatform.tasks.status.completed");
+			case "failed":
+				return t("adminPlatform.tasks.status.failed");
+			default:
+				return status;
+		}
+	}
+
+	function triggerLabel(trigger: string): string {
+		switch (trigger) {
+			case "once":
+				return t("adminPlatform.tasks.trigger.once");
+			case "cron":
+				return t("adminPlatform.tasks.trigger.cron");
+			case "startup":
+				return t("adminPlatform.tasks.trigger.startup");
+			default:
+				return trigger;
+		}
+	}
+
+	const searchFields = useMemo(
+		() =>
+			SEARCH_FIELD_VALUES.map((value) => ({
+				value,
+				label: t(`adminPlatform.tasks.filters.fields.${value}`),
+			})),
+		[t],
+	);
+
+	const kindOptions = useMemo(
+		() =>
+			KINDS.map((value) => ({
+				value,
+				label: t(`adminPlatform.tasks.filters.kinds.${value}`),
+			})),
+		[t],
+	);
 
 	const searchValue = sanitizeFilterValue(list.filter);
 	const conditions: string[] = [];
@@ -172,39 +211,53 @@ export function AdminScheduledTasksPage(): ReactNode {
 
 	const runMutation = useMutation({
 		mutationFn: (task: ScheduledTasks) =>
-			call(client.admin.scheduled_tasks.run(task.id), "手动执行任务"),
+			call(client.admin.scheduled_tasks.run(task.id), t("adminPlatform.tasks.requests.run")),
 		onSuccess: (task) => {
 			toast.success(
-				`任务「${task.task_name}」已入队`,
-				`状态 ${task.status}；调度器会在毫秒级拉起执行，稍后刷新查看结果。`,
+				t("adminPlatform.tasks.run.toastTitle", { name: task.task_name }),
+				t("adminPlatform.tasks.run.toastDescription", {
+					status: statusLabel(task.status),
+				}),
 			);
 			void queryClient.invalidateQueries({ queryKey: qk.admin.scheduledTasks() });
 		},
-		onError: (error) => toast.apiError("手动执行失败", error),
+		onError: (error) => toast.apiError(t("adminPlatform.tasks.run.toastFailed"), error),
 	});
 
 	const removeMutation = useMutation({
 		mutationFn: (ids: string[]) =>
-			callVoid(client.admin.scheduled_tasks.remove(ids), "删除计划任务"),
+			callVoid(
+				client.admin.scheduled_tasks.remove(ids),
+				t("adminPlatform.tasks.requests.delete"),
+			),
 		onSuccess: (_data, ids) => {
-			toast.success(`已删除 ${ids.length} 条计划任务`);
+			toast.success(t("adminPlatform.tasks.remove.toastSuccess", { count: ids.length }));
 			setSelected([]);
 			void queryClient.invalidateQueries({ queryKey: qk.admin.scheduledTasks() });
 		},
-		onError: (error) => toast.apiError("删除计划任务失败", error),
+		onError: (error) => toast.apiError(t("adminPlatform.tasks.remove.toastFailed"), error),
 	});
 
 	async function runTask(task: ScheduledTasks) {
 		const ok = await confirm({
-			title: `立即执行「${task.task_name}」？`,
-			description: `任务键 ${task.task_key} · 触发方式 ${task.trigger_type}`,
+			title: t("adminPlatform.tasks.run.title", { name: task.task_name }),
+			description: (
+				<span className="flex flex-wrap items-center gap-1.5">
+					<span>{t("adminPlatform.tasks.detail.taskKey")}</span>
+					<MonoText>{task.task_key}</MonoText>
+					<span>·</span>
+					<span>{t("adminPlatform.tasks.detail.trigger")}</span>
+					<MonoText>{task.trigger_type}</MonoText>
+				</span>
+			),
 			consequences: [
-				"调度器会立即拉起该任务（status 置为 pending、execute_at 置为当前时间）",
-				"任务会真实修改平台数据 / 调用宿主 helper，其副作用与定时触发完全一致",
-				"重复点击会重复入队；请先确认任务当前没有正在执行",
+				t("adminPlatform.tasks.run.consequence1"),
+				t("adminPlatform.tasks.run.consequence2"),
+				t("adminPlatform.tasks.run.consequence3"),
 			],
 			tone: "danger",
-			confirmText: "入队执行",
+			confirmText: t("adminPlatform.tasks.run.confirmText"),
+			confirmPhrase: task.task_key,
 		});
 		if (!ok) return;
 		runMutation.mutate(task);
@@ -215,24 +268,32 @@ export function AdminScheduledTasksPage(): ReactNode {
 		const blocked = rows.filter((row) => row.protected);
 		if (blocked.length > 0) {
 			toast.warning(
-				"受保护任务无法删除",
-				`已跳过：${blocked.map((row) => row.task_name).join("、")}（后端会拒绝删除 protected 任务）`,
+				t("adminPlatform.tasks.remove.blockedTitle"),
+				t("adminPlatform.tasks.remove.blockedDescription", {
+					names: blocked
+						.map((row) => row.task_name)
+						.join(t("adminPlatform.common.listSeparator")),
+				}),
 			);
 		}
 		if (deletable.length === 0) return;
 		const ok = await confirm({
 			title:
 				deletable.length === 1
-					? `删除任务「${deletable[0].task_name}」？`
-					: `删除 ${deletable.length} 条计划任务？`,
-			description: deletable.map((row) => row.task_name).join("、"),
+					? t("adminPlatform.tasks.remove.titleOne", {
+							name: deletable[0].task_name,
+						})
+					: t("adminPlatform.tasks.remove.titleMany", { count: deletable.length }),
+			description: deletable
+				.map((row) => row.task_name)
+				.join(t("adminPlatform.common.listSeparator")),
 			consequences: [
-				"任务不再被调度：正在等待的 execute_at / cron 触发会失效",
-				"若任务已被其它业务引用，相关自动化流程会静默停止",
-				"删除后不可恢复（需要重新创建并填回任务键与触发参数）",
+				t("adminPlatform.tasks.remove.consequence1"),
+				t("adminPlatform.tasks.remove.consequence2"),
+				t("adminPlatform.tasks.remove.consequence3"),
 			],
 			tone: "danger",
-			confirmText: "永久删除",
+			confirmText: t("adminPlatform.tasks.remove.confirmText"),
 			confirmPhrase: DELETE_PHRASE,
 		});
 		if (!ok) return;
@@ -242,38 +303,48 @@ export function AdminScheduledTasksPage(): ReactNode {
 	const columns: DataTableColumn<ScheduledTasks>[] = [
 		{
 			id: "task_name",
-			header: "任务名称",
+			header: t("adminPlatform.tasks.columns.name"),
 			sortValue: (row) => row.task_name,
 			cell: (row) => (
 				<span className="inline-flex items-center gap-1.5">
 					<span className="font-medium">{row.task_name}</span>
-					{row.protected ? <TonePill tone="muted">受保护</TonePill> : null}
+					{row.protected ? (
+						<TonePill tone="muted">{t("adminPlatform.tasks.pills.protected")}</TonePill>
+					) : null}
 				</span>
 			),
 		},
 		{
 			id: "task_key",
-			header: "任务键",
+			header: t("adminPlatform.tasks.columns.key"),
 			hideBelow: "sm",
 			sortValue: (row) => row.task_key,
 			cell: (row) => <MonoText>{row.task_key}</MonoText>,
 		},
 		{
 			id: "trigger_type",
-			header: "触发",
+			header: t("adminPlatform.tasks.columns.trigger"),
 			hideBelow: "md",
 			sortValue: (row) => row.trigger_type,
-			cell: (row) => <TonePill tone="neutral">{row.trigger_type}</TonePill>,
+			cell: (row) => (
+				<TonePill tone="neutral" title={row.trigger_type}>
+					{triggerLabel(row.trigger_type)}
+				</TonePill>
+			),
 		},
 		{
 			id: "status",
-			header: "状态",
+			header: t("adminPlatform.tasks.columns.status"),
 			sortValue: (row) => row.status,
-			cell: (row) => <TonePill tone={statusTone(row.status)}>{row.status}</TonePill>,
+			cell: (row) => (
+				<TonePill tone={statusTone(row.status)} title={row.status}>
+					{statusLabel(row.status)}
+				</TonePill>
+			),
 		},
 		{
 			id: "schedule",
-			header: "计划",
+			header: t("adminPlatform.tasks.columns.schedule"),
 			hideBelow: "lg",
 			cell: (row) =>
 				row.cron_expr ? (
@@ -286,13 +357,19 @@ export function AdminScheduledTasksPage(): ReactNode {
 		},
 		{
 			id: "enabled",
-			header: "启用",
+			header: t("adminPlatform.tasks.columns.enabled"),
 			hideBelow: "md",
-			cell: (row) => <BooleanPill value={row.enabled} trueText="启用" falseText="停用" />,
+			cell: (row) => (
+				<BooleanPill
+					value={row.enabled}
+					trueText={t("adminPlatform.common.enabled")}
+					falseText={t("adminPlatform.common.disabled")}
+				/>
+			),
 		},
 		{
 			id: "last_run_at",
-			header: "上次执行",
+			header: t("adminPlatform.tasks.columns.lastRun"),
 			align: "right",
 			hideBelow: "xl",
 			sortValue: (row) => Date.parse(row.last_run_at ?? ""),
@@ -301,7 +378,7 @@ export function AdminScheduledTasksPage(): ReactNode {
 		},
 		{
 			id: "updated_at",
-			header: "更新时间",
+			header: t("adminPlatform.tasks.columns.updatedAt"),
 			align: "right",
 			sortValue: (row) => Date.parse(row.updated_at),
 			cell: (row) => <AbsoluteTime value={row.updated_at} />,
@@ -311,8 +388,8 @@ export function AdminScheduledTasksPage(): ReactNode {
 	return (
 		<PageBody>
 			<PageHeader
-				title="计划任务"
-				description="平台定时 / 一次性 / 启动任务"
+				title={t("adminPlatform.tasks.title")}
+				description={t("adminPlatform.tasks.description")}
 				actions={
 					<Toolbar>
 						<RefreshingBadge active={query.isFetching && !query.isPending} />
@@ -322,43 +399,64 @@ export function AdminScheduledTasksPage(): ReactNode {
 							onClick={() => void query.refetch()}
 							disabled={query.isFetching}
 						>
-							<RefreshCw />
-							刷新
+							<RefreshCw aria-hidden="true" />
+							{t("adminPlatform.common.refresh")}
 						</Button>
 						<Button size="sm" onClick={() => setEditing(null)}>
-							<Plus />
-							新建任务
+							<Plus aria-hidden="true" />
+							{t("adminPlatform.tasks.create")}
 						</Button>
 					</Toolbar>
 				}
 			/>
 
 			<SectionCard
-				title="任务列表"
-				description="搜索与分组条件会同时下发给后端"
+				title={t("adminPlatform.tasks.section.title")}
+				description={t("adminPlatform.tasks.section.description")}
 				actions={
 					<div className="flex flex-wrap items-center gap-2">
 						<Select value={kind} onValueChange={(value) => setKind(value as Kind)}>
-							<SelectTrigger size="sm" className="w-[190px]" aria-label="任务分组">
+							<SelectTrigger
+								size="sm"
+								className="w-48"
+								aria-label={t("adminPlatform.tasks.filters.groupAria")}
+							>
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								{KINDS.map((item) => (
+								{kindOptions.map((item) => (
 									<SelectItem key={item.value} value={item.value}>
 										{item.label}
 									</SelectItem>
 								))}
 							</SelectContent>
 						</Select>
+						<FilterChips
+							filters={
+								kind === "all"
+									? []
+									: [
+											{
+												key: "kind",
+												label: t(`adminPlatform.tasks.filters.kinds.${kind}`),
+												onRemove: () => setKind("all"),
+											},
+										]
+							}
+						/>
 						<Select
 							value={field}
 							onValueChange={(value) => setField(value as SearchField)}
 						>
-							<SelectTrigger size="sm" className="w-[132px]" aria-label="搜索字段">
+							<SelectTrigger
+								size="sm"
+								className="w-32"
+								aria-label={t("adminPlatform.tasks.filters.fieldAria")}
+							>
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								{SEARCH_FIELDS.map((item) => (
+								{searchFields.map((item) => (
 									<SelectItem key={item.value} value={item.value}>
 										{item.label}
 									</SelectItem>
@@ -368,15 +466,20 @@ export function AdminScheduledTasksPage(): ReactNode {
 						<SearchInput
 							value={list.search}
 							onChange={list.setSearch}
-							placeholder={`搜索${SEARCH_FIELDS.find((item) => item.value === field)?.label ?? ""}`}
+							placeholder={t("adminPlatform.tasks.filters.searchPlaceholder", {
+								field:
+									searchFields.find((item) => item.value === field)?.label ?? "",
+							})}
 						/>
 						<DeleteSelectedButton
 							count={selected.length}
 							isPending={removeMutation.isPending}
-							label="删除所选任务"
+							label={t("adminPlatform.tasks.deleteSelected")}
 							onClick={() =>
 								void removeRows(
-									(query.data?.items ?? []).filter((row) => selected.includes(row.id)),
+									(query.data?.items ?? []).filter((row) =>
+										selected.includes(row.id),
+									),
 								)
 							}
 						/>
@@ -386,16 +489,20 @@ export function AdminScheduledTasksPage(): ReactNode {
 				<QueryState
 					query={query}
 					skeleton={<TableSkeleton rows={8} columns={6} />}
-					errorTitle="加载计划任务失败"
+					errorTitle={t("adminPlatform.tasks.errors.load")}
 					isEmpty={(result) => result.items.length === 0}
 					empty={
 						<EmptyBlock
 							variant={remoteFilter ? "filtered" : "empty"}
-							title={remoteFilter ? "没有匹配的任务" : "暂无计划任务"}
+							title={
+								remoteFilter
+									? t("adminPlatform.tasks.empty.filteredTitle")
+									: t("adminPlatform.tasks.empty.title")
+							}
 							description={
 								remoteFilter
-									? "试试切换分组或调整搜索条件。"
-									: "平台内置任务由后端补种；管理员也可以新建一次性 / Cron 任务。"
+									? t("adminPlatform.tasks.empty.filteredDescription")
+									: t("adminPlatform.tasks.empty.description")
 							}
 						/>
 					}
@@ -410,50 +517,76 @@ export function AdminScheduledTasksPage(): ReactNode {
 								selectedIds={selected}
 								onSelectionChange={setSelected}
 								onRowClick={(row) => setOpenTask(row)}
-								rowActions={(row) => (
-									<DropdownMenu>
-										<DropdownMenuTrigger asChild>
-											<Button variant="ghost" size="icon-sm" aria-label="任务操作">
-												<MoreHorizontal />
-											</Button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent align="end">
-											<DropdownMenuItem
-												disabled={runMutation.isPending}
-												onSelect={() => void runTask(row)}
-											>
-												<Play />
-												立即执行
-											</DropdownMenuItem>
-											<DropdownMenuItem onSelect={() => setEditing(row)}>
-												<Pencil />
-												编辑
-											</DropdownMenuItem>
-											<DropdownMenuItem onSelect={() => setOpenTask(row)}>
-												<ScrollText />
-												运行详情
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												variant="destructive"
-												disabled={row.protected}
-												onSelect={() => void removeRows([row])}
-											>
-												<Trash2 />
-												{row.protected ? "受保护，不可删除" : "删除"}
-											</DropdownMenuItem>
-										</DropdownMenuContent>
-									</DropdownMenu>
-								)}
+								rowActions={(row) => {
+									const menuLabel = t("adminPlatform.tasks.menu.ariaLabel", {
+										name: row.task_name,
+									});
+									return (
+										<DropdownMenu>
+											<DropdownMenuTrigger asChild>
+												<Button
+													variant="ghost"
+													size="icon-sm"
+													aria-label={menuLabel}
+													title={menuLabel}
+												>
+													<MoreHorizontal aria-hidden="true" />
+												</Button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent align="end">
+												<DropdownMenuItem
+													disabled={runMutation.isPending}
+													onSelect={() => void runTask(row)}
+												>
+													<Play aria-hidden="true" />
+													{t("adminPlatform.tasks.menu.run")}
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													onSelect={() => setEditing(row)}
+												>
+													<Pencil aria-hidden="true" />
+													{t("adminPlatform.tasks.menu.edit")}
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													onSelect={() => setOpenTask(row)}
+												>
+													<ScrollText aria-hidden="true" />
+													{t("adminPlatform.tasks.menu.detail")}
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													variant="destructive"
+													disabled={row.protected}
+													onSelect={() => void removeRows([row])}
+												>
+													<Trash2 aria-hidden="true" />
+													{row.protected
+														? t(
+																"adminPlatform.tasks.menu.protectedDelete",
+															)
+														: t("adminPlatform.tasks.menu.delete")}
+												</DropdownMenuItem>
+											</DropdownMenuContent>
+										</DropdownMenu>
+									);
+								}}
 								mobileCard={(row) => (
 									<div className="space-y-2">
 										<div className="flex items-start justify-between gap-2">
 											<span className="font-medium">{row.task_name}</span>
-											<TonePill tone={statusTone(row.status)}>{row.status}</TonePill>
+											<TonePill tone={statusTone(row.status)} title={row.status}>
+												{statusLabel(row.status)}
+											</TonePill>
 										</div>
 										<p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
 											<MonoText>{row.task_key}</MonoText>
-											<TonePill tone="muted">{row.trigger_type}</TonePill>
-											<BooleanPill value={row.enabled} trueText="启用" falseText="停用" />
+											<TonePill tone="muted" title={row.trigger_type}>
+												{triggerLabel(row.trigger_type)}
+											</TonePill>
+											<BooleanPill
+												value={row.enabled}
+												trueText={t("adminPlatform.common.enabled")}
+												falseText={t("adminPlatform.common.disabled")}
+											/>
 										</p>
 										{row.error_msg || row.last_error ? (
 											<p className="text-xs text-destructive">
@@ -467,12 +600,16 @@ export function AdminScheduledTasksPage(): ReactNode {
 												disabled={runMutation.isPending}
 												onClick={() => void runTask(row)}
 											>
-												<Play />
-												立即执行
+												<Play aria-hidden="true" />
+												{t("adminPlatform.tasks.menu.run")}
 											</Button>
-											<Button variant="ghost" size="sm" onClick={() => setEditing(row)}>
-												<Pencil />
-												编辑
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => setEditing(row)}
+											>
+												<Pencil aria-hidden="true" />
+												{t("adminPlatform.tasks.menu.edit")}
 											</Button>
 											<Button
 												variant="ghost"
@@ -481,8 +618,8 @@ export function AdminScheduledTasksPage(): ReactNode {
 												disabled={row.protected}
 												onClick={() => void removeRows([row])}
 											>
-												<Trash2 />
-												删除
+												<Trash2 aria-hidden="true" />
+												{t("adminPlatform.tasks.menu.delete")}
 											</Button>
 										</div>
 									</div>
@@ -512,9 +649,16 @@ export function AdminScheduledTasksPage(): ReactNode {
 			<Sheet open={openTask !== null} onOpenChange={(open) => !open && setOpenTask(null)}>
 				<SheetContent className="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-2xl">
 					<SheetHeader>
-						<SheetTitle>{openTask ? openTask.task_name : "运行详情"}</SheetTitle>
+						<SheetTitle>
+							{openTask ? openTask.task_name : t("adminPlatform.tasks.detail.title")}
+						</SheetTitle>
 						<SheetDescription>
-							{openTask ? <CopyText value={openTask.id} label="任务 ID" /> : null}
+							{openTask ? (
+								<CopyText
+									value={openTask.id}
+									label={t("adminPlatform.tasks.detail.idLabel")}
+								/>
+							) : null}
 						</SheetDescription>
 					</SheetHeader>
 					{openTask ? (
@@ -522,23 +666,33 @@ export function AdminScheduledTasksPage(): ReactNode {
 							<KeyValueList
 								columns={2}
 								items={[
-									{ key: "任务键", value: <MonoText>{openTask.task_key}</MonoText> },
 									{
-										key: "状态",
+										key: t("adminPlatform.tasks.detail.taskKey"),
+										value: <MonoText>{openTask.task_key}</MonoText>,
+									},
+									{
+										key: t("adminPlatform.tasks.detail.status"),
 										value: (
-											<TonePill tone={statusTone(openTask.status)}>{openTask.status}</TonePill>
+											<TonePill
+												tone={statusTone(openTask.status)}
+												title={openTask.status}
+											>
+												{statusLabel(openTask.status)}
+											</TonePill>
 										),
 									},
 									{
-										key: "触发方式",
-										value: <MonoText>{openTask.trigger_type}</MonoText>,
+										key: t("adminPlatform.tasks.detail.trigger"),
+										value: (
+											<MonoText>{openTask.trigger_type}</MonoText>
+										),
 									},
 									{
-										key: "Cron",
+										key: t("adminPlatform.tasks.detail.cron"),
 										value: <MonoText>{openTask.cron_expr ?? "—"}</MonoText>,
 									},
 									{
-										key: "执行时间",
+										key: t("adminPlatform.tasks.detail.executeAt"),
 										value: openTask.execute_at ? (
 											<AbsoluteTime value={openTask.execute_at} seconds />
 										) : (
@@ -546,7 +700,7 @@ export function AdminScheduledTasksPage(): ReactNode {
 										),
 									},
 									{
-										key: "过期时间",
+										key: t("adminPlatform.tasks.detail.expiresAt"),
 										value: openTask.expires_at ? (
 											<AbsoluteTime value={openTask.expires_at} seconds />
 										) : (
@@ -554,25 +708,26 @@ export function AdminScheduledTasksPage(): ReactNode {
 										),
 									},
 									{
-										key: "分组 ID",
+										key: t("adminPlatform.tasks.detail.groupId"),
 										value: <MonoText>{openTask.group_id ?? "—"}</MonoText>,
-										hint: "非空表示赛事运行时任务",
+										hint: t("adminPlatform.tasks.detail.groupHint"),
 									},
 									{
-										key: "尝试次数",
+										key: t("adminPlatform.tasks.detail.attempts"),
 										value: (
 											<MonoText>
-												{textOf(openTask.attempt_count)} / {textOf(openTask.max_attempts)}
+												{textOf(openTask.attempt_count)} /{" "}
+												{textOf(openTask.max_attempts)}
 											</MonoText>
 										),
 									},
 									{
-										key: "超时",
+										key: t("adminPlatform.tasks.detail.timeout"),
 										value: <MonoText>{textOf(openTask.timeout_secs)}</MonoText>,
-										hint: "运行时字段，创建/编辑接口不接受",
+										hint: t("adminPlatform.tasks.detail.timeoutHint"),
 									},
 									{
-										key: "上次执行",
+										key: t("adminPlatform.tasks.detail.lastRun"),
 										value: openTask.last_run_at ? (
 											<AbsoluteTime value={openTask.last_run_at} seconds />
 										) : (
@@ -580,7 +735,7 @@ export function AdminScheduledTasksPage(): ReactNode {
 										),
 									},
 									{
-										key: "锁定时间",
+										key: t("adminPlatform.tasks.detail.lockedAt"),
 										value: openTask.locked_at ? (
 											<AbsoluteTime value={openTask.locked_at} seconds />
 										) : (
@@ -588,7 +743,7 @@ export function AdminScheduledTasksPage(): ReactNode {
 										),
 									},
 									{
-										key: "心跳",
+										key: t("adminPlatform.tasks.detail.heartbeat"),
 										value: openTask.heartbeat_at ? (
 											<AbsoluteTime value={openTask.heartbeat_at} seconds />
 										) : (
@@ -598,12 +753,16 @@ export function AdminScheduledTasksPage(): ReactNode {
 								]}
 							/>
 							<div className="space-y-1">
-								<p className="text-xs text-muted-foreground">描述</p>
+								<p className="text-xs text-muted-foreground">
+									{t("adminPlatform.tasks.detail.description")}
+								</p>
 								<ReadonlyBlock>{openTask.description ?? ""}</ReadonlyBlock>
 							</div>
 							{openTask.error_msg || openTask.last_error ? (
 								<div className="space-y-1">
-									<p className="text-xs text-destructive">最近错误</p>
+									<p className="text-xs text-destructive">
+										{t("adminPlatform.tasks.detail.lastError")}
+									</p>
 									<ReadonlyBlock className="border-destructive/30 bg-destructive/5 font-mono text-xs">
 										{openTask.error_msg ?? openTask.last_error ?? ""}
 									</ReadonlyBlock>
@@ -611,11 +770,12 @@ export function AdminScheduledTasksPage(): ReactNode {
 							) : null}
 							<div className="space-y-1">
 								<p className="text-xs text-muted-foreground">
-									payload（JSON，只读：SDK 把它声明成 string，见报告 SDK GAP）
+									{t("adminPlatform.tasks.detail.payload")}
 								</p>
 								<ReadonlyBlock>
 									<pre className="max-h-72 overflow-auto font-mono text-xs">
-										{jsonText(openTask.payload) || "（空）"}
+										{jsonText(openTask.payload) ||
+											t("adminPlatform.common.emptyJson")}
 									</pre>
 								</ReadonlyBlock>
 							</div>
@@ -636,6 +796,7 @@ function ScheduledTaskFormSheet({
 	row: ScheduledTasks | null;
 	onOpenChange: (open: boolean) => void;
 }): ReactNode {
+	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const [form, setForm] = useState({
@@ -656,6 +817,19 @@ function ScheduledTaskFormSheet({
 		cronExpr?: string;
 	}>({});
 
+	function triggerLabel(trigger: string): string {
+		switch (trigger) {
+			case "once":
+				return t("adminPlatform.tasks.trigger.once");
+			case "cron":
+				return t("adminPlatform.tasks.trigger.cron");
+			case "startup":
+				return t("adminPlatform.tasks.trigger.startup");
+			default:
+				return trigger;
+		}
+	}
+
 	useEffect(() => {
 		if (!open) return;
 		setErrors({});
@@ -674,24 +848,30 @@ function ScheduledTaskFormSheet({
 
 	const createMutation = useMutation({
 		mutationFn: (input: Partial<ScheduledTasks>) =>
-			call(client.admin.scheduled_tasks.create(input), "创建计划任务"),
+			call(
+				client.admin.scheduled_tasks.create(input),
+				t("adminPlatform.tasks.requests.create"),
+			),
 		onSuccess: () => {
-			toast.success("计划任务已创建");
+			toast.success(t("adminPlatform.tasks.toasts.created"));
 			void queryClient.invalidateQueries({ queryKey: qk.admin.scheduledTasks() });
 			onOpenChange(false);
 		},
-		onError: (error) => toast.apiError("创建计划任务失败", error),
+		onError: (error) => toast.apiError(t("adminPlatform.tasks.toasts.createFailed"), error),
 	});
 
 	const patchMutation = useMutation({
 		mutationFn: (input: Partial<ScheduledTasks>) =>
-			call(client.admin.scheduled_tasks.patch(input), "更新计划任务"),
+			call(
+				client.admin.scheduled_tasks.patch(input),
+				t("adminPlatform.tasks.requests.update"),
+			),
 		onSuccess: () => {
-			toast.success("计划任务已更新");
+			toast.success(t("adminPlatform.tasks.toasts.updated"));
 			void queryClient.invalidateQueries({ queryKey: qk.admin.scheduledTasks() });
 			onOpenChange(false);
 		},
-		onError: (error) => toast.apiError("更新计划任务失败", error),
+		onError: (error) => toast.apiError(t("adminPlatform.tasks.toasts.updateFailed"), error),
 	});
 
 	const isPending = createMutation.isPending || patchMutation.isPending;
@@ -701,13 +881,21 @@ function ScheduledTaskFormSheet({
 		const taskName = form.taskName.trim();
 		const taskKey = form.taskKey.trim();
 		const nextErrors: typeof errors = {};
-		if (taskName.length === 0) nextErrors.taskName = "任务名称不能为空";
-		if (taskKey.length === 0) nextErrors.taskKey = "任务键不能为空";
+		if (taskName.length === 0)
+			nextErrors.taskName = t("adminPlatform.tasks.validation.taskNameRequired");
+		if (taskKey.length === 0)
+			nextErrors.taskKey = t("adminPlatform.tasks.validation.taskKeyRequired");
 		if (form.triggerType === "once" && form.executeAt.length === 0) {
-			nextErrors.executeAt = "触发方式 once 必须填写执行时间（后端同样会拒绝）";
+			nextErrors.executeAt = t("adminPlatform.tasks.validation.executeAtRequired");
 		}
-		if (form.triggerType === "cron" && form.cronExpr.trim().length === 0) {
-			nextErrors.cronExpr = "触发方式 cron 必须填写 Cron 表达式（后端同样会拒绝）";
+		if (form.triggerType === "cron") {
+			const cron = form.cronExpr.trim();
+			if (cron.length === 0) {
+				nextErrors.cronExpr = t("adminPlatform.tasks.validation.cronRequired");
+			} else if (cron.split(/\s+/).filter(Boolean).length !== 7) {
+				// 后端用 cron 库校验 7 段（秒 分 时 日 月 周 年）：这里先给出即时反馈。
+				nextErrors.cronExpr = t("adminPlatform.tasks.validation.cronShape");
+			}
 		}
 		setErrors(nextErrors);
 		if (Object.keys(nextErrors).length > 0) return;
@@ -733,49 +921,85 @@ function ScheduledTaskFormSheet({
 		<FormSheet
 			open={open}
 			onOpenChange={onOpenChange}
-			title={row ? `编辑任务 ${row.task_name}` : "新建计划任务"}
-			description="任务键必须是平台已注册的键，未知键会被拒绝并返回具体错误"
+			title={
+				row
+					? t("adminPlatform.tasks.form.editTitle", { name: row.task_name })
+					: t("adminPlatform.tasks.form.createTitle")
+			}
+			description={t("adminPlatform.tasks.form.description")}
 			width="lg"
 			footer={
 				<FormFooter
 					formId="scheduled-task-form"
 					isPending={isPending}
-					submitLabel={row ? "保存" : "创建"}
+					submitLabel={
+						row
+							? t("adminPlatform.tasks.form.save")
+							: t("adminPlatform.tasks.form.create")
+					}
 					onCancel={() => onOpenChange(false)}
-					hint={row ? `ID ${row.id}` : "任务名称、任务键与触发参数由后端校验"}
+					hint={
+						row ? (
+							<span>
+								{t("adminPlatform.tasks.form.idHint")}{" "}
+								<MonoText>{row.id}</MonoText>
+							</span>
+						) : (
+							t("adminPlatform.tasks.form.createHint")
+						)
+					}
 				/>
 			}
 		>
-			<form id="scheduled-task-form" className="space-y-4" onSubmit={submit}>
+			<form
+				id="scheduled-task-form"
+				className="space-y-4"
+				onSubmit={(event) => submit(event)}
+			>
 				<FormGrid columns={2}>
-					<Field label="任务名称" htmlFor="task-name" required error={errors.taskName}>
+					<Field
+						label={t("adminPlatform.tasks.form.taskName")}
+						htmlFor="task-name"
+						required
+						error={errors.taskName}
+					>
 						<Input
 							id="task-name"
 							value={form.taskName}
-							onChange={(event) => setForm({ ...form, taskName: event.target.value })}
+							onChange={(event) =>
+								setForm({ ...form, taskName: event.target.value })
+							}
 						/>
 					</Field>
 					<Field
-						label="任务键"
+						label={t("adminPlatform.tasks.form.taskKey")}
 						htmlFor="task-key"
 						required
 						error={errors.taskKey}
-						hint="平台注册的 TaskKey，例如 awd.round.end"
+						hint={t("adminPlatform.tasks.form.taskKeyHint")}
 					>
 						<Input
 							id="task-key"
 							className="font-mono text-xs"
 							value={form.taskKey}
-							onChange={(event) => setForm({ ...form, taskKey: event.target.value })}
+							onChange={(event) =>
+								setForm({ ...form, taskKey: event.target.value })
+							}
 						/>
 					</Field>
 				</FormGrid>
 				<FormGrid columns={2}>
-					<Field label="触发方式" htmlFor="task-trigger">
+					<Field
+						label={t("adminPlatform.tasks.form.triggerType")}
+						htmlFor="task-trigger"
+					>
 						<Select
 							value={form.triggerType}
 							onValueChange={(value) =>
-								setForm({ ...form, triggerType: value as (typeof TRIGGER_TYPES)[number] })
+								setForm({
+									...form,
+									triggerType: value as (typeof TRIGGER_TYPES)[number],
+								})
 							}
 						>
 							<SelectTrigger id="task-trigger" className="w-full">
@@ -784,87 +1008,118 @@ function ScheduledTaskFormSheet({
 							<SelectContent>
 								{TRIGGER_TYPES.map((type) => (
 									<SelectItem key={type} value={type}>
-										{type}
+										{triggerLabel(type)}
 									</SelectItem>
 								))}
 							</SelectContent>
 						</Select>
 					</Field>
 					<Field
-						label="Cron 表达式"
+						label={t("adminPlatform.tasks.form.cron")}
 						htmlFor="task-cron"
 						error={errors.cronExpr}
-						hint="trigger_type=cron 时必填（后端用 cron 库校验）"
+						hint={t("adminPlatform.tasks.form.cronHint")}
 					>
 						<Input
 							id="task-cron"
 							className="font-mono text-xs"
-							placeholder="0 */5 * * * * *"
+							placeholder={t("adminPlatform.tasks.form.cronPlaceholder")}
 							value={form.cronExpr}
-							onChange={(event) => setForm({ ...form, cronExpr: event.target.value })}
+							onChange={(event) =>
+								setForm({ ...form, cronExpr: event.target.value })
+							}
 						/>
 					</Field>
 				</FormGrid>
 				<FormGrid columns={2}>
 					<Field
-						label="执行时间"
+						label={t("adminPlatform.tasks.form.executeAt")}
 						htmlFor="task-execute-at"
 						error={errors.executeAt}
-						hint="trigger_type=once 时必填；留空表示不修改。"
+						hint={t("adminPlatform.tasks.form.executeAtHint")}
 					>
 						<Input
 							id="task-execute-at"
 							type="datetime-local"
 							value={form.executeAt}
-							onChange={(event) => setForm({ ...form, executeAt: event.target.value })}
+							onChange={(event) =>
+								setForm({ ...form, executeAt: event.target.value })
+							}
 						/>
 					</Field>
-					<Field label="过期时间" htmlFor="task-expires-at" hint="留空表示不过期。">
+					<Field
+						label={t("adminPlatform.tasks.form.expiresAt")}
+						htmlFor="task-expires-at"
+						hint={t("adminPlatform.tasks.form.expiresAtHint")}
+					>
 						<Input
 							id="task-expires-at"
 							type="datetime-local"
 							value={form.expiresAt}
-							onChange={(event) => setForm({ ...form, expiresAt: event.target.value })}
+							onChange={(event) =>
+								setForm({ ...form, expiresAt: event.target.value })
+							}
 						/>
 					</Field>
 				</FormGrid>
-				<Field label="描述" htmlFor="task-description">
+				<LocalTimeHint />
+				<Field
+					label={t("adminPlatform.tasks.form.descriptionField")}
+					htmlFor="task-description"
+				>
 					<Textarea
 						id="task-description"
 						style={{ minHeight: 80 }}
 						value={form.description}
-						onChange={(event) => setForm({ ...form, description: event.target.value })}
+						onChange={(event) =>
+							setForm({ ...form, description: event.target.value })
+						}
 					/>
 				</Field>
 				<FormGrid columns={2}>
-					<Field label="启用" htmlFor="task-enabled" hint="停用后调度器不会拉起该任务。">
+					<Field
+						label={t("adminPlatform.tasks.form.enabled")}
+						htmlFor="task-enabled"
+						hint={t("adminPlatform.tasks.form.enabledHint")}
+					>
 						<div className="flex items-center gap-2">
 							<Switch
 								id="task-enabled"
 								checked={form.enabled}
-								onCheckedChange={(checked) => setForm({ ...form, enabled: checked })}
+								onCheckedChange={(checked) =>
+									setForm({ ...form, enabled: checked })
+								}
 							/>
-							<BooleanPill value={form.enabled} trueText="启用" falseText="停用" />
+							<BooleanPill
+								value={form.enabled}
+								trueText={t("adminPlatform.common.enabled")}
+								falseText={t("adminPlatform.common.disabled")}
+							/>
 						</div>
 					</Field>
 					<Field
-						label="受保护"
+						label={t("adminPlatform.tasks.form.protected")}
 						htmlFor="task-protected"
-						hint="受保护任务不能被删除（后端拒绝），请谨慎开启。"
+						hint={t("adminPlatform.tasks.form.protectedHint")}
 					>
 						<div className="flex items-center gap-2">
 							<Switch
 								id="task-protected"
 								checked={form.protected}
-								onCheckedChange={(checked) => setForm({ ...form, protected: checked })}
+								onCheckedChange={(checked) =>
+									setForm({ ...form, protected: checked })
+								}
 							/>
-							<BooleanPill value={form.protected} trueText="受保护" falseText="可删除" />
+							<BooleanPill
+								value={form.protected}
+								trueText={t("adminPlatform.common.protected")}
+								falseText={t("adminPlatform.common.deletable")}
+							/>
 						</div>
 					</Field>
 				</FormGrid>
 				<p className="text-xs text-muted-foreground">
-					说明：`max_attempts` / `timeout_secs` 是运行时字段，创建与编辑接口不接受；
-					`payload` 由平台按任务键写入 —— 二者都在「运行详情」里只读展示。
+					{t("adminPlatform.tasks.form.runtimeNote")}
 				</p>
 			</form>
 		</FormSheet>

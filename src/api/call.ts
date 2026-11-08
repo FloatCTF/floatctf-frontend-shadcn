@@ -12,6 +12,8 @@
  * `FloatCTFError` rejection；`call` / `callList` 只负责取数据，让页面的 `useQuery` 三态自然成立。
  */
 
+import i18n from "~/lib/i18n";
+
 import {
 	FloatCTFError,
 	UNI_SUCCESS_CODE,
@@ -103,7 +105,7 @@ export function installEnvelopeGuard(client: FloatCTFClient): void {
 }
 
 /** 把信封（或 AxiosResponse 包裹的信封）解成数据；失败抛 `FloatCTFError`。 */
-export function unwrap<T>(response: unknown, what = "请求"): T {
+export function unwrap<T>(response: unknown, what?: string): T {
 	const envelope = asEnvelope(response);
 	if (!envelope) {
 		if (response === undefined || response === null) return undefined as T;
@@ -114,25 +116,53 @@ export function unwrap<T>(response: unknown, what = "请求"): T {
 	if (envelope.code !== UNI_SUCCESS_CODE) {
 		throw (
 			floatCTFErrorFromEnvelope(envelope) ??
-			new FloatCTFError({ message: `${what}失败`, kind: "platform" })
+			new FloatCTFError({
+				message: i18n.t("errors.whatFailed", { what: what ?? i18n.t("errors.requestFailed") }),
+				kind: "platform",
+			})
 		);
 	}
 	return (envelope.data ?? undefined) as T;
 }
 
-/** 取数据：`const event = await call(client.service.events.get(id), "赛事详情")`。 */
+/**
+ * 取数据：`const event = await call(client.service.events.get(id), "赛事详情")`。
+ *
+ * 信封成功但 `data` 为空 → 视为**契约违约**并抛错（而不是把 `undefined` 交给 React Query）：
+ * 页面的 `QueryState` 会渲染可见错误，也不会再出现 `data cannot be undefined` 的静默告警。
+ * 对「空是合法业务态」的接口请显式用 {@link callMaybe}。
+ */
 export function call<T>(request: Promise<UniResponse<T>>, what?: string): Promise<T>;
 export function call<T>(request: Promise<unknown>, what?: string): Promise<T>;
 export async function call<T>(request: Promise<unknown>, what?: string): Promise<T> {
-	return unwrap<T>(await request, what);
+	const value = unwrap<T>(await request, what);
+	if (value === undefined) {
+		throw new FloatCTFError({
+			message: i18n.t("errors.emptyResponse", {
+				what: what ?? i18n.t("errors.requestFailed"),
+			}),
+			kind: "platform",
+		});
+	}
+	return value;
 }
 
 /** 取列表 + 分页 meta：`const { items, meta } = await callList(...)`。 */
 export function unwrapList<T>(response: unknown): { items: T[]; meta: QueryParams } {
 	const envelope = asEnvelope(response);
 	const data = unwrap<T[] | null | undefined>(response);
+	if (!Array.isArray(data)) {
+		// 列表接口的空值是 `[]`；`null` / `undefined` 是契约违约。静默变成空列表
+		// 会把「端点缺失 / 响应形状错误」伪装成「暂时没有数据」。
+		throw new FloatCTFError({
+			message: i18n.t("errors.emptyResponse", {
+				what: i18n.t("errors.requestFailed"),
+			}),
+			kind: "platform",
+		});
+	}
 	return {
-		items: Array.isArray(data) ? data : [],
+		items: data,
 		meta: (envelope?.meta as QueryParams | undefined) ?? {},
 	};
 }

@@ -1,6 +1,9 @@
 /**
  * 导航配置 —— 信息架构的唯一出处（侧边栏、移动端导航、命令面板、面包屑都从这里派生）。
  * 路由路径由本前端自主决定，与 Default Frontend 无关。
+ *
+ * 文案不写死：`labelKey` / `groupKey` 是 i18n key（`nav.*` 命名空间），
+ * 渲染时由消费方 `t()` 翻译 —— 保证中英双语与语言切换即时生效。
  */
 
 import {
@@ -37,123 +40,119 @@ import type { LucideIcon } from "lucide-react";
 
 export interface NavItem {
 	to: string;
-	label: string;
+	/** i18n key（`nav.items.*`）。 */
+	labelKey: string;
 	icon: LucideIcon;
 	/** 精确匹配（用于 `/` 这类根路径）。 */
 	end?: boolean;
-	description?: string;
-	/**
-	 * 整页加载（真实 `<a>` 跳转），不经过客户端路由。
-	 *
-	 * 用于**同源但不属于本前端路由表**的静态站点（平台在 `/training/` 挂载的教学课程站）：
-	 * `<Link>` 会走客户端路由并落到 not-found 页，必须强制文档级跳转。
-	 */
+	/** i18n key：命令面板里的补充说明（可选）。 */
+	descriptionKey?: string;
+	/** 同源静态站点（如 `/training/` 课程站）使用整页跳转，不走客户端路由。 */
 	reloadDocument?: boolean;
 }
 
 export interface NavGroup {
-	label: string;
+	/** i18n key（`nav.groups.*`）。 */
+	labelKey: string;
 	items: NavItem[];
 }
 
 export const playerNav: NavGroup[] = [
 	{
-		label: "Play",
+		labelKey: "nav.groups.play",
 		items: [
-			{ to: "/", label: "总览", icon: Home, end: true, description: "我的比赛与待办" },
-			{ to: "/events", label: "赛事", icon: CalendarDays, description: "全部赛事与工作区" },
-			{ to: "/challenges", label: "题库", icon: Puzzle, description: "练习题库" },
-			{ to: "/challenge-sets", label: "题集", icon: Blocks, description: "按主题组织的题目集合" },
-			// 平台在 `/training/` 直接提供的教学课程站（同源静态站点，不属于本前端路由，故整页加载）。
+			{ to: "/", labelKey: "nav.items.overview", icon: Home, end: true, descriptionKey: "nav.items.overviewHint" },
+			{ to: "/events", labelKey: "nav.items.events", icon: CalendarDays, descriptionKey: "nav.items.eventsHint" },
+			{ to: "/challenges", labelKey: "nav.items.challenges", icon: Puzzle, descriptionKey: "nav.items.challengesHint" },
+			{ to: "/challenge-sets", labelKey: "nav.items.challengeSets", icon: Blocks },
 			{
 				to: "/training/",
-				label: "课程",
+				labelKey: "nav.items.course",
 				icon: GraduationCap,
 				reloadDocument: true,
-				description: "教学课程站（整页打开）",
 			},
-			{ to: "/training", label: "训练场", icon: Dumbbell, description: "AWDP 练习靶机" },
-			{ to: "/instances", label: "我的实例", icon: Boxes, description: "已启动的题目环境" },
+			{ to: "/training", labelKey: "nav.items.training", icon: Dumbbell },
+			{ to: "/instances", labelKey: "nav.items.instances", icon: Boxes },
 		],
 	},
 	{
-		label: "Community",
+		labelKey: "nav.groups.community",
 		items: [
-			{ to: "/rank", label: "排行榜", icon: Trophy, description: "Top15 选手" },
-			{ to: "/solves", label: "解题流水", icon: Activity, description: "我的练习解题记录" },
-			{ to: "/community/announcements", label: "公告", icon: Megaphone },
-			{ to: "/community/discussions", label: "讨论区", icon: MessagesSquare },
-			{ to: "/writeups", label: "题解", icon: BookOpen },
-			{ to: "/arsenal", label: "武器库", icon: Swords },
+			{ to: "/rank", labelKey: "nav.items.rank", icon: Trophy },
+			{ to: "/solves", labelKey: "nav.items.solves", icon: Activity },
+			{ to: "/community/announcements", labelKey: "nav.items.announcements", icon: Megaphone },
+			{ to: "/community/discussions", labelKey: "nav.items.discussions", icon: MessagesSquare },
+			{ to: "/writeups", labelKey: "nav.items.writeups", icon: BookOpen },
+			{ to: "/arsenal", labelKey: "nav.items.arsenal", icon: Swords },
 		],
 	},
 	{
-		label: "Me",
-		items: [{ to: "/profile", label: "我的资料", icon: UserCircle }],
+		labelKey: "nav.groups.me",
+		items: [{ to: "/profile", labelKey: "nav.items.profile", icon: UserCircle }],
 	},
 ];
 
 export const adminNav: NavGroup[] = [
 	{
-		label: "控制台",
+		labelKey: "nav.groups.control",
 		items: [
-			{ to: "/admin", label: "总览", icon: Gauge, end: true, description: "平台聚合状态" },
-			{ to: "/admin/events", label: "赛事", icon: CalendarDays, description: "赛事控制台" },
+			{ to: "/admin", labelKey: "nav.items.adminDashboard", icon: Gauge, end: true },
+			{ to: "/admin/events", labelKey: "nav.items.adminEvents", icon: CalendarDays },
 		],
 	},
 	{
-		label: "内容",
+		labelKey: "nav.groups.content",
 		items: [
-			{ to: "/admin/challenges", label: "题库", icon: Puzzle, description: "题目导入 / 构建 / 校验" },
-			{ to: "/admin/challenge-sets", label: "题集", icon: Blocks },
-			{ to: "/admin/gameboxes", label: "GameBox 库", icon: Boxes },
-			{ to: "/admin/network", label: "靶场网络", icon: Network },
+			{ to: "/admin/challenges", labelKey: "nav.items.adminChallenges", icon: Puzzle },
+			{ to: "/admin/challenge-sets", labelKey: "nav.items.adminChallengeSets", icon: Blocks },
+			{ to: "/admin/gameboxes", labelKey: "nav.items.adminGameboxes", icon: Boxes },
+			{ to: "/admin/network", labelKey: "nav.items.adminNetworks", icon: Network },
 		],
 	},
 	{
-		label: "社区",
+		labelKey: "nav.groups.community",
 		items: [
-			{ to: "/admin/community/announcements", label: "公告", icon: Megaphone },
-			{ to: "/admin/community/discussions", label: "讨论", icon: MessagesSquare },
-			{ to: "/admin/community/weapons", label: "武器库", icon: Swords },
+			{ to: "/admin/community/announcements", labelKey: "nav.items.announcements", icon: Megaphone },
+			{ to: "/admin/community/discussions", labelKey: "nav.items.discussions", icon: MessagesSquare },
+			{ to: "/admin/community/weapons", labelKey: "nav.items.arsenal", icon: Swords },
 		],
 	},
 	{
-		label: "平台",
+		labelKey: "nav.groups.platform",
 		items: [
-			{ to: "/admin/platform/users", label: "用户", icon: Users },
-			{ to: "/admin/platform/super-admins", label: "超管", icon: UserCog },
-			{ to: "/admin/platform/logs", label: "日志", icon: ScrollText },
-			{ to: "/admin/platform/settings", label: "设置", icon: Settings },
-			{ to: "/admin/platform/frontends", label: "前端", icon: PanelsTopLeft },
-			{ to: "/admin/platform/tasks", label: "计划任务", icon: Timer },
+			{ to: "/admin/platform/users", labelKey: "nav.items.adminUsers", icon: Users },
+			{ to: "/admin/platform/roles", labelKey: "nav.items.adminRoles", icon: UserCog },
+			{ to: "/admin/platform/logs", labelKey: "nav.items.adminLogs", icon: ScrollText },
+			{ to: "/admin/platform/settings", labelKey: "nav.items.adminSettings", icon: Settings },
+			{ to: "/admin/platform/frontends", labelKey: "nav.items.adminFrontends", icon: PanelsTopLeft },
+			{ to: "/admin/platform/tasks", labelKey: "nav.items.adminTasks", icon: Timer },
 		],
 	},
 	{
-		label: "基础设施",
+		labelKey: "nav.groups.infra",
 		items: [
-			{ to: "/admin/infra/docker", label: "Docker", icon: Container },
-			{ to: "/admin/infra/sql", label: "SQL 控制台", icon: Database },
-			{ to: "/admin/infra/terminal", label: "终端", icon: Terminal },
-			{ to: "/admin/version", label: "版本", icon: Info },
+			{ to: "/admin/infra/docker", labelKey: "nav.items.adminDocker", icon: Container },
+			{ to: "/admin/infra/sql", labelKey: "nav.items.adminSql", icon: Database },
+			{ to: "/admin/infra/terminal", labelKey: "nav.items.adminTerminal", icon: Terminal },
+			{ to: "/admin/version", labelKey: "nav.items.adminVersion", icon: Info },
 		],
 	},
 ];
 
 /** 移动端底部导航（只放最高频入口）。 */
 export const playerMobileNav: NavItem[] = [
-	{ to: "/", label: "总览", icon: Home, end: true },
-	{ to: "/events", label: "赛事", icon: CalendarDays },
-	{ to: "/challenges", label: "题库", icon: Puzzle },
-	{ to: "/rank", label: "排行", icon: Trophy },
-	{ to: "/profile", label: "我的", icon: UserCircle },
+	{ to: "/", labelKey: "nav.items.overview", icon: Home, end: true },
+	{ to: "/events", labelKey: "nav.items.events", icon: CalendarDays },
+	{ to: "/challenges", labelKey: "nav.items.challenges", icon: Puzzle },
+	{ to: "/rank", labelKey: "nav.items.rank", icon: Trophy },
+	{ to: "/profile", labelKey: "nav.items.profile", icon: UserCircle },
 ];
 
 export const adminMobileNav: NavItem[] = [
-	{ to: "/admin", label: "总览", icon: Gauge, end: true },
-	{ to: "/admin/events", label: "赛事", icon: CalendarDays },
-	{ to: "/admin/challenges", label: "题库", icon: Puzzle },
-	{ to: "/admin/platform/users", label: "用户", icon: Users },
+	{ to: "/admin", labelKey: "nav.items.adminDashboard", icon: Gauge, end: true },
+	{ to: "/admin/events", labelKey: "nav.items.adminEvents", icon: CalendarDays },
+	{ to: "/admin/challenges", labelKey: "nav.items.adminChallenges", icon: Puzzle },
+	{ to: "/admin/platform/users", labelKey: "nav.items.adminUsers", icon: Users },
 ];
 
 export function flatNav(groups: NavGroup[]): NavItem[] {

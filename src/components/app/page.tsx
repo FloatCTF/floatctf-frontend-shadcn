@@ -3,8 +3,9 @@
  * 页面级组件只组合这些基元，不各自发明间距与层级。
  */
 
-import { useState, type ReactNode } from "react";
-import { Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, X } from "lucide-react";
 
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -24,7 +25,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "~/components/ui/select";
-import { Separator } from "~/components/ui/separator";
 import { useCopyToClipboard } from "~/lib/hooks";
 import { cn } from "~/lib/utils";
 
@@ -49,7 +49,7 @@ export function PageHeader({
 			<div className="flex flex-wrap items-start justify-between gap-3">
 				<div className="min-w-0 space-y-1">
 					<div className="flex flex-wrap items-center gap-2">
-						<h1 className="truncate text-xl font-semibold tracking-tight">{title}</h1>
+						<h1 className="truncate text-xl font-semibold tracking-tight" title={typeof title === "string" ? title : undefined}>{title}</h1>
 						{badge}
 					</div>
 					{description ? (
@@ -64,7 +64,7 @@ export function PageHeader({
 
 export function PageBody({ children, className }: { children: ReactNode; className?: string }) {
 	return (
-		<div className={cn("mx-auto w-full max-w-screen-2xl space-y-5 px-4 py-5 lg:px-6", className)}>
+		<div className={cn("mx-auto w-full max-w-screen-2xl space-y-6 p-4 md:p-6", className)}>
 			{children}
 		</div>
 	);
@@ -98,12 +98,9 @@ export function SectionCard({
 			) : null}
 			<CardContent className={cn(title ? "" : "pt-5", contentClassName)}>{children}</CardContent>
 			{footer ? (
-				<>
-					<Separator />
-					<div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-						{footer}
-					</div>
-				</>
+				<div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/50 px-4 py-3">
+					{footer}
+				</div>
 			) : null}
 		</Card>
 	);
@@ -124,20 +121,20 @@ export function StatCard({
 }) {
 	const toneClass =
 		tone === "success"
-			? "text-[var(--success)]"
+			? "text-emerald-600 dark:text-emerald-400"
 			: tone === "warning"
-				? "text-[var(--warning)]"
+				? "text-amber-700 dark:text-amber-400"
 				: tone === "danger"
 					? "text-destructive"
 					: "text-foreground";
 	return (
 		<Card>
-			<CardContent className="flex items-start justify-between gap-3 pt-5">
+			<CardContent className="flex items-start justify-between gap-3">
 				<div className="min-w-0 space-y-1">
-					<p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+					<p className="text-xs font-medium text-muted-foreground">
 						{label}
 					</p>
-					<p className={cn("tnum text-2xl font-semibold", toneClass)}>{value}</p>
+					<p className={cn("tnum text-2xl font-medium", toneClass)}>{value}</p>
 					{hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
 				</div>
 				{icon ? <div className="text-muted-foreground">{icon}</div> : null}
@@ -220,6 +217,8 @@ export function CopyText({
 	mono?: boolean;
 }) {
 	const { copied, copy } = useCopyToClipboard();
+	const { t } = useTranslation();
+	const name = label ?? t("common.misc.value");
 	return (
 		<span className={cn("inline-flex min-w-0 items-center gap-1.5", className)}>
 			<span className={cn("min-w-0 truncate", mono && "tnum font-mono text-xs")} title={value}>
@@ -229,10 +228,10 @@ export function CopyText({
 				variant="ghost"
 				size="icon-xs"
 				onClick={() => void copy(value)}
-				aria-label={copied ? (label ? `${label}已复制` : "已复制") : label ? `复制${label}` : "复制"}
-				title={label ? `复制${label}` : "复制"}
+				aria-label={copied ? t("common.copiedLabel", { name }) : t("common.copyLabel", { name })}
+				title={copied ? t("common.copied") : t("common.copyLabel", { name })}
 			>
-				{copied ? <Check className="text-[var(--success)]" /> : <Copy />}
+				{copied ? <Check className="text-emerald-600 dark:text-emerald-400" /> : <Copy />}
 			</Button>
 		</span>
 	);
@@ -248,25 +247,28 @@ export function CopyText({
 export function SecretValue({ value, label }: { value: string; label?: string }) {
 	const [shown, setShown] = useState(false);
 	const { copied, copy } = useCopyToClipboard();
+	const { t } = useTranslation();
 	if (!value) return <span className="text-xs text-muted-foreground">—</span>;
-	const name = label ?? "敏感值";
+	const name = label ?? t("common.misc.secret");
 	return (
 		<span className="inline-flex min-w-0 items-center gap-1.5">
+			{/* 隐藏时渲染固定长度掩码而不是「CSS 模糊明文」：
+			    模糊只挡肉眼，DOM / 读屏 / 复制选中仍然能拿到明文。 */}
 			<span
 				className={cn(
 					"tnum min-w-0 truncate font-mono text-xs",
-					!shown && "blur-[3px] select-none",
+					!shown && "select-none",
 				)}
-				title={shown ? value : `${name}（已隐藏）`}
+				title={shown ? value : t("common.hiddenValue", { name })}
 			>
-				{value}
+				{shown ? value : "••••••••"}
 			</span>
 			<Button
 				variant="ghost"
 				size="icon-xs"
 				onClick={() => setShown((prev) => !prev)}
-				aria-label={shown ? `隐藏${name}` : `显示${name}`}
-				title={shown ? `隐藏${name}` : `显示${name}`}
+				aria-label={shown ? t("common.hideLabel", { name }) : t("common.showLabel", { name })}
+				title={shown ? t("common.hideLabel", { name }) : t("common.showLabel", { name })}
 			>
 				{shown ? <EyeOff /> : <Eye />}
 			</Button>
@@ -274,12 +276,59 @@ export function SecretValue({ value, label }: { value: string; label?: string })
 				variant="ghost"
 				size="icon-xs"
 				onClick={() => void copy(value)}
-				aria-label={copied ? `${name}已复制` : `复制${name}`}
-				title={copied ? "已复制" : `复制${name}`}
+				aria-label={copied ? t("common.copiedLabel", { name }) : t("common.copyLabel", { name })}
+				title={copied ? t("common.copied") : t("common.copyLabel", { name })}
 			>
-				{copied ? <Check className="text-[var(--success)]" /> : <Copy />}
+				{copied ? <Check className="text-emerald-600 dark:text-emerald-400" /> : <Copy />}
 			</Button>
 		</span>
+	);
+}
+
+
+/** 已生效筛选的 chip 列表：让「我筛过什么」始终可见、可单独移除。 */
+export interface ActiveFilterChip {
+	key: string;
+	label: string;
+	onRemove: () => void;
+}
+
+export function FilterChips({
+	filters,
+	onClearAll,
+	className,
+}: {
+	filters: ActiveFilterChip[];
+	onClearAll?: () => void;
+	className?: string;
+}) {
+	const { t } = useTranslation();
+	if (filters.length === 0) return null;
+	return (
+		<div className={cn("flex flex-wrap items-center gap-1.5", className)}>
+			{filters.map((filter) => (
+				<span
+					key={filter.key}
+					className="inline-flex items-center gap-1 rounded-full border bg-muted/40 py-0.5 pl-2.5 pr-0.5 text-xs"
+				>
+					<span>{filter.label}</span>
+					<button
+						type="button"
+						onClick={filter.onRemove}
+						aria-label={t("common.filters.remove", { filter: filter.label })}
+						title={t("common.filters.remove", { filter: filter.label })}
+						className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+					>
+						<X className="size-3" aria-hidden="true" />
+					</button>
+				</span>
+			))}
+			{onClearAll ? (
+				<Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={onClearAll}>
+					{t("common.filters.clearAll")}
+				</Button>
+			) : null}
+		</div>
 	);
 }
 
@@ -298,13 +347,20 @@ export function PaginationBar({
 	onPageSizeChange?: (size: number) => void;
 	pageSizeOptions?: number[];
 }) {
+	const { t } = useTranslation();
 	const totalPages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
-	const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+	// 删除 / 过滤后当前页可能越界：自动回到最后一页，避免「显示 21–20」这种空页。
+	useEffect(() => {
+		if (page > totalPages) onPageChange(totalPages);
+	}, [page, totalPages, onPageChange]);
+	// 0 条时不再渲染「共 0 条 / 第 1 页」——空态已经说明了没有数据。
+	if (total === 0) return null;
+	const from = (page - 1) * pageSize + 1;
 	const to = Math.min(total, page * pageSize);
 	return (
 		<div className="flex flex-wrap items-center justify-between gap-3">
 			<p className="tnum text-xs text-muted-foreground">
-				共 {total} 条{total > 0 ? ` · 显示 ${from}–${to}` : ""}
+					{total > 0 ? t("common.pagination.range", { total, from, to }) : t("common.pagination.total", { total })}
 			</p>
 			<div className="flex items-center gap-2">
 				{onPageSizeChange ? (
@@ -312,13 +368,13 @@ export function PaginationBar({
 						value={String(pageSize)}
 						onValueChange={(value) => onPageSizeChange(Number(value))}
 					>
-						<SelectTrigger size="sm" className="w-[110px]" aria-label="每页条数">
+						<SelectTrigger size="sm" className="w-[110px]" aria-label={t("common.pagination.pageSizeLabel")}>
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
 							{pageSizeOptions.map((size) => (
 								<SelectItem key={size} value={String(size)}>
-									每页 {size} 条
+									{t("common.pagination.pageSize", { size })}
 								</SelectItem>
 							))}
 						</SelectContent>
@@ -329,7 +385,8 @@ export function PaginationBar({
 					size="icon-sm"
 					disabled={page <= 1}
 					onClick={() => onPageChange(page - 1)}
-					aria-label="上一页"
+					aria-label={t("common.table.prevPage")}
+					title={t("common.table.prevPage")}
 				>
 					<ChevronLeft />
 				</Button>
@@ -341,7 +398,8 @@ export function PaginationBar({
 					size="icon-sm"
 					disabled={page >= totalPages}
 					onClick={() => onPageChange(page + 1)}
-					aria-label="下一页"
+					aria-label={t("common.table.nextPage")}
+					title={t("common.table.nextPage")}
 				>
 					<ChevronRight />
 				</Button>
@@ -350,14 +408,10 @@ export function PaginationBar({
 	);
 }
 
-export function TagList({
-	items,
-	emptyText = "—",
-}: {
-	items: string[];
-	emptyText?: string;
-}) {
-	if (items.length === 0) return <span className="text-xs text-muted-foreground">{emptyText}</span>;
+export function TagList({ items, emptyText }: { items: string[]; emptyText?: string }) {
+	const { t } = useTranslation();
+	const empty = emptyText ?? t("common.empty");
+	if (items.length === 0) return <span className="text-xs text-muted-foreground">{empty}</span>;
 	return (
 		<div className="flex flex-wrap gap-1">
 			{items.map((item) => (
@@ -373,12 +427,14 @@ export function TagList({
 export function ReadonlyBlock({
 	children,
 	className,
-	emptyText = "（空）",
+	emptyText,
 }: {
 	children: ReactNode;
 	className?: string;
 	emptyText?: string;
 }) {
+	const { t } = useTranslation();
+	const empty = emptyText ?? t("common.misc.emptyBlock");
 	const isEmpty =
 		children === null ||
 		children === undefined ||
@@ -390,7 +446,7 @@ export function ReadonlyBlock({
 				className,
 			)}
 		>
-			{isEmpty ? <span className="text-muted-foreground">{emptyText}</span> : children}
+			{isEmpty ? <span className="text-muted-foreground">{empty}</span> : children}
 		</div>
 	);
 }

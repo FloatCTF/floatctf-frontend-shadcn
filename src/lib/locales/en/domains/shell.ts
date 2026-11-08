@@ -1,0 +1,46 @@
+/** Shell copy (topbar / sidebar / command palette). */
+
+export default {
+	playerSubtitle: "Field · player workspace",
+	adminSubtitle: "Control Room · operations console",
+	playerSession: "Player session",
+	adminSession: "Admin session",
+	adminLabel: "Administrator",
+	notSignedIn: "Not signed in",
+	goPlayer: "Go to player view",
+	commandPanel: "Command palette",
+	skipToContent: "Skip to main content",
+	commands: {
+		focusFlag: "Focus the flag field",
+		refresh: "Refresh this page",
+	},
+	command: {
+		recent: "Recent",
+		adminNav: "Admin navigation",
+		playerNav: "Player navigation",
+		nav: "Navigation",
+		description: "Search pages and actions",
+		searchPlaceholder: "Search pages or page actions…",
+		empty: "No matching result.",
+		contextual: "Current page actions",
+		hints: "Hints",
+		openPalette: "Open command palette",
+		trigger: "Search",
+	},
+	notFound: {
+		title: "Page not found",
+		description: "This address has no matching page. The link may be stale, or the resource was deleted.",
+		toPlayer: "Back to player view",
+		toAdmin: "Go to admin",
+	},
+	renderError: {
+		title: "The interface failed to render",
+		hint: "If this keeps happening, refresh the page; your session will not be lost.",
+	},
+	toggleNav: "Toggle navigation",
+	navigation: "Navigation",
+	mobileNavDescription: "Every page entry; closes after you pick one.",
+	commandPlaceholder: "Search pages, challenges, accounts…",
+	commandEmpty: "No matching command",
+	commandHint: "Command palette",
+};

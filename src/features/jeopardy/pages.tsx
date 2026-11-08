@@ -7,14 +7,18 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Blocks, CheckCircle2, ChevronRight, Puzzle, Search } from "lucide-react";
 
 import { call, callList } from "~/api/call";
+import { isNotFound } from "~/api/errors";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { DataTable, type DataTableColumn } from "~/components/app/data-table";
 import {
+	MonoText,
 	PageBody,
+	FilterChips,
 	PageHeader,
 	PaginationBar,
 	SectionCard,
@@ -25,6 +29,7 @@ import {
 	LoadingBlock,
 	NotFoundBlock,
 	QueryState,
+	TableSkeleton,
 } from "~/components/app/states";
 import { TonePill } from "~/components/app/badges";
 import { Button } from "~/components/ui/button";
@@ -37,12 +42,19 @@ import {
 	SelectValue,
 } from "~/components/ui/select";
 import type { ChallengesListItem } from "@floatctf/sdk";
+import type { ChallengeSets } from "@floatctf/sdk/entity";
 import { formatRelative } from "~/lib/format";
 import { useDebouncedValue, useDocumentTitle, useNow } from "~/lib/hooks";
 import { ChallengeWorkbench, ChallengeWriteups } from "./workbench";
 
+/** 表格里统一的空值占位（theme.md §3.3）。 */
+function EmptyCell() {
+	return <span className="text-xs text-muted-foreground">—</span>;
+}
+
 export function ChallengesCatalogPage() {
-	useDocumentTitle("题库 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("jeopardy.list.documentTitle"));
 	const client = useClient();
 	const [search, setSearch] = useState("");
 	const [category, setCategory] = useState("all");
@@ -51,9 +63,16 @@ export function ChallengesCatalogPage() {
 	const [pageSize, setPageSize] = useState(20);
 	const debouncedSearch = useDebouncedValue(search, 300);
 
+	const clearFilters = () => {
+		setSearch("");
+		setCategory("all");
+		setOnlyUnsolved(false);
+		setPage(1);
+	};
+
 	const query = useQuery({
-		queryKey: qk.challenges.list({ limit: 200 }),
-		queryFn: () => callList(client.service.challenges.fetch({ limit: 200 })),
+		queryKey: qk.challenges.list({ page: 1, limit: 200 }),
+		queryFn: () => callList(client.service.challenges.fetch({ page: 1, limit: 200 })),
 	});
 
 	const items = query.data?.items ?? [];
@@ -81,59 +100,76 @@ export function ChallengesCatalogPage() {
 	const columns: DataTableColumn<ChallengesListItem>[] = [
 		{
 			id: "name",
-			header: "题目",
+			header: t("jeopardy.list.columns.challenge"),
 			sortValue: (row) => row.name,
 			cell: (row) => (
 				<div className="min-w-0">
 					<Link
 						to={`/challenges/${row.id}`}
 						className="truncate text-sm font-medium hover:underline"
+						title={row.name}
 					>
 						{row.name}
 					</Link>
-					<p className="truncate text-xs text-muted-foreground">{row.safe_name}</p>
+					<p className="truncate text-xs text-muted-foreground" title={row.safe_name}>
+						{row.safe_name}
+					</p>
 				</div>
 			),
 		},
 		{
 			id: "category",
-			header: "分类",
+			header: t("jeopardy.list.columns.category"),
 			sortValue: (row) => row.category,
-			cell: (row) => <TonePill tone="neutral">{row.category || "未分类"}</TonePill>,
+			cell: (row) => (
+				<TonePill tone="neutral">
+					{row.category || t("jeopardy.common.categoryFallback")}
+				</TonePill>
+			),
 		},
 		{
 			id: "version",
-			header: "版本",
+			header: t("jeopardy.list.columns.version"),
 			hideBelow: "sm",
 			sortValue: (row) => row.version ?? "",
-			cell: (row) => <span className="tnum font-mono text-xs">{row.version ?? "—"}</span>,
+			cell: (row) =>
+				row.version ? <MonoText>{row.version}</MonoText> : <EmptyCell />,
 		},
 		{
 			id: "author",
-			header: "作者",
+			header: t("jeopardy.list.columns.author"),
 			hideBelow: "md",
-			cell: (row) => <span className="text-xs">{row.author || "—"}</span>,
+			cell: (row) =>
+				row.author ? (
+					<span className="text-xs" data-user-data>
+						{row.author}
+					</span>
+				) : (
+					<EmptyCell />
+				),
 		},
 		{
 			id: "solved",
-			header: "状态",
+			header: t("jeopardy.list.columns.status"),
+			sortValue: (row) => (row.solved ? 1 : 0),
 			cell: (row) =>
 				row.solved ? (
-					<TonePill tone="success" icon={<CheckCircle2 />}>
-						已解出
+					<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
+						{t("jeopardy.common.solved")}
 					</TonePill>
 				) : (
-					<TonePill tone="muted">未解出</TonePill>
+					<TonePill tone="muted">{t("jeopardy.common.unsolved")}</TonePill>
 				),
 		},
 		{
 			id: "actions",
-			header: "",
+			header: <span className="sr-only">{t("jeopardy.list.columns.actions")}</span>,
 			align: "right",
 			cell: (row) => (
 				<Button variant="ghost" size="sm" asChild>
 					<Link to={`/challenges/${row.id}`}>
-						开始 <ChevronRight />
+						{t("jeopardy.list.start")}
+						<ChevronRight aria-hidden="true" />
 					</Link>
 				</Button>
 			),
@@ -143,13 +179,14 @@ export function ChallengesCatalogPage() {
 	return (
 		<PageBody>
 			<PageHeader
-				title="题库"
-				description="练习用题目集合。动态题启动后平台为你的实例生成独立 flag。"
+				title={t("jeopardy.list.title")}
+				description={t("jeopardy.list.subtitle")}
 				actions={
 					<Toolbar>
 						<Button variant="outline" asChild>
 							<Link to="/challenge-sets">
-								<Blocks /> 题集
+								<Blocks aria-hidden="true" />
+								{t("jeopardy.list.setsAction")}
 							</Link>
 						</Button>
 					</Toolbar>
@@ -157,86 +194,142 @@ export function ChallengesCatalogPage() {
 			/>
 
 			<SectionCard
-				title="全部题目"
+				title={t("jeopardy.list.cardTitle")}
 				description={
-					query.isSuccess
-						? `共 ${items.length} 道，当前筛选后 ${filtered.length} 道`
-						: undefined
-				}
-				actions={
-					<Toolbar>
-						<div className="relative">
-							<Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground" />
-							<Input
-								value={search}
-								onChange={(event) => {
-									setSearch(event.target.value);
-									setPage(1);
-								}}
-								placeholder="搜索题名 / 分类 / 描述"
-								className="w-56 pl-8"
-							/>
-						</div>
-						<Select
-							value={category}
-							onValueChange={(value) => {
-								setCategory(value);
-								setPage(1);
-							}}
-						>
-							<SelectTrigger className="w-36" aria-label="分类筛选">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="all">全部分类</SelectItem>
-								{categories.map((item) => (
-									<SelectItem key={item} value={item}>
-										{item}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						<Button
-							variant={onlyUnsolved ? "default" : "outline"}
-							size="sm"
-							onClick={() => {
-								setOnlyUnsolved((value) => !value);
-								setPage(1);
-							}}
-						>
-							{onlyUnsolved ? "只看未解出" : "含已解出"}
-						</Button>
-					</Toolbar>
+					query.isSuccess ? (
+						<span className="tnum">
+							{filtered.length === items.length
+								? t("jeopardy.list.countAll", { total: items.length })
+								: t("jeopardy.list.countSummary", {
+										total: items.length,
+										filtered: filtered.length,
+									})}
+						</span>
+					) : undefined
 				}
 				contentClassName="px-0"
 				footer={
-					<PaginationBar
-						page={page}
-						pageSize={pageSize}
-						total={filtered.length}
-						onPageChange={setPage}
-						onPageSizeChange={(size) => {
-							setPageSize(size);
-							setPage(1);
-						}}
-					/>
+					filtered.length > 0 ? (
+						<PaginationBar
+							page={page}
+							pageSize={pageSize}
+							total={filtered.length}
+							onPageChange={setPage}
+							onPageSizeChange={(size) => {
+								setPageSize(size);
+								setPage(1);
+							}}
+						/>
+					) : null
 				}
 			>
+				<Toolbar className="px-4 pb-4">
+					<div className="relative w-full sm:w-56">
+						<Search
+							className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+							aria-hidden="true"
+						/>
+						<Input
+							value={search}
+							onChange={(event) => {
+								setSearch(event.target.value);
+								setPage(1);
+							}}
+							placeholder={t("jeopardy.list.searchPlaceholder")}
+							aria-label={t("jeopardy.list.searchLabel")}
+							className="pl-8"
+						/>
+					</div>
+					<Select
+						value={category}
+						onValueChange={(value) => {
+							setCategory(value);
+							setPage(1);
+						}}
+					>
+						<SelectTrigger
+							className="w-full sm:w-36"
+							aria-label={t("jeopardy.list.categoryFilterLabel")}
+						>
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="all">{t("jeopardy.list.allCategories")}</SelectItem>
+							{categories.map((item) => (
+								<SelectItem key={item} value={item}>
+									{item}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+					<Button
+						variant={onlyUnsolved ? "default" : "outline"}
+						size="sm"
+						aria-pressed={onlyUnsolved}
+						onClick={() => {
+							setOnlyUnsolved((value) => !value);
+							setPage(1);
+						}}
+					>
+						{onlyUnsolved
+							? t("jeopardy.list.onlyUnsolved")
+							: t("jeopardy.list.includeSolved")}
+					</Button>
+				</Toolbar>
+				<FilterChips
+					filters={[
+						...(category !== "all"
+							? [
+									{
+										key: "category",
+										label: category,
+										onRemove: () => {
+											setCategory("all");
+											setPage(1);
+										},
+									},
+								]
+							: []),
+						...(onlyUnsolved
+							? [
+									{
+										key: "unsolved",
+										label: t("jeopardy.list.onlyUnsolved"),
+										onRemove: () => {
+											setOnlyUnsolved(false);
+											setPage(1);
+										},
+									},
+								]
+							: []),
+					]}
+					onClearAll={clearFilters}
+					className="px-4"
+				/>
 				<QueryState
 					query={query}
-					skeleton={<LoadingBlock label="加载题库…" />}
+					skeleton={<TableSkeleton rows={8} columns={5} />}
 					isEmpty={() => items.length === 0}
 					empty={
 						<EmptyBlock
-							title="题库还是空的"
-							description="管理员导入题目后会出现在这里。"
-							icon={<Puzzle className="size-5" />}
+							title={t("jeopardy.list.emptyTitle")}
+							description={t("jeopardy.list.emptyDescription")}
 						/>
 					}
+					errorTitle={t("jeopardy.list.loadError")}
 				>
 					{() =>
 						filtered.length === 0 ? (
-							<EmptyBlock variant="filtered" />
+							<EmptyBlock
+								variant="filtered"
+								title={t("jeopardy.list.filteredTitle")}
+								description={t("jeopardy.list.filteredDescription")}
+								action={
+									<Button variant="outline" size="sm" onClick={clearFilters}>
+										{t("jeopardy.list.filteredAction")}
+									</Button>
+								}
+							/>
 						) : (
 							<DataTable
 								data={paged}
@@ -248,14 +341,27 @@ export function ChallengesCatalogPage() {
 											<Link
 												to={`/challenges/${row.id}`}
 												className="truncate text-sm font-medium hover:underline"
+												title={row.name}
 											>
 												{row.name}
 											</Link>
-											<p className="text-xs text-muted-foreground">
-												{row.category || "未分类"} · {row.solved ? "已解出" : "未解出"}
+											<p className="truncate text-xs text-muted-foreground">
+												{row.category || t("jeopardy.common.categoryFallback")}
 											</p>
 										</div>
-										<ChevronRight className="size-4 text-muted-foreground" />
+										<div className="flex shrink-0 items-center gap-2">
+											{row.solved ? (
+												<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
+													{t("jeopardy.common.solved")}
+												</TonePill>
+											) : (
+												<TonePill tone="muted">{t("jeopardy.common.unsolved")}</TonePill>
+											)}
+											<ChevronRight
+												className="size-4 text-muted-foreground"
+												aria-hidden="true"
+											/>
+										</div>
 									</div>
 								)}
 							/>
@@ -268,6 +374,7 @@ export function ChallengesCatalogPage() {
 }
 
 export function ChallengeDetailPage() {
+	const { t } = useTranslation();
 	const { challengeId = "" } = useParams<{ challengeId: string }>();
 	const client = useClient();
 	const query = useQuery({
@@ -276,35 +383,69 @@ export function ChallengeDetailPage() {
 		enabled: challengeId !== "",
 	});
 
+	useDocumentTitle(
+		query.data
+			? t("jeopardy.detail.documentTitle", { name: query.data.name })
+			: t("jeopardy.detail.documentTitleFallback"),
+	);
+
+	if (query.isError && isNotFound(query.error)) {
+		return (
+			<PageBody>
+				<NotFoundBlock
+					title={t("jeopardy.detail.notFoundTitle")}
+					description={t("jeopardy.detail.notFoundDescription")}
+					action={
+						<Button asChild variant="outline">
+							<Link to="/challenges">{t("jeopardy.detail.backToCatalog")}</Link>
+						</Button>
+					}
+				/>
+			</PageBody>
+		);
+	}
+
 	return (
-		<PageBody>
-			<QueryState query={query} skeleton={<LoadingBlock label="加载题目…" />} errorTitle="加载题目失败">
+		<PageBody className="lg:flex lg:h-[calc(100svh-3.5rem)] lg:flex-col lg:gap-4 lg:space-y-0 lg:overflow-hidden">
+			<QueryState
+				query={query}
+				skeleton={<LoadingBlock label={t("jeopardy.detail.loading")} className="lg:flex-1" />}
+				errorTitle={t("jeopardy.detail.loadError")}
+			>
 				{(challenge) => (
 					<>
 						<PageHeader
 							title={challenge.name}
-							description={challenge.safe_name}
+							description={<MonoText>{challenge.safe_name}</MonoText>}
 							breadcrumbs={
 								<span className="flex items-center gap-1">
 									<Link to="/challenges" className="hover:underline">
-										题库
+										{t("jeopardy.detail.breadcrumbCatalog")}
 									</Link>
-									<ChevronRight className="size-3" />
-									<span>{challenge.category || "未分类"}</span>
+									<ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
+									<span>{challenge.category || t("jeopardy.common.categoryFallback")}</span>
 								</span>
 							}
 							badge={
 								challenge.solved ? (
-									<TonePill tone="success" icon={<CheckCircle2 />}>
-										已解出
+									<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
+										{t("jeopardy.common.solved")}
 									</TonePill>
 								) : null
 							}
 						/>
-						<ChallengeWorkbench challenge={challenge} mode={{ kind: "practice" }} />
-						<SectionCard title="公开题解" description="其他选手分享的解题思路。">
-							<ChallengeWriteups challengeId={challengeId} />
-						</SectionCard>
+						<ChallengeWorkbench
+							challenge={challenge}
+							mode={{ kind: "practice" }}
+							className="lg:min-h-0 lg:flex-1"
+						>
+							<SectionCard
+								title={t("jeopardy.detail.writeupsTitle")}
+								description={t("jeopardy.detail.writeupsDescription")}
+							>
+								<ChallengeWriteups challengeId={challengeId} />
+							</SectionCard>
+						</ChallengeWorkbench>
 					</>
 				)}
 			</QueryState>
@@ -313,7 +454,8 @@ export function ChallengeDetailPage() {
 }
 
 export function ChallengeSetsPage() {
-	useDocumentTitle("题集 · FloatCTF");
+	const { t } = useTranslation();
+	useDocumentTitle(t("jeopardy.sets.documentTitle"));
 	const client = useClient();
 	const now = useNow(60_000);
 	const query = useQuery({
@@ -324,21 +466,28 @@ export function ChallengeSetsPage() {
 	return (
 		<PageBody>
 			<PageHeader
-				title="题集"
-				description="按主题组织的题目集合，适合专项训练。"
+				title={t("jeopardy.sets.title")}
+				description={t("jeopardy.sets.subtitle")}
 				actions={
 					<Button variant="outline" asChild>
 						<Link to="/challenges">
-							<Puzzle /> 全部题目
+							<Puzzle aria-hidden="true" />
+							{t("jeopardy.sets.allChallenges")}
 						</Link>
 					</Button>
 				}
 			/>
 			<QueryState
 				query={query}
-				skeleton={<LoadingBlock label="加载题集…" />}
+				skeleton={<LoadingBlock label={t("jeopardy.sets.loading")} />}
+				errorTitle={t("jeopardy.sets.loadError")}
 				isEmpty={(sets) => sets.length === 0}
-				empty={<EmptyBlock title="还没有题集" icon={<Blocks className="size-5" />} />}
+				empty={
+					<EmptyBlock
+						title={t("jeopardy.sets.emptyTitle")}
+						description={t("jeopardy.sets.emptyDescription")}
+					/>
+				}
 			>
 				{(sets) => (
 					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -350,13 +499,16 @@ export function ChallengeSetsPage() {
 								actions={
 									<Button variant="ghost" size="sm" asChild>
 										<Link to={`/challenge-sets/${set.id}`}>
-											打开 <ChevronRight />
+											{t("jeopardy.sets.open")}
+											<ChevronRight aria-hidden="true" />
 										</Link>
 									</Button>
 								}
 							>
-								<p className="text-xs text-muted-foreground">
-									更新于 {formatRelative(set.updated_at, now)}
+								<p className="tnum text-xs text-muted-foreground">
+									{t("jeopardy.sets.updatedAt", {
+										time: formatRelative(set.updated_at, now),
+									})}
 								</p>
 							</SectionCard>
 						))}
@@ -368,6 +520,8 @@ export function ChallengeSetsPage() {
 }
 
 export function ChallengeSetDetailPage() {
+	const { t } = useTranslation();
+	useDocumentTitle(t("jeopardy.setDetail.documentTitle"));
 	const { setId = "" } = useParams<{ setId: string }>();
 	const client = useClient();
 	const query = useQuery({
@@ -375,54 +529,142 @@ export function ChallengeSetDetailPage() {
 		queryFn: () => call(client.service.challenges.getChallengeSet(setId), "题集详情"),
 		enabled: setId !== "",
 	});
+	// 后端 getChallengeSet 对不存在的 id 返回空数组（与「空题集」无法区分），
+	// 用题集列表确认存在性；列表页使用同一 key，通常直接命中缓存。
+	const setsQuery = useQuery({
+		queryKey: qk.sets.list({}),
+		queryFn: () => call<ChallengeSets[]>(client.service.challenges.getChallengeSets(), "题集列表"),
+	});
+
+	if (setsQuery.isSuccess && !setsQuery.data.some((item) => item.id === setId)) {
+		return (
+			<PageBody>
+				<NotFoundBlock
+					title={t("jeopardy.setDetail.notFoundTitle")}
+					description={t("jeopardy.setDetail.notFoundDescription")}
+					action={
+						<Button asChild variant="outline">
+							<Link to="/challenge-sets">{t("jeopardy.setDetail.backToSets")}</Link>
+						</Button>
+					}
+				/>
+			</PageBody>
+		);
+	}
+
+	const columns: DataTableColumn<ChallengesListItem>[] = [
+		{
+			id: "name",
+			header: t("jeopardy.setDetail.columns.challenge"),
+			sortValue: (row) => row.name,
+			cell: (row) => (
+				<div className="min-w-0">
+					<Link
+						to={`/challenges/${row.id}`}
+						className="truncate text-sm font-medium hover:underline"
+						title={row.name}
+					>
+						{row.name}
+					</Link>
+					<p className="truncate text-xs text-muted-foreground" title={row.safe_name}>
+						{row.safe_name}
+					</p>
+				</div>
+			),
+		},
+		{
+			id: "category",
+			header: t("jeopardy.setDetail.columns.category"),
+			sortValue: (row) => row.category,
+			cell: (row) => (
+				<TonePill tone="neutral">
+					{row.category || t("jeopardy.common.categoryFallback")}
+				</TonePill>
+			),
+		},
+		{
+			id: "solved",
+			header: t("jeopardy.setDetail.columns.status"),
+			align: "right",
+			sortValue: (row) => (row.solved ? 1 : 0),
+			cell: (row) =>
+				row.solved ? (
+					<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
+						{t("jeopardy.common.solved")}
+					</TonePill>
+				) : (
+					<TonePill tone="muted">{t("jeopardy.common.unsolved")}</TonePill>
+				),
+		},
+	];
 
 	return (
 		<PageBody>
 			<PageHeader
-				title="题集内容"
+				title={t("jeopardy.setDetail.title")}
 				breadcrumbs={
 					<Link to="/challenge-sets" className="hover:underline">
-						题集
+						{t("jeopardy.setDetail.breadcrumbSets")}
 					</Link>
 				}
 			/>
 			<QueryState
 				query={query}
-				skeleton={<LoadingBlock label="加载题集…" />}
-				errorTitle="加载题集失败"
+				skeleton={<LoadingBlock label={t("jeopardy.setDetail.loading")} />}
+				errorTitle={t("jeopardy.setDetail.loadError")}
 				isEmpty={(items) => items.length === 0}
-				empty={<NotFoundBlock title="题集里还没有题目" />}
+				empty={
+					<NotFoundBlock
+						title={t("jeopardy.setDetail.emptyTitle")}
+						description={t("jeopardy.setDetail.emptyDescription")}
+						action={
+							<Button variant="outline" asChild>
+								<Link to="/challenge-sets">{t("jeopardy.setDetail.backToSets")}</Link>
+							</Button>
+						}
+					/>
+				}
 			>
 				{(items) => (
-					<SectionCard title={`共 ${items.length} 道题`} contentClassName="px-0">
-						<ul className="divide-y">
-							{items.map((challenge) => (
-								<li key={challenge.id}>
-									<Link
-										to={`/challenges/${challenge.id}`}
-										className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-muted/40"
-									>
-										<div className="min-w-0">
-											<p className="truncate text-sm font-medium">{challenge.name}</p>
-											<p className="truncate text-xs text-muted-foreground">
-												{challenge.category || "未分类"}
-											</p>
-										</div>
-										{challenge.solved ? (
-											<TonePill tone="success" icon={<CheckCircle2 />}>
-												已解出
-											</TonePill>
-										) : (
-											<ChevronRight className="size-4 text-muted-foreground" />
-										)}
-									</Link>
-								</li>
-							))}
-						</ul>
+					<SectionCard
+						title={
+							<span className="tnum">
+								{t("jeopardy.setDetail.count", { count: items.length })}
+							</span>
+						}
+						contentClassName="px-0"
+					>
+						<DataTable
+							data={items}
+							getRowId={(row) => row.id}
+							columns={columns}
+							mobileCard={(row) => (
+								<div className="flex items-center justify-between gap-3">
+									<div className="min-w-0">
+										<Link
+											to={`/challenges/${row.id}`}
+											className="truncate text-sm font-medium hover:underline"
+											title={row.name}
+										>
+											{row.name}
+										</Link>
+										<p className="truncate text-xs text-muted-foreground">
+											{row.category || t("jeopardy.common.categoryFallback")}
+										</p>
+									</div>
+									{row.solved ? (
+										<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
+											{t("jeopardy.common.solved")}
+										</TonePill>
+									) : (
+										<TonePill tone="muted">{t("jeopardy.common.unsolved")}</TonePill>
+									)}
+								</div>
+							)}
+						/>
 					</SectionCard>
 				)}
 			</QueryState>
 		</PageBody>
 	);
 }
-

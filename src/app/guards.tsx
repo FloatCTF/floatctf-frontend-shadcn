@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
 
 import { useIsAdminAuthenticated, useIsUserAuthenticated } from "~/auth/store";
+import { safeNextPath } from "~/lib/safe-next";
 
 function currentPath(): string {
 	if (typeof window === "undefined") return "/";
@@ -43,13 +44,16 @@ export function RedirectIfAuthenticated({
 	scope?: "user" | "admin";
 	to?: string;
 }) {
+	const location = useLocation();
 	const user = useIsUserAuthenticated();
 	const admin = useIsAdminAuthenticated();
 	const authenticated = scope === "admin" ? admin : user;
 	if (authenticated) {
-		const params = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
-		const next = params.get("next");
-		return <Navigate to={next && next.startsWith("/") ? next : to} replace />;
+		// 用 router 的 location 而不是 window.location.search：
+		// 登录成功时 onSuccess 与守卫会在同一次提交里各跳一次，读 window 会读到已跳走的 URL，
+		// 于是 next 丢失、被兜底到 "/"（曾经导致 ?next= 深链失效）。
+		const params = new URLSearchParams(location.search);
+		return <Navigate to={safeNextPath(params.get("next"), to)} replace />;
 	}
 	return <>{children}</>;
 }
