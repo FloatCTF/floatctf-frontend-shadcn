@@ -281,3 +281,15 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 复测：w-2 正文/作者/打开 Run 正常；无效 ID 只有 not-found 块。
 
 验证：`vite build` / i18n / theme / mock-check 全绿。
+
+## 第 14 轮补充（选手端无效题集）
+
+已完成：
+
+- **选手端无效题集显示 not-found**：后端 `GET /challenge_sets/:id` 对不存在的 id 返回空数组，
+  与「空题集」无法区分。现在详情页同时读题集列表（与列表页同 queryKey，通常命中缓存），
+  确认 id 不存在时显示「题集不存在 + 返回题集」，不再显示“题集里还没有题目”的误导空状态。
+- 补中英文 `jeopardy.setDetail.notFound*` 文案。
+- 复测：`/challenge-sets/does-not-exist` 只有 not-found；`set-1` 正常显示 1 道题与已解出状态。
+
+验证：`vite build` / i18n / theme / mock-check 全绿（i18n 5013 keys）。
