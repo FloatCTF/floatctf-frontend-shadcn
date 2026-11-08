@@ -800,10 +800,17 @@ function SettingFormSheet({
 				{row ? (
 					<div className="flex items-center gap-2 text-xs text-muted-foreground">
 						<span>{t("adminPlatform.settings.field.resolvedLabel")}</span>
-						<CopyText
-							value={row.resolved_value ?? ""}
-							label={t("adminPlatform.settings.field.resolvedCopyLabel")}
-						/>
+						{isSensitiveKey(form.key) ? (
+							<SecretValue
+								value={row.resolved_value ?? ""}
+								label={t("adminPlatform.settings.field.resolvedCopyLabel")}
+							/>
+						) : (
+							<CopyText
+								value={row.resolved_value ?? ""}
+								label={t("adminPlatform.settings.field.resolvedCopyLabel")}
+							/>
+						)}
 					</div>
 				) : null}
 			</form>
