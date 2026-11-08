@@ -1086,6 +1086,9 @@ const awdpEvaluations = () =>
 		: [];
 // E6 是个人赛（individual）：积分榜主体必须是选手，不是战队。
 // 当前默认阶段是 Break，Fix 分只能为 0（否则会出现「Break 阶段已有 Fix 得分」）。
+// 初始 fixture 中 E6 的 web-shop 已经是「已被攻破」状态；再次提交应走 already_broken，
+// 不能凭空再加一次 Break 分。
+const awdpBroken = new Set(["e0a1b2c3-0006-4a11-9a11-000000000006:egb-awdp-1"]);
 const awdpScores = [
 	{ subject_id: "s-1", subject_name: "李明", break_score: 200, fix_score: 0, total_score: 200, rank: 1 },
 	{ subject_id: "s-2", subject_name: "0x7f", break_score: 200, fix_score: 0, total_score: 200, rank: 2 },
@@ -1897,8 +1900,24 @@ const routes = [
 		return ok(res, currentAwdpInstance());
 	}],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
-	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/break$/, (_m, res) =>
-		ok(res, { accepted: true, scored: true, already_broken: false })],
+	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/break$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const key = `${m[1]}:${m[2]}`;
+			if (String(body.flag ?? "").trim() !== "flag{mock_awdp_flag}") {
+				return ok(res, { accepted: false, scored: false, already_broken: false });
+			}
+			if (awdpBroken.has(key)) {
+				return ok(res, { accepted: true, scored: false, already_broken: true });
+			}
+			awdpBroken.add(key);
+			const meScore = awdpScores.find((row) => row.subject_name === "李明");
+			if (meScore) {
+				meScore.break_score += 200;
+				meScore.total_score += 200;
+			}
+			broadcastSse({ type: "score.updated", sequence: Date.now(), occurred_at: iso(now) });
+			return ok(res, { accepted: true, scored: true, already_broken: false });
+		})],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/patch$/, (_m, res) =>
 		ok(res, { status: "applied", error_message: null })],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/test-check$/, (_m, res) =>
@@ -1945,8 +1964,7 @@ const routes = [
 		])],
 
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/instance\/stop$/, (_m, res) => ok(res, null)],
-	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/break$/, (_m, res) =>
-		ok(res, { accepted: true, scored: true, already_broken: false })],
+
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/patch$/, (_m, res) =>
 		ok(res, { status: "applied", error_message: null })],
 	["POST", /^\/api\/events\/([^/]+)\/awdp\/gameboxes\/([^/]+)\/test-check$/, (_m, res) =>
