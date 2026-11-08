@@ -510,6 +510,11 @@ export function EventWorkspacePage() {
 								badge={
 									<div className="flex flex-wrap items-center gap-2">
 										<EventStatusPill event={data.event} />
+										{liveBeforeWindow ? (
+											<TonePill tone="success">
+												{t("events.workspace.earlyStart")}
+											</TonePill>
+										) : null}
 										<TonePill tone="neutral">{labels.family(data.event.family)}</TonePill>
 										<TonePill tone="neutral">{labels.mode(data.event.participant_mode)}</TonePill>
 										{data.joined ? (
@@ -634,7 +639,9 @@ export function EventWorkspacePage() {
 													? data.joined
 														? t("events.workspace.teamCardDescriptionJoined")
 														: t("events.workspace.teamCardDescription")
-													: participationGate(data.event, now.getTime()).kind === "open"
+													: liveBeforeWindow
+														? t("events.workspace.participationLocked")
+														: participationGate(data.event, now.getTime()).kind === "open"
 														? t("events.workspace.participationOpen")
 														: participationGate(data.event, now.getTime()).kind === "closed"
 															? t("events.participation.notOpenHint")
@@ -643,7 +650,11 @@ export function EventWorkspacePage() {
 																: t("events.workspace.participationLocked")
 											}
 										>
-											{isTeam ? <TeamPanel info={data} /> : <JoinLeaveControl info={data} />}
+											{isTeam ? (
+												<TeamPanel info={data} locked={liveBeforeWindow} />
+											) : (
+												<JoinLeaveControl info={data} locked={liveBeforeWindow} />
+											)}
 										</SectionCard>
 									)}
 								</div>

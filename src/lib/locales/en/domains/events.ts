@@ -163,6 +163,7 @@ export default {
 		notFoundTitle: "Event not found",
 		notFoundDescription: "This event may have been deleted, hidden, or the link is invalid.",
 		joinedBadge: "Participating",
+		earlyStart: "Started early",
 		backToList: "Back to events",
 		tabs: {
 			overview: "Overview",

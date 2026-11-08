@@ -150,7 +150,7 @@ export function EventFactsCard({ event }: { event: Events }) {
 }
 
 /** 个人赛参赛 / 退赛（仅未开始时可用）。 */
-export function JoinLeaveControl({ info }: { info: EventInfo }) {
+export function JoinLeaveControl({ info, locked = false }: { info: EventInfo; locked?: boolean }) {
 	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
@@ -162,7 +162,7 @@ export function JoinLeaveControl({ info }: { info: EventInfo }) {
 		now.getTime(),
 	);
 	const gate = participationGate(info.event, now.getTime());
-	const canJoin = gate.kind === "open";
+	const canJoin = !locked && gate.kind === "open";
 
 	const invalidate = () => {
 		void queryClient.invalidateQueries({ queryKey: qk.events.detail(info.event.id) });
@@ -190,9 +190,9 @@ export function JoinLeaveControl({ info }: { info: EventInfo }) {
 	});
 
 	const gateReason =
-		gate.kind === "closed"
-			? t("events.participation.notOpenHint")
-			: t("events.participation.lockedHint");
+		locked || gate.kind !== "closed"
+			? t("events.participation.lockedHint")
+			: t("events.participation.notOpenHint");
 
 	// 练习赛 / 系统托管赛事：后端明确拒绝自助报名，这里不显示按钮，避免「点了必失败」。
 	if (gate.kind === "not-competition" || gate.kind === "system-managed") {
@@ -252,14 +252,14 @@ export function JoinLeaveControl({ info }: { info: EventInfo }) {
 }
 
 /** 战队赛：建队 / 用 Team ID 加入 / 退队 / 查看成员。 */
-export function TeamPanel({ info }: { info: EventInfo }) {
+export function TeamPanel({ info, locked = false }: { info: EventInfo; locked?: boolean }) {
 	const { t } = useTranslation();
 	const client = useClient();
 	const queryClient = useQueryClient();
 	const confirm = useConfirm();
 	const now = useNow(30_000);
 	const gate = participationGate(info.event, now.getTime());
-	const canChange = gate.kind === "open";
+	const canChange = !locked && gate.kind === "open";
 	const [teamName, setTeamName] = useState("");
 	const [teamId, setTeamId] = useState("");
 

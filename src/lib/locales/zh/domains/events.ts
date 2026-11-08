@@ -160,6 +160,7 @@ export default {
 		notFoundTitle: "赛事不存在",
 		notFoundDescription: "该赛事可能已被删除、隐藏，或链接已失效。",
 		joinedBadge: "已参赛",
+		earlyStart: "已提前开赛",
 		backToList: "返回赛事列表",
 		tabs: {
 			overview: "总览",
