@@ -803,7 +803,8 @@ const trainingRun = (phase = mockRunPhase, runId = "run-1") => ({
 	finished_at: null,
 	current_round: phase === "fix" ? 1 : 0,
 	next_action_at: iso(now + 25 * 60000),
-	my_score: phase === "pending" ? 0 : 100,
+	// 分数只在 Fix 阶段（有回合判定）后产生；Break 刚开始时应为 0。
+	my_score: phase === "fix" || phase === "ended" ? 100 : 0,
 	fix_round_penalty: 10,
 	source_code_dir: "src/web-shop",
 	instances: [currentRunInstance()],
