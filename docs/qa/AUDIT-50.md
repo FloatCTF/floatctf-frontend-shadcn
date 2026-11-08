@@ -492,3 +492,18 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 320×568 扫 15 条重点路由：无横向溢出、无 console error。
 
 验证：`vite build` / i18n（5024 keys）/ theme 全绿。
+
+## 第 26 轮补充（题集创建假失败）
+
+真实后端 `POST /api/admin/challenge_sets` 成功时返回 `data: null`（`ok_none()`），
+但 SDK 把返回类型标成 `ChallengeSets`；页面用 `call<ChallengeSets>` 解析，
+于是：
+
+- 后端已创建题集；
+- 前端却弹「保存题集失败：没有返回数据」；
+- 列表不刷新，用户以为没创建，实际库里已经多了一条。
+
+修复：创建与编辑都改用 `callVoid`（页面不使用返回值），成功后 toast + invalidate。
+实测创建 `Working Set QA` 成功，列表立即出现；后端记录一致。
+
+验证：`vite build` / i18n（5024 keys）/ theme 全绿。
