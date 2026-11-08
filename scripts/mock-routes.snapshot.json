@@ -1,6 +1,10 @@
 {
-	"generatedAt": "2026-11-08T04:47:27.378Z",
+	"generatedAt": "2026-11-08T05:24:03.737Z",
 	"routes": [
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/announcements"
+		},
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/awd\\/gameboxes"
@@ -12,6 +16,10 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/challenge_sets\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/challenges"
 		},
 		{
 			"method": "DELETE",
@@ -27,6 +35,14 @@
 		},
 		{
 			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/announcements"
+		},
+		{
+			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/gameboxes\\/([^/]+)"
 		},
 		{
@@ -36,6 +52,14 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/teams"
 		},
 		{
 			"method": "DELETE",
@@ -252,6 +276,10 @@
 		{
 			"method": "GET",
 			"pattern": "\\/api\\/admin\\/roles"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/roles\\/([^/]+)"
 		},
 		{
 			"method": "GET",
@@ -487,11 +515,31 @@
 		},
 		{
 			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/announcements\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
 			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/([^/]+)"
 		},
 		{
 			"method": "PATCH",
 			"pattern": "\\/api\\/admin\\/awd\\/network"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/challenge_sets\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/challenges\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/announcements\\/([^/]+)"
 		},
 		{
 			"method": "PATCH",
@@ -507,6 +555,10 @@
 		},
 		{
 			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "PATCH",
 			"pattern": "\\/api\\/admin\\/roles\\/([^/]+)"
 		},
 		{
@@ -516,6 +568,10 @@
 		{
 			"method": "PATCH",
 			"pattern": "\\/api\\/admin\\/settings\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/users\\/([^/]+)"
 		},
 		{
 			"method": "PATCH",
@@ -543,6 +599,10 @@
 		},
 		{
 			"method": "POST",
+			"pattern": "\\/api\\/admin\\/announcements"
+		},
+		{
+			"method": "POST",
 			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/([^/]+)\\/hide"
 		},
 		{
@@ -567,7 +627,15 @@
 		},
 		{
 			"method": "POST",
+			"pattern": "\\/api\\/admin\\/challenges"
+		},
+		{
+			"method": "POST",
 			"pattern": "\\/api\\/admin\\/database\\/exec_sql"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/docker\\/containers\\/([^/]+)\\/start"
 		},
 		{
 			"method": "POST",
@@ -576,6 +644,14 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/admin\\/docker\\/networks"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/announcements"
 		},
 		{
 			"method": "POST",
@@ -623,6 +699,14 @@
 		},
 		{
 			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/challenges\\/(open|hidden)"
+		},
+		{
+			"method": "POST",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/teams\\/([^/]+)\\/banned"
 		},
 		{
@@ -663,11 +747,19 @@
 		},
 		{
 			"method": "POST",
+			"pattern": "\\/api\\/admin\\/users"
+		},
+		{
+			"method": "POST",
 			"pattern": "\\/api\\/admin\\/weapons"
 		},
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/admin\\/weapons\\/([^/]+)\\/upload"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/challenges\\/([^/]+)\\/my_writeup"
 		},
 		{
 			"method": "POST",
@@ -820,6 +912,10 @@
 		{
 			"method": "PUT",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/network"
+		},
+		{
+			"method": "PUT",
+			"pattern": "\\/api\\/admin\\/users\\/([^/]+)\\/roles"
 		},
 		{
 			"method": "PUT",

@@ -301,6 +301,8 @@ const teams = [
 // 否则会出现「战队面板 1240 / 积分榜高亮 Kernel Panic / 加的分跑到 0x7f」这种自相矛盾。
 const MY_AWD_TEAM_INDEX = 3;
 const MY_AWD_TEAM_ID = `team-${MY_AWD_TEAM_INDEX}`;
+const mockRemovedTeamIds = new Set();
+const mockTeamBans = new Set();
 
 // mock 的基准参赛关系：E1（Jeopardy）与 E2（AWD）默认已参赛。
 // 注意：AWD 选手端接口在真实后端会 403 未参赛账号，mock 必须同构。
@@ -515,6 +517,18 @@ const adminEvents = events.map((event, index) => ({
 	event_user_count: 12,
 }));
 
+/** 新建 / 编辑赛事后同时刷新管理端列表里的行，避免「保存成功但列表不变」。 */
+function syncAdminEvent(event) {
+	const row = {
+		...event,
+		event_challenge_count: event.family === "jeopardy" ? eventChallenges.length : 0,
+		event_user_count: eventMemberIds(event.id).length,
+	};
+	const index = adminEvents.findIndex((item) => item.id === event.id);
+	if (index >= 0) adminEvents[index] = row;
+	else adminEvents.push(row);
+}
+
 const dashboardSummary = {
 	stats: {
 		users: 128,
@@ -671,7 +685,9 @@ const awdpAdminInstances = [
  * 否则管理端「按战队调分」会改到另一个队、积分榜看起来没反应。
  */
 const awdTeams = (eventId) =>
-	teams.slice(0, 3).map(([name, score], index) => ({
+	teams
+		.slice(0, 3)
+		.map(([name, score], index) => ({
 		id: `team-${index}`,
 		team: {
 			id: `team-${index}`,
@@ -681,8 +697,8 @@ const awdTeams = (eventId) =>
 			points: score,
 			created_at: iso(now - 3 * D),
 			updated_at: iso(now - 2 * H),
-			// 第三支队伍标记为已封禁，用于验证封禁态展示。
-			banned: index === 2,
+			// 第三支队伍默认封禁；管理端封禁/解封要能反映到这份状态。
+			banned: index === 2 || mockTeamBans.has(`team-${index}`),
 		},
 		captain: index === 0 ? "李明" : `队长 ${index}`,
 		members: [
@@ -691,33 +707,45 @@ const awdTeams = (eventId) =>
 				? [{ username: "2024009", nickname: "NOP Sled", role: "member", points: Math.round(score / 2) }]
 				: []),
 		],
-	}));
+	}))
+		.filter((team) => !mockRemovedTeamIds.has(team.id));
 
 // ── 管理端 AWD 运维（赛事状态机 / 网络 / 赛事靶机 / 预检）──────────────
-let awdAdminStatus = process.env.MOCK_AWD_ADMIN_STATUS ?? "running";
+// 每场 AWD 赛事各自的状态：不能用一份全局 running 让「未开始」的赛事也显示攻击期。
+const awdStatusOverrides = new Map();
 const awdAdminOverrides = {};
-const awdAdminState = (eventId) => ({
-	event_id: eventId,
-	status: awdAdminStatus,
-	phase: ["running", "paused"].includes(awdAdminStatus) ? "attack" : "hardening",
-	round_count: 8,
-	round_duration_secs: 600,
-	initial_score: 1000,
-	free_reset_count: 2,
-	extra_reset_penalty: 50,
-	judge_max_concurrency: 8,
-	judge_default_timeout_secs: 120,
-	judge_retry_interval_secs: 30,
-	archive_retention_hours: 72,
-	planned_start_at: iso(now - 2 * H),
-	verified_at: awdAdminStatus === "draft" || awdAdminStatus === "configuring" ? null : iso(now - 3 * H),
-	started_at: ["running", "paused", "finished", "archived"].includes(awdAdminStatus)
-		? iso(now - 40 * 60000)
-		: null,
-	updated_at: iso(now - 5 * 60000),
-	final_settlement: false,
-	...awdAdminOverrides[eventId],
-});
+function awdStatusFor(eventId) {
+	const override = awdStatusOverrides.get(eventId);
+	if (override) return override;
+	const event = events.find((item) => item.id === eventId);
+	if (event && Date.parse(event.start_time) > Date.now()) return "verified";
+	return process.env.MOCK_AWD_ADMIN_STATUS ?? "running";
+}
+const awdAdminState = (eventId) => {
+	const status = awdStatusFor(eventId);
+	return {
+		event_id: eventId,
+		status,
+		phase: ["running", "paused"].includes(status) ? "attack" : "hardening",
+		round_count: 8,
+		round_duration_secs: 600,
+		initial_score: 1000,
+		free_reset_count: 2,
+		extra_reset_penalty: 50,
+		judge_max_concurrency: 8,
+		judge_default_timeout_secs: 120,
+		judge_retry_interval_secs: 30,
+		archive_retention_hours: 72,
+		planned_start_at: iso(now - 2 * H),
+		verified_at: status === "draft" || status === "configuring" ? null : iso(now - 3 * H),
+		started_at: ["running", "paused", "finished", "archived"].includes(status)
+			? iso(now - 40 * 60000)
+			: null,
+		updated_at: iso(now - 5 * 60000),
+		final_settlement: false,
+		...awdAdminOverrides[eventId],
+	};
+};
 const awdEventNetwork = (eventId) => ({
 	event_id: eventId,
 	allocation_mode: "automatic",
@@ -941,6 +969,7 @@ const awdScoreRows = () =>
 				total_score: score,
 			};
 		})
+		.filter((row) => !mockRemovedTeamIds.has(row.team_id))
 		.sort((a, b) => b.total_score - a.total_score)
 		.map((row, index) => ({ ...row, rank: index + 1 }));
 
@@ -1135,6 +1164,7 @@ const sse = (res, req) => {
 };
 
 let mockWriteup = null;
+const mockMyWriteups = {};
 let mockAwdBonus = 0;
 
 
@@ -1166,6 +1196,8 @@ let mockUsers = [
 
 
 /** 角色列表（mock）：内置超级管理员 + 可创建的自定义角色。 */
+const mockPermissionKeys = ["events.manage", "users.manage", "roles.manage"];
+const mockUserRoles = new Map([[me.id, ["r-1"]]]);
 let mockRoles = [
 	{
 		id: "r-1",
@@ -1606,7 +1638,7 @@ const routes = [
 	// 管理端 AWD：生命周期（状态机）/ 网络 / 赛事靶机 / 实例 / 预检 / 积分 / 战队
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/(deploy|start|pause|resume|finish|archive)$/, (m, res) => {
 		const next = { deploy: "deployed", start: "running", pause: "paused", resume: "running", finish: "finished", archive: "archived" }[m[2]];
-		awdAdminStatus = next;
+		awdStatusOverrides.set(m[1], next);
 		broadcastSse({ type: "precheck.updated", sequence: Date.now(), occurred_at: iso(now) });
 		return ok(res, null);
 	}],
@@ -1665,8 +1697,20 @@ const routes = [
 	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awd\/gameboxes\/([^/]+)$/, (m, res) => ok(res, awdEventGameboxes(m[1])[0])],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd\/instances$/, (_m, res) => ok(res, [])],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/teams$/, (m, res) => ok(res, awdTeams(m[1]))],
-	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/teams\/([^/]+)\/ban$/, (_m, res) => ok(res, "team banned")],
-	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awd\/teams\/([^/]+)\/ban$/, (_m, res) => ok(res, null)],
+	["DELETE", /^\/api\/admin\/events\/([^/]+)\/teams$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			for (const id of ids) mockRemovedTeamIds.add(id);
+			return ok(res, ids.filter((id) => id.startsWith("team-")).length);
+		})],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/teams\/([^/]+)\/ban$/, (m, res) => {
+		mockTeamBans.add(m[2]);
+		return ok(res, "team banned");
+	}],
+	["DELETE", /^\/api\/admin\/events\/([^/]+)\/awd\/teams\/([^/]+)\/ban$/, (m, res) => {
+		mockTeamBans.delete(m[2]);
+		return ok(res, null);
+	}],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/score\/adjust$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const idx = Number(String(body.team_id ?? "").replace("team-", ""));
@@ -2087,7 +2131,21 @@ const routes = [
 			return ok(res, null);
 		})],
 	["GET", /^\/api\/challenges\/([^/]+)\/writeups$/, (_m, res, req) => ok(res, challengeWriteups, req)],
-	["GET", /^\/api\/challenges\/([^/]+)\/my_writeup$/, (_m, res) => ok(res, null)],
+	["GET", /^\/api\/challenges\/([^/]+)\/my_writeup$/, (m, res) => ok(res, mockMyWriteups[m[1]] ?? null)],
+	["POST", /^\/api\/challenges\/([^/]+)\/my_writeup$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const existing = mockMyWriteups[m[1]];
+			const writeup = {
+				id: existing?.id ?? `cw-${Date.now()}`,
+				challenge_id: m[1],
+				user_id: me.id,
+				content: String(body.content ?? ""),
+				created_at: existing?.created_at ?? iso(now),
+				updated_at: iso(now),
+			};
+			mockMyWriteups[m[1]] = writeup;
+			return ok(res, writeup);
+		})],
 	["POST", /^\/api\/challenges\/([^/]+)\/submit$/, (_m, res) => ok(res, { correct: true, points: 500 })],
 	// 选手端题集：与管理员端同一份状态（mockChallengeSets / mockSetChallenges），
 	// 否则会出现「管理端有 1 个题集、选手端却显示还没有题集」。
@@ -2225,17 +2283,18 @@ const routes = [
 			return json(res, 403, { code: 403, message: "你不是本赛事的参赛者", data: null, meta: null });
 		}
 		// 管理端阶段推进必须反映到选手端；不能各写一份「正在攻击」的假状态。
-		const running = awdAdminStatus === "running";
-		const paused = awdAdminStatus === "paused";
+		const status = awdStatusFor(eventId);
+		const running = status === "running";
+		const paused = status === "paused";
 		ok(res, {
 			event_id: eventId,
-			status: running ? "running" : paused ? "paused" : awdAdminStatus,
+			status,
 			phase: running || paused ? "attack" : "hardening",
 			current_round: running ? 3 : 0,
 			round_count: 8,
 			banned: process.env.MOCK_TEAM_BANNED === "1",
 			score: teams[MY_AWD_TEAM_INDEX][1] + mockAwdBonus,
-			final_settlement: awdAdminStatus === "finished",
+			final_settlement: status === "finished",
 		});
 	}],
 	["GET", /^\/api\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => {
@@ -2434,6 +2493,47 @@ const routes = [
 		const key = url.searchParams.get("key") ?? "download.bin";
 		return ok(res, `/public/${key.replace(/^\/+/, "")}`);
 	}],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/challenges$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.challenge_id_list)
+				? body.challenge_id_list.map(String)
+				: body.challenge_id
+					? [String(body.challenge_id)]
+					: [];
+			for (const id of ids) {
+				const challenge = challenges.find((item) => item.id === id);
+				if (challenge && !eventChallenges.some((item) => item.challenge.id === id)) {
+					eventChallenges.push({
+						id,
+						challenge,
+						current_points: Number(body.points ?? 500),
+						solved_count: 0,
+						solved: false,
+						solved_no: 0,
+					});
+				}
+			}
+			return ok(res, []);
+		})],
+	["PATCH", /^\/api\/admin\/events\/([^/]+)\/challenges$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.challenge_id_list) ? body.challenge_id_list.map(String) : [];
+			const points = Number(body.points ?? 0);
+			for (const item of eventChallenges) {
+				if (ids.includes(item.challenge.id)) item.current_points = points;
+			}
+			return ok(res, []);
+		})],
+	["DELETE", /^\/api\/admin\/events\/([^/]+)\/challenges$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const before = eventChallenges.length;
+			for (let index = eventChallenges.length - 1; index >= 0; index -= 1) {
+				if (ids.includes(eventChallenges[index].challenge.id)) eventChallenges.splice(index, 1);
+			}
+			return ok(res, before - eventChallenges.length);
+		})],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/challenges\/(open|hidden)$/, (_m, res) => ok(res, [])],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/challenges$/, (m, res, req) =>
 		okPage(
 			res,
@@ -2454,11 +2554,49 @@ const routes = [
 			announcements.map((item) => ({ ...item, event_id: m[1] })),
 			req,
 		)],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/announcements$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const announcement = {
+				id: `a-${Date.now()}`,
+				event_id: m[1],
+				title: String(body.title ?? "未命名公告"),
+				content: String(body.content ?? ""),
+				publisher: String(body.publisher ?? "赛事组委会"),
+				created_at: iso(now),
+				updated_at: iso(now),
+			};
+			announcements.push(announcement);
+			return ok(res, announcement);
+		})],
+	["PATCH", /^\/api\/admin\/events\/([^/]+)\/announcements\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const announcement = announcements.find((item) => item.id === m[2]);
+			if (!announcement) return json(res, 404, { code: 404, message: "公告不存在", data: null, meta: null });
+			announcement.title = String(body.title ?? announcement.title);
+			announcement.content = String(body.content ?? announcement.content);
+			announcement.updated_at = iso(now);
+			return ok(res, { ...announcement, event_id: m[1] });
+		})],
+	["DELETE", /^\/api\/admin\/events\/([^/]+)\/announcements$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const before = announcements.length;
+			for (let index = announcements.length - 1; index >= 0; index -= 1) {
+				if (ids.includes(announcements[index].id)) announcements.splice(index, 1);
+			}
+			return ok(res, before - announcements.length);
+		})],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/users$/, (m, res, req) => {
 		return okPage(res, eventUserRows(m[1]).filter((row) => mockFilterMatch(req, row)), req);
 	}],
-	["POST", /^\/api\/admin\/events\/([^/]+)\/teams\/([^/]+)\/banned$/, (_m, res) => ok(res, null)],
-	["POST", /^\/api\/admin\/events\/([^/]+)\/teams\/([^/]+)\/unbanned$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/teams\/([^/]+)\/banned$/, (m, res) => {
+		mockTeamBans.add(m[2]);
+		return ok(res, null);
+	}],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/teams\/([^/]+)\/unbanned$/, (m, res) => {
+		mockTeamBans.delete(m[2]);
+		return ok(res, null);
+	}],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/users\/([^/]+)\/banned$/, (m, res) => {
 		mockMemberBans.add(`${m[1]}:${m[2]}`);
 		// 真实后端是 UniResponse::ok_none()（data:null），不是回传成员对象。
@@ -2486,8 +2624,59 @@ const routes = [
 			return ok(res, matched.length);
 		})],
 	["GET", /^\/api\/admin\/events$/, (_m, res, req) => okPage(res, adminEvents.filter((e) => mockFilterMatch(req, e)), req)],
+	["POST", /^\/api\/admin\/events$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const created = {
+				id: crypto.randomUUID(),
+				title: String(body.title ?? "未命名赛事"),
+				description: String(body.description ?? ""),
+				hidden: Boolean(body.hidden ?? false),
+				start_time: String(body.start_time ?? iso(now)),
+				end_time: body.end_time ? String(body.end_time) : null,
+				rules: String(body.rules ?? ""),
+				allow_join: Boolean(body.allow_join ?? true),
+				flag_prefix: String(body.flag_prefix ?? "flag{"),
+				created_at: iso(now),
+				updated_at: iso(now),
+				family: body.family ?? "jeopardy",
+				purpose: body.purpose ?? "competition",
+				participant_mode: body.participant_mode ?? "individual",
+				is_virtual: Boolean(body.is_virtual ?? false),
+				system_key: null,
+			};
+			events.push(created);
+			syncAdminEvent(created);
+			return ok(res, created);
+		})],
+	["PATCH", /^\/api\/admin\/events\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const event = events.find((item) => item.id === m[1]);
+			if (!event) return json(res, 404, { code: 404, message: "未找到该赛事", data: null, meta: null });
+			for (const key of ["title", "description", "rules", "flag_prefix", "start_time", "end_time"]) {
+				if (body[key] !== undefined) event[key] = body[key];
+			}
+			if (body.hidden !== undefined) event.hidden = Boolean(body.hidden);
+			if (body.allow_join !== undefined) event.allow_join = Boolean(body.allow_join);
+			event.updated_at = iso(now);
+			syncAdminEvent(event);
+			return ok(res, event);
+		})],
+	["DELETE", /^\/api\/admin\/events$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const count = events.filter((event) => ids.includes(event.id)).length;
+			for (let index = events.length - 1; index >= 0; index -= 1) {
+				if (ids.includes(events[index].id)) events.splice(index, 1);
+			}
+			for (let index = adminEvents.length - 1; index >= 0; index -= 1) {
+				if (ids.includes(adminEvents[index].id)) adminEvents.splice(index, 1);
+			}
+			return ok(res, count);
+		})],
 	["GET", /^\/api\/admin\/events\/([^/]+)$/, (m, res) => {
-		ok(res, adminEvents.find((item) => item.id === m[1]) ?? adminEvents[0]);
+		const event = adminEvents.find((item) => item.id === m[1]);
+		if (!event) return json(res, 404, { code: 404, message: "未找到该赛事", data: null, meta: null });
+		return ok(res, event);
 	}],
 	["GET", /^\/api\/admin\/scheduled_tasks$/, (_m, res, req) => {
 		const rows = mockTasks;
@@ -2633,6 +2822,47 @@ const routes = [
 			trend: isJeopardy ? trend : [],
 		});
 	}],
+	["POST", /^\/api\/admin\/challenges$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const challenge = {
+				id: `c-${Date.now()}`,
+				name: String(body.name ?? "未命名题目"),
+				safe_name: String(body.safe_name ?? "unnamed"),
+				category: String(body.category ?? "Misc"),
+				description: String(body.description ?? ""),
+				hidden: Boolean(body.hidden ?? false),
+				version: "1.0.0",
+				author: "admin",
+				created_at: iso(now),
+				updated_at: iso(now),
+				recommended_cpu_millis: 100,
+				recommended_memory_bytes: 134217728,
+				recommended_pids_limit: 64,
+				build_status: "ready",
+				solved: false,
+			};
+			challenges.push(challenge);
+			return ok(res, challenge);
+		})],
+	["PATCH", /^\/api\/admin\/challenges\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const challenge = challenges.find((item) => item.id === m[1]);
+			if (!challenge) return json(res, 404, { code: 404, message: "题目不存在", data: null, meta: null });
+			for (const key of ["name", "safe_name", "category", "description", "hidden", "version", "author"]) {
+				if (body[key] !== undefined) challenge[key] = body[key];
+			}
+			challenge.updated_at = iso(now);
+			return ok(res, challenge);
+		})],
+	["DELETE", /^\/api\/admin\/challenges$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const before = challenges.length;
+			for (let index = challenges.length - 1; index >= 0; index -= 1) {
+				if (ids.includes(challenges[index].id)) challenges.splice(index, 1);
+			}
+			return ok(res, before - challenges.length);
+		})],
 	["GET", /^\/api\/admin\/challenges$/, (_m, res, req) => okPage(res, challenges.filter((c) => mockFilterMatch(req, c)), req)],
 	["GET", /^\/api\/admin\/challenge_sets$/, (_m, res, req) => okPage(res, mockChallengeSets, req)],
 	["POST", /^\/api\/admin\/challenge_sets$/, (_m, res, req) =>
@@ -2646,6 +2876,15 @@ const routes = [
 			};
 			mockChallengeSets.push(set);
 			mockSetChallenges[set.id] = [];
+			return ok(res, set);
+		})],
+	["PATCH", /^\/api\/admin\/challenge_sets\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const set = mockChallengeSets.find((item) => item.id === m[1]);
+			if (!set) return json(res, 404, { code: 404, message: "题集不存在", data: null, meta: null });
+			if (body.name !== undefined) set.name = String(body.name);
+			if (body.description !== undefined) set.description = String(body.description);
+			set.updated_at = iso(now);
 			return ok(res, set);
 		})],
 	["DELETE", /^\/api\/admin\/challenge_sets$/, (_m, res, req) =>
@@ -2675,6 +2914,38 @@ const routes = [
 		})],
 	["GET", /^\/api\/admin\/users$/, (_m, res, req) =>
 		okPage(res, mockUsers.filter((row) => mockFilterMatch(req, row)), req)],
+	["POST", /^\/api\/admin\/users$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const username = String(body.username ?? "").trim();
+			if (!username) return json(res, 200, { code: 400, message: "用户名不能为空", data: null, meta: null });
+			if (mockUsers.some((user) => user.username === username)) {
+				return json(res, 200, { code: 409, message: "用户名已存在", data: null, meta: null });
+			}
+			const user = {
+				id: crypto.randomUUID(),
+				username,
+				nickname: String(body.nickname ?? username),
+				email: String(body.email ?? ""),
+				avatar: null,
+				created_at: iso(now),
+				updated_at: iso(now),
+				permissions: [],
+				grants_all: false,
+				password: body.password ? "$argon2id$mock" : "",
+			};
+			mockUsers.push(user);
+			return ok(res, user);
+		})],
+	["PATCH", /^\/api\/admin\/users\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const user = mockUsers.find((item) => item.id === m[1]);
+			if (!user) return json(res, 404, { code: 404, message: "用户不存在", data: null, meta: null });
+			for (const key of ["username", "nickname", "email"]) {
+				if (body[key] !== undefined) user[key] = String(body[key]);
+			}
+			user.updated_at = iso(now);
+			return ok(res, user);
+		})],
 	["DELETE", /^\/api\/admin\/users$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
@@ -2682,8 +2953,37 @@ const routes = [
 			mockUsers = mockUsers.filter((row) => !ids.includes(row.id));
 			return ok(res, before - mockUsers.length);
 		})],
-	["GET", /^\/api\/admin\/users\/([^/]+)\/roles$/, (m, res) =>
-		ok(res, { user_id: m[1], username: me.username, roles: [], permissions: [] })],
+	["GET", /^\/api\/admin\/users\/([^/]+)\/roles$/, (m, res) => {
+		const user = mockUsers.find((row) => row.id === m[1]);
+		if (!user) return json(res, 404, { code: 404, message: "用户不存在", data: null, meta: null });
+		const roleIds = mockUserRoles.get(m[1]) ?? [];
+		const roles = mockRoles.filter((role) => roleIds.includes(role.id));
+		return ok(res, {
+			user_id: user.id,
+			username: user.username,
+			roles: roles.map((role) => ({ id: role.id, key: role.key, name: role.name })),
+			permissions: roles.flatMap((role) =>
+				role.grants_all ? mockPermissionKeys : role.permissions,
+			),
+		});
+	}],
+	["PUT", /^\/api\/admin\/users\/([^/]+)\/roles$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const user = mockUsers.find((row) => row.id === m[1]);
+			if (!user) return json(res, 404, { code: 404, message: "用户不存在", data: null, meta: null });
+			const ids = Array.isArray(body.role_ids) ? body.role_ids.map(String) : [];
+			const existing = ids.filter((id) => mockRoles.some((role) => role.id === id));
+			mockUserRoles.set(m[1], existing);
+			const roles = mockRoles.filter((role) => existing.includes(role.id));
+			return ok(res, {
+				user_id: user.id,
+				username: user.username,
+				roles: roles.map((role) => ({ id: role.id, key: role.key, name: role.name })),
+				permissions: roles.flatMap((role) =>
+					role.grants_all ? mockPermissionKeys : role.permissions,
+				),
+			});
+		})],
 	["GET", /^\/api\/admin\/permissions$/, (_m, res) =>
 		ok(res, [
 			{ key: "events.manage", domain: "事件", description: "管理赛事", high_risk: false },
@@ -2691,7 +2991,19 @@ const routes = [
 			{ key: "roles.manage", domain: "身份", description: "管理角色与权限", high_risk: true },
 		])],
 	["GET", /^\/api\/admin\/permissions\/domains$/, (_m, res) => ok(res, ["事件", "身份"])],
-	["GET", /^\/api\/admin\/roles$/, (_m, res) => ok(res, mockRoles)],
+	["GET", /^\/api\/admin\/roles$/, (_m, res) =>
+		ok(
+			res,
+			mockRoles.map((role) => ({
+				...role,
+				user_count: [...mockUserRoles.values()].filter((ids) => ids.includes(role.id)).length,
+			})),
+		)],
+	["GET", /^\/api\/admin\/roles\/([^/]+)$/, (m, res) => {
+		const role = mockRoles.find((item) => item.id === m[1]);
+		if (!role) return json(res, 404, { code: 404, message: "角色不存在", data: null, meta: null });
+		return ok(res, role);
+	}],
 	["POST", /^\/api\/admin\/roles$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const key = String(body.key ?? "").trim();
@@ -2816,6 +3128,12 @@ const routes = [
 		box.status = "exited";
 		return ok(res, null);
 	}],
+	["POST", /^\/api\/admin\/docker\/containers\/([^/]+)\/start$/, (m, res) => {
+		const box = mockDockerContainers.find((row) => row.id === m[1]);
+		if (!box) return json(res, 404, { code: 404, message: "容器不存在", data: null, meta: null });
+		box.status = "running";
+		return ok(res, null);
+	}],
 	["DELETE", /^\/api\/admin\/docker\/containers\/([^/]+)$/, (m, res) => {
 		const index = mockDockerContainers.findIndex((row) => row.id === m[1]);
 		if (index < 0) return json(res, 404, { code: 404, message: "容器不存在", data: null, meta: null });
@@ -2864,6 +3182,37 @@ const routes = [
 	["GET", /^\/api\/admin\/docker\/images$/, (_m, res, req) => okPage(res, mockDockerImages, req)],
 	["GET", /^\/api\/admin\/docker\/networks$/, (_m, res, req) => okPage(res, mockDockerNetworks, req)],
 	["GET", /^\/api\/admin\/announcements$/, (_m, res, req) => okPage(res, announcements.filter((a) => mockFilterMatch(req, a)), req)],
+	["POST", /^\/api\/admin\/announcements$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const announcement = {
+				id: `a-${Date.now()}`,
+				title: String(body.title ?? "未命名公告"),
+				content: String(body.content ?? ""),
+				publisher: String(body.publisher ?? "组委会"),
+				created_at: iso(now),
+				updated_at: iso(now),
+			};
+			announcements.push(announcement);
+			return ok(res, announcement);
+		})],
+	["PATCH", /^\/api\/admin\/announcements\/([^/]+)$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const announcement = announcements.find((item) => item.id === m[1]);
+			if (!announcement) return json(res, 404, { code: 404, message: "公告不存在", data: null, meta: null });
+			announcement.title = String(body.title ?? announcement.title);
+			announcement.content = String(body.content ?? announcement.content);
+			announcement.updated_at = iso(now);
+			return ok(res, announcement);
+		})],
+	["DELETE", /^\/api\/admin\/announcements$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const before = announcements.length;
+			for (let index = announcements.length - 1; index >= 0; index -= 1) {
+				if (ids.includes(announcements[index].id)) announcements.splice(index, 1);
+			}
+			return ok(res, before - announcements.length);
+		})],
 	["GET", /^\/api\/admin\/discussions$/, (_m, res, req) => okPage(res, discussions.filter((d) => mockFilterMatch(req, d)), req)],
 	["POST", /^\/api\/admin\/weapons$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
