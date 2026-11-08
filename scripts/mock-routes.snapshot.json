@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T02:30:54.803Z",
+	"generatedAt": "2026-11-08T02:34:27.183Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -444,6 +444,10 @@
 		{
 			"method": "PATCH",
 			"pattern": "\\/api\\/admin\\/awd\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "PATCH",
+			"pattern": "\\/api\\/admin\\/awd\\/network"
 		},
 		{
 			"method": "PATCH",

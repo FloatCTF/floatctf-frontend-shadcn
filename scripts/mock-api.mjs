@@ -1362,6 +1362,27 @@ let mockGameboxLibrary = [
 	},
 ];
 
+
+/** 平台网络设置（mock）：地址池前缀必须自洽（子网前缀 > 地址池前缀），否则表单会拒绝保存。 */
+let mockNetworkConfig = {
+	gamebox_pool: "10.32.0.0/12",
+	gamebox_event_prefix: 16,
+	gamebox_team_prefix: 24,
+	wireguard_pool: "10.64.0.0/12",
+	wireguard_event_prefix: 16,
+	wireguard_team_prefix: 24,
+	wireguard_port_min: 51820,
+	wireguard_port_max: 51900,
+	wireguard_public_endpoint: "vpn.example.edu:51820",
+	updated_at: iso(now - 12 * D),
+	gamebox_event_capacity: 16,
+	gamebox_team_capacity_per_event: 256,
+	gamebox_hosts_per_team: 254,
+	wireguard_event_capacity: 16,
+	wireguard_team_capacity_per_event: 256,
+	wireguard_port_capacity: 81,
+};
+
 const routes = [
 
 
@@ -1938,24 +1959,15 @@ const routes = [
 		})],
 
 	// 平台网络（AWD 地址池 + 宿主观测 + 分配账本）
-	["GET", /^\/api\/admin\/awd\/network$/, (_m, res) =>
-		ok(res, {
-			gamebox_pool: "10.42.16.0/20",
-			gamebox_event_prefix: 16,
-			gamebox_team_prefix: 8,
-			wireguard_pool: "10.66.0.0/16",
-			wireguard_event_prefix: 21,
-			wireguard_team_prefix: 24,
-			wireguard_port_min: 51820,
-			wireguard_port_max: 51900,
-			wireguard_public_endpoint: "vpn.example.edu:51820",
-			updated_at: iso(now - 12 * D),
-			gamebox_event_capacity: 15,
-			gamebox_team_capacity_per_event: 256,
-			gamebox_hosts_per_team: 6,
-			wireguard_event_capacity: 31,
-			wireguard_team_capacity_per_event: 256,
-			wireguard_port_capacity: 81,
+	["GET", /^\/api\/admin\/awd\/network$/, (_m, res) => ok(res, mockNetworkConfig)],
+	["PATCH", /^\/api\/admin\/awd\/network$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			mockNetworkConfig = {
+				...mockNetworkConfig,
+				...body,
+				updated_at: iso(now),
+			};
+			return ok(res, mockNetworkConfig);
 		})],
 	["GET", /^\/api\/admin\/awd\/network\/health$/, (_m, res) =>
 		ok(res, {
