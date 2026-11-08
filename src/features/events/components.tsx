@@ -528,7 +528,21 @@ export function EventWriteupPanel({ info }: { info: EventInfo }) {
 						accept="application/pdf"
 						aria-label={t("events.writeup.fileLabel")}
 						className="hidden"
-						onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+						onChange={(event) => {
+							const picked = event.target.files?.[0] ?? null;
+							// `accept` 只是选择器过滤，用户可切到「所有文件」：这里先挡一次非 PDF。
+							if (
+								picked &&
+								picked.type !== "application/pdf" &&
+								!picked.name.toLowerCase().endsWith(".pdf")
+							) {
+								toast.warning(t("events.writeup.notPdf"));
+								setFile(null);
+								event.target.value = "";
+								return;
+							}
+							setFile(picked);
+						}}
 					/>
 					<Button type="button" variant="outline" asChild>
 						<span>

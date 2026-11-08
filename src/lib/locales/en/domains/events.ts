@@ -126,10 +126,11 @@ export default {
 	},
 	writeup: {
 		title: "Post-event materials",
-		description: "Submit your write-up (PDF) after the event.",
+		description: "Submit your write-up (PDF): accepted before, during and after the event. Re-uploading replaces the previous file.",
 		loading: "Reading write-up status…",
 		submitted: "Write-up submitted",
 		notSubmitted: "No write-up (PDF) submitted yet.",
+		notPdf: "Choose a PDF file (the server only accepts files that pass PDF magic-byte validation).",
 		choose: "Choose PDF",
 		fileLabel: "Choose write-up PDF",
 		submit: "Submit write-up",

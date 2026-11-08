@@ -124,10 +124,11 @@ export default {
 	},
 	writeup: {
 		title: "赛后材料",
-		description: "提交赛后复盘（PDF），赛后可随时补交；重新上传会覆盖旧文件。",
+		description: "提交 Writeup（PDF）：赛前、赛中、赛后都可以提交；重新上传会覆盖旧文件。",
 		loading: "读取 writeup 状态…",
 		submitted: "已提交 writeup",
 		notSubmitted: "还没有提交 writeup（PDF）。",
+		notPdf: "请选择 PDF 文件（后端只接受 PDF 魔数校验通过的文件）。",
 		choose: "选择 PDF",
 		fileLabel: "选择 writeup PDF",
 		submit: "提交 writeup",
