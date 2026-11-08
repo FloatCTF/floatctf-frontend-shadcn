@@ -2503,8 +2503,8 @@ const routes = [
 	["POST", /^\/api\/events\/([^/]+)\/awd\/submissions$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const flag = String(body.flag ?? "").trim();
-			if (!/^flag\{.+\}$/i.test(flag)) {
-				return json(res, 200, { code: 400, message: "flag 不正确", data: null, meta: null });
+			if (flag !== "flag{mock_awd_flag}") {
+				return json(res, 200, { code: 400, message: "flag 错误", data: null, meta: null });
 			}
 			// 加分必须落在当前账号所在队伍（Byte Me），而不是随便加到榜首。
 			mockAwdBonus += 100;
