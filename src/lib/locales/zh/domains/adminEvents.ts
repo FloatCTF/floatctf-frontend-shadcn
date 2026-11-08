@@ -629,6 +629,7 @@ export default {
 	},
 	records: {
 		logs: {
+			self: "本人",
 			title: "赛事操作日志",
 			description: "平台在该赛事内记录的操作流水（管理端与选手端行为）。",
 			loadError: "加载赛事日志失败",

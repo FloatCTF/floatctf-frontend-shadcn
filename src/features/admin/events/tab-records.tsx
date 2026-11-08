@@ -14,7 +14,7 @@ import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Download, FileText, RefreshCw } from "lucide-react";
 
-import { callList, callMaybe } from "~/api/call";
+import { call, callList, callMaybe } from "~/api/call";
 import { useClient } from "~/api/client";
 import { qk } from "~/api/keys";
 import { TonePill, type PillTone } from "~/components/app/badges";
@@ -23,7 +23,7 @@ import { MonoText, SectionCard, Toolbar } from "~/components/app/page";
 import { EmptyBlock } from "~/components/app/states";
 import { toast } from "~/components/app/toast";
 import { Button } from "~/components/ui/button";
-import type { EventLogs, EventWriteup } from "@floatctf/sdk/entity";
+import type { EventLogs, EventWriteup, Users } from "@floatctf/sdk/entity";
 import { formatDateTime } from "~/lib/format";
 
 import { MobileFacts, PagedTable } from "./shared";
@@ -59,6 +59,13 @@ export function EventLogsTab({ eventId }: { eventId: string }): ReactNode {
 			callList<EventLogs>(client.admin.event_logs.fetch(eventId)({ page, limit: pageSize })),
 	});
 
+	// 操作者列：把当前账号显示成「本人」，其它 UUID 截断显示（title 保留完整值）。
+	const authQuery = useQuery({
+		queryKey: qk.auth.me(),
+		queryFn: () => call<Users>(client.service.users.getMe(), t("adminEvents.actions.loadEventInstances")),
+	});
+	const meId = authQuery.data?.id ?? "";
+
 	const columns: DataTableColumn<EventLogs>[] = [
 		{
 			id: "level",
@@ -89,8 +96,14 @@ export function EventLogsTab({ eventId }: { eventId: string }): ReactNode {
 			cell: (row) =>
 				row.user_id || row.team_id ? (
 					<span className="flex flex-col gap-1">
-						{row.user_id ? <MonoText>user {row.user_id}</MonoText> : null}
-						{row.team_id ? <MonoText>team {row.team_id}</MonoText> : null}
+						{row.user_id ? (
+							row.user_id === meId ? (
+								<span className="text-xs">{t("adminEvents.records.logs.self")}</span>
+							) : (
+								<MonoText title={row.user_id}>{`user ${row.user_id.slice(0, 8)}…`}</MonoText>
+							)
+						) : null}
+						{row.team_id ? <MonoText title={row.team_id}>{`team ${row.team_id}`}</MonoText> : null}
 					</span>
 				) : (
 					<span className="text-xs text-muted-foreground">{t("common.empty")}</span>

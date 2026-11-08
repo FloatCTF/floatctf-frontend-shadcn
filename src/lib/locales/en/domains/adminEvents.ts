@@ -665,6 +665,7 @@ export default {
 	},
 	records: {
 		logs: {
+			self: "You",
 			title: "Event operation logs",
 			description: "Operation stream recorded for this event (both admin and player actions).",
 			loadError: "Failed to load event logs",
