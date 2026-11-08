@@ -451,3 +451,18 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
   `patch.tar.gz` 规则拒绝，确认两处 AWDP 组件的补丁格式修复都生效。
 
 验证：`vite build` / i18n（5023 keys）/ theme 全绿。
+
+## 第 23 轮补充（AWDP 提前开赛的赛事入口）
+
+上一轮修了 `/lab/:id` 直链，但赛事工作区 `/events/:id` 仍只按 event 时间隐藏 AWDP 标签，
+玩家手动提前开赛时找不到入口。本轮补上：
+
+- 赛事工作区在已参赛且 event 仍 upcoming 时，按 family 查询 AWD status / AWDP overview：
+  - AWD 为 running / paused / network_error；
+  - AWDP 的 `started_at != null`；
+  满足则允许内容标签（arena / lab）出现。
+- 实测 AWDP 赛事在赛程开始前手动开赛后，`/events/:id` 出现「AWDP 概览」标签，
+  点击显示真实 Break 阶段、靶机数与「进入 AWDP 工作台」按钮。
+- 赛事头部仍按赛程显示「未开始」，但内容入口已与真实运行态一致；测试赛事已删除。
+
+验证：`vite build` / i18n（5023 keys）/ theme 全绿。
