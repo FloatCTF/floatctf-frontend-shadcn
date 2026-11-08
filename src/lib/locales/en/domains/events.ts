@@ -305,6 +305,10 @@ export default {
 	awd: {
 		statusAction: "AWD event status",
 		rulesDescription: "Read the event rules and scoring notes before the match.",
+		teamTitle: "My team",
+		teamDescription: "Team identity and members.",
+		teamName: "Team name",
+		teamId: "Team ID",
 		loading: "Reading AWD status…",
 		loadError: "Failed to read AWD status",
 		phase: "Event phase",

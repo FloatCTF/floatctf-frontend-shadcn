@@ -301,6 +301,10 @@ export default {
 	awd: {
 		statusAction: "AWD 赛事状态",
 		rulesDescription: "开赛前请阅读赛事规则与计分说明。",
+		teamTitle: "我的战队",
+		teamDescription: "战队身份与成员。",
+		teamName: "战队名称",
+		teamId: "战队 ID",
 		loading: "读取 AWD 状态…",
 		loadError: "读取 AWD 状态失败",
 		phase: "赛事阶段",
