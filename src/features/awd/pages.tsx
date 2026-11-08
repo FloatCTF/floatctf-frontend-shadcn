@@ -83,24 +83,35 @@ export function ArenaPage(): ReactNode {
 
 	// 后端对未参赛 / 未开始 / 赛制不符的赛事会直接拒绝选手端 AWD 接口。
 	// 先把闸门放在请求之前：深链接不会先打一发必失败的 403，再给一个没有出路的错误块。
+	// 但 AWD 可以管理员手动开赛：此时 event.start_time 可能仍在未来，AWD 状态才是权威。
+	const awdStatusQuery = useQuery({
+		queryKey: qk.awd.status(eventId),
+		queryFn: () =>
+			call<AwdPlayerStatus>(client.awd.player.status(eventId), t("awd.actionNames.status")),
+		enabled:
+			Boolean(eventId) &&
+			eventInfo !== undefined &&
+			eventInfo.event.family === "awd" &&
+			!isPracticeEvent(eventInfo.event) &&
+			eventInfo.joined,
+		retry: false,
+	});
+	const awdLive =
+		awdStatusQuery.data !== undefined &&
+		["running", "paused", "network_error"].includes(awdStatusQuery.data.status);
+
 	let access: WorkspaceAccessReason | null = null;
 	if (eventInfo) {
 		if (eventInfo.event.family !== "awd") access = "wrong-family";
 		else if (isPracticeEvent(eventInfo.event)) access = "practice";
 		else if (!eventInfo.joined) access = "not-joined";
-		else if (eventStatus === "upcoming") access = "not-started";
+		else if (eventStatus === "upcoming" && !awdLive) access = "not-started";
 	}
 	const canAccess = eventQuery.isSuccess && access === null;
 
 	const stream = useAwdEventStream({ eventId, enabled: Boolean(eventId) && canAccess });
 
-	const statusQuery = useQuery({
-		queryKey: qk.awd.status(eventId),
-		queryFn: () =>
-			call<AwdPlayerStatus>(client.awd.player.status(eventId), t("awd.actionNames.status")),
-		enabled: Boolean(eventId) && canAccess,
-		retry: false,
-	});
+	const statusQuery = awdStatusQuery;
 
 	// 命令面板的上下文命令：只注册本页真实存在的动作（聚焦提交框 / 刷新权威状态）。
 	useCommands(

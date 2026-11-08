@@ -114,11 +114,15 @@ export function AwdOpsPage() {
 			);
 			refreshAll();
 		},
-		onError: (error, action) =>
+		onError: (error, action) => {
 			toast.apiError(
 				t("adminAwdOps.lifecycle.submitFailed", { action: awdActionLabel(action, t) }),
 				error,
-			),
+			);
+			// 失败也可能已经改变后端状态（例如 Deploying -> DeployFailed）；
+			// 不刷新会让按钮继续基于旧状态可用，下一次点击收到非法状态转移。
+			refreshAll();
+		},
 	});
 
 	const gates = buildAwdGates(

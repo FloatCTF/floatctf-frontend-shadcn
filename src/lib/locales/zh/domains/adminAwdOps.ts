@@ -239,6 +239,8 @@ export default {
 			running: "比赛进行中：不能重新部署",
 			paused: "比赛已暂停：请先恢复或结束比赛",
 			networkError: "网络异常：请先恢复赛事",
+			deployFailed: "部署失败（deploy_failed）：请先在「配置」修改任意字段并保存（状态会回到配置中），再重新部署",
+			verificationFailed: "预检失败（verification_failed）：请先重新预检或保存配置回到配置中",
 			finished: "赛事已结束：不能重新部署",
 			archived: "赛事已归档：不能重新部署",
 		},

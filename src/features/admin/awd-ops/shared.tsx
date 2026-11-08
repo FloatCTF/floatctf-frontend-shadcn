@@ -362,12 +362,14 @@ const CONFIGURABLE_STATUSES: string[] = [
 ];
 
 /** 可（重新）部署的状态：处于运行前的配置态，允许修复后重试。 */
+// 后端虽然把 DeployFailed / VerificationFailed 归入 is_configurable()，但状态机的
+// 合法转移只有 DeployFailed -> Configuring、VerificationFailed -> Prechecking/Configuring；
+// 直接 Deploying 会被 "Invalid transition" 拒绝。因此这里不再把它们标成可部署，
+// 而是提示先保存配置/重新预检回到配置态。
 const DEPLOYABLE_STATUSES: string[] = [
 	AwdEventStatus.Draft,
 	AwdEventStatus.Configuring,
 	AwdEventStatus.Deployed,
-	AwdEventStatus.DeployFailed,
-	AwdEventStatus.VerificationFailed,
 ];
 
 const TERMINAL_STATUSES: string[] = [AwdEventStatus.Finished, AwdEventStatus.Archived];
@@ -381,6 +383,8 @@ const DEPLOY_BLOCK_KEYS: Record<string, string> = {
 	[AwdEventStatus.Running]: "adminAwdOps.gates.deployBlock.running",
 	[AwdEventStatus.Paused]: "adminAwdOps.gates.deployBlock.paused",
 	[AwdEventStatus.NetworkError]: "adminAwdOps.gates.deployBlock.networkError",
+	[AwdEventStatus.DeployFailed]: "adminAwdOps.gates.deployBlock.deployFailed",
+	[AwdEventStatus.VerificationFailed]: "adminAwdOps.gates.deployBlock.verificationFailed",
 	[AwdEventStatus.Finished]: "adminAwdOps.gates.deployBlock.finished",
 	[AwdEventStatus.Archived]: "adminAwdOps.gates.deployBlock.archived",
 };

@@ -268,6 +268,10 @@ export default {
 			running: "The competition is running: it cannot be redeployed",
 			paused: "The competition is paused: resume or finish it first",
 			networkError: "Network error: recover the event first",
+			deployFailed:
+				"Deployment failed (deploy_failed): change any configuration field and save (this returns the event to configuring), then deploy again",
+			verificationFailed:
+				"Precheck failed (verification_failed): rerun precheck or save the configuration to return to configuring",
 			finished: "The event has finished: it cannot be redeployed",
 			archived: "The event is archived: it cannot be redeployed",
 		},
