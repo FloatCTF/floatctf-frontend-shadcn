@@ -85,12 +85,15 @@ export function EventConsolePage(): ReactNode {
 	);
 
 	// 家族专属标签：其它家族下如果 URL 带着这些 tab，回退到「配置」。
+	// 「题目 / 数据大屏」是 Jeopardy 语义；AWD/AWDP 用各自运维页的 GameBox/数据标签，
+	// 否则 AWD 页面会出现「挂题数 0、累计解出 0」但积分榜有分的矛盾。
 	const rawTab = normalizeTab(searchParams.get("tab"));
-	const tab: TabKey =
-		(rawTab === "awd" && event !== null && event.family !== "awd") ||
-		(rawTab === "awdp" && event !== null && event.family !== "awdp")
-			? "config"
-			: rawTab;
+	const familyMismatch =
+		event !== null &&
+		((rawTab === "awd" && event.family !== "awd") ||
+			(rawTab === "awdp" && event.family !== "awdp") ||
+			((rawTab === "challenges" || rawTab === "data") && event.family !== "jeopardy"));
+	const tab: TabKey = familyMismatch ? "config" : rawTab;
 
 	function changeTab(next: string) {
 		const nextParams = new URLSearchParams(searchParams);
@@ -250,9 +253,11 @@ export function EventConsolePage(): ReactNode {
 						aria-label={t("adminEvents.console.tabsLabel")}
 					>
 						<TabsTrigger value="config">{t("adminEvents.console.tabs.config")}</TabsTrigger>
-						<TabsTrigger value="challenges">
-							{t("adminEvents.console.tabs.challenges")}
-						</TabsTrigger>
+						{event.family === "jeopardy" ? (
+							<TabsTrigger value="challenges">
+								{t("adminEvents.console.tabs.challenges")}
+							</TabsTrigger>
+						) : null}
 						<TabsTrigger value="members">{t("adminEvents.console.tabs.members")}</TabsTrigger>
 						<TabsTrigger value="teams">{t("adminEvents.console.tabs.teams")}</TabsTrigger>
 						<TabsTrigger value="announcements">
@@ -263,7 +268,9 @@ export function EventConsolePage(): ReactNode {
 						<TabsTrigger value="writeups">
 							{t("adminEvents.console.tabs.writeups")}
 						</TabsTrigger>
-						<TabsTrigger value="data">{t("adminEvents.console.tabs.data")}</TabsTrigger>
+						{event.family === "jeopardy" ? (
+							<TabsTrigger value="data">{t("adminEvents.console.tabs.data")}</TabsTrigger>
+						) : null}
 						{event.family === "awd" ? (
 							<TabsTrigger value="awd">{t("adminEvents.console.tabs.awd")}</TabsTrigger>
 						) : null}
@@ -276,9 +283,11 @@ export function EventConsolePage(): ReactNode {
 				<TabsContent value="config" className="mt-4">
 					<EventConfigTab event={event} />
 				</TabsContent>
-				<TabsContent value="challenges" className="mt-4">
-					<EventChallengesTab eventId={event.id} />
-				</TabsContent>
+				{event.family === "jeopardy" ? (
+					<TabsContent value="challenges" className="mt-4">
+						<EventChallengesTab eventId={event.id} />
+					</TabsContent>
+				) : null}
 				<TabsContent value="members" className="mt-4">
 					<EventMembersTab eventId={event.id} participantMode={event.participant_mode} />
 				</TabsContent>
@@ -297,9 +306,11 @@ export function EventConsolePage(): ReactNode {
 				<TabsContent value="writeups" className="mt-4">
 					<EventWriteupsTab eventId={event.id} />
 				</TabsContent>
-				<TabsContent value="data" className="mt-4">
-					<EventDataTab eventId={event.id} />
-				</TabsContent>
+				{event.family === "jeopardy" ? (
+					<TabsContent value="data" className="mt-4">
+						<EventDataTab eventId={event.id} />
+					</TabsContent>
+				) : null}
 				{event.family === "awd" ? (
 					<TabsContent value="awd" className="mt-4">
 						<EventAwdTab eventId={event.id} />
