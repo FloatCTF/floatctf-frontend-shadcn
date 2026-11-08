@@ -41,6 +41,7 @@ export default {
 			public: "公开",
 		},
 		noContainerPort: "无容器端口",
+		invalidZip: "文件不是 ZIP 归档（缺少 PK 魔数），请选择有效的题目包 / 靶机包。",
 		notConfigured: "未配置",
 		configured: "已配置",
 		noDescription: "无描述",

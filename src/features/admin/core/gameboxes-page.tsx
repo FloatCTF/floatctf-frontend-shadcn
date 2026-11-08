@@ -778,7 +778,7 @@ export function AdminGameboxesPage(): ReactNode {
 					type="file"
 					accept=".zip,application/zip"
 					className="hidden"
-					onChange={(event) => {
+					onChange={async (event) => {
 						const selected = event.target.files?.[0] ?? null;
 						event.target.value = "";
 						if (!selected) return;
@@ -787,6 +787,15 @@ export function AdminGameboxesPage(): ReactNode {
 								t("adminCore.gameboxes.toasts.zipOnly"),
 								t("adminCore.gameboxes.toasts.zipOnlyDescription"),
 							);
+							return;
+						}
+						const head = new Uint8Array(await selected.slice(0, 4).arrayBuffer());
+						if (
+							head[0] !== 0x50 ||
+							head[1] !== 0x4b ||
+							(head[2] !== 0x03 && head[2] !== 0x05 && head[2] !== 0x07)
+						) {
+							toast.error(t("adminCore.common.invalidZip"));
 							return;
 						}
 						setFile(selected);

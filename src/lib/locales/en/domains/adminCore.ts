@@ -41,6 +41,7 @@ export default {
 			public: "Public",
 		},
 		noContainerPort: "No container port",
+		invalidZip: "The file is not a ZIP archive (missing PK magic bytes); choose a valid challenge or GameBox package.",
 		notConfigured: "Not configured",
 		configured: "Configured",
 		noDescription: "No description",
