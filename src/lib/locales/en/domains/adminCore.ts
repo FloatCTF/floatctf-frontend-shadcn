@@ -504,7 +504,7 @@ export default {
 		picker: {
 			title: "Add challenges to set",
 			description:
-				"Pick challenges from the library; adding one that is already in the set is rejected by the backend unique constraint.",
+				"Pick challenges from the library; challenges already in the set cannot be selected again.",
 			searchPlaceholder: "Search challenge name / safe_name / category",
 			error: "Failed to load challenges",
 			empty: {

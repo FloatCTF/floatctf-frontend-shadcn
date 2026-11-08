@@ -99,8 +99,8 @@ function AddEventGameboxSheet({
 	const [hostOffset, setHostOffset] = useState("");
 	const [hidden, setHidden] = useState(false);
 	const [attackScore, setAttackScore] = useState("100");
-	const [judgeDownPenalty, setJudgeDownPenalty] = useState("200");
-	const [firstBonus, setFirstBonus] = useState("20");
+	const [judgeDownPenalty, setJudgeDownPenalty] = useState("20");
+	const [firstBonus, setFirstBonus] = useState("50");
 
 	const errors = {
 		host_offset: intOrError(hostOffset, 2, 254, t) ?? undefined,

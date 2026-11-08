@@ -487,7 +487,7 @@ export default {
 		},
 		picker: {
 			title: "向题集添加题目",
-			description: "从题库中选择题目；已加入的题目重复添加会被后端唯一约束拒绝。",
+			description: "从题库中选择题目；已在题集中的题目不可重复勾选。",
 			searchPlaceholder: "搜索题目名称 / safe_name / 分类",
 			error: "加载题库失败",
 			empty: {
