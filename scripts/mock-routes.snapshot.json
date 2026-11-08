@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T02:02:24.673Z",
+	"generatedAt": "2026-11-08T02:10:06.151Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -12,6 +12,10 @@
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/gameboxes\\/([^/]+)"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/users"
 		},
 		{
 			"method": "DELETE",
@@ -156,6 +160,10 @@
 		{
 			"method": "GET",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/teams"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/users"
 		},
 		{
 			"method": "GET",
@@ -484,6 +492,18 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/start"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/users"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/users\\/([^/]+)\\/banned"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/users\\/([^/]+)\\/unbanned"
 		},
 		{
 			"method": "POST",

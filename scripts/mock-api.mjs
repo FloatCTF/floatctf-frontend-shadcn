@@ -469,7 +469,7 @@ const adminEvents = events.map((event, index) => ({
 	...event,
 	// 管理端还有一些统计字段；缺省时页面按空值渲染
 	event_challenge_count: index === 0 ? challenges.length : 0,
-	event_user_count: index === 0 ? 42 : 12,
+	event_user_count: 25,
 }));
 
 const dashboardSummary = {
@@ -1266,6 +1266,37 @@ const weapons = [
 /** 训练 run 的 writeup（mock）：保存后再次读取应拿到同一份内容。 */
 let mockRunWriteup = { content: "", updated_at: null };
 
+
+/** 赛事成员（mock）：默认全部 mock 用户参赛；支持添加/移出/封禁。 */
+let mockEventMembers = {};
+const eventMemberIds = (eventId) => {
+	if (!mockEventMembers[eventId]) mockEventMembers[eventId] = mockUsers.map((user) => user.id);
+	return mockEventMembers[eventId];
+};
+
+
+/** 赛事成员封禁状态（mock）：`eventId:userId`。 */
+const mockMemberBans = new Set(["e0a1b2c3-0001-4a11-9a11-000000000001:u-2"]);
+
+
+/** 赛事成员行（含 user 与 event_user），供列表与封禁接口共用。 */
+const eventUserRows = (eventId) =>
+	mockUsers
+		.filter((user) => eventMemberIds(eventId).includes(user.id))
+		.map((user) => ({
+			id: user.id,
+			user,
+			username: user.username,
+			nickname: user.nickname,
+			event_user: {
+				event_id: eventId,
+				user_id: user.id,
+				points: 0,
+				banned: mockMemberBans.has(`${eventId}:${user.id}`),
+				joined_at: user.created_at,
+			},
+		}));
+
 const routes = [
 
 
@@ -1864,6 +1895,31 @@ const routes = [
 
 	// 管理端
 	["GET", /^\/api\/admin\/dashboard\/summary$/, (_m, res) => ok(res, dashboardSummary)],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/users$/, (m, res, req) => {
+		return okPage(res, eventUserRows(m[1]).filter((row) => mockFilterMatch(req, row)), req);
+	}],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/users\/([^/]+)\/banned$/, (m, res) => {
+		mockMemberBans.add(`${m[1]}:${m[2]}`);
+		return ok(res, eventUserRows(m[1]).find((row) => row.id === m[2]) ?? null);
+	}],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/users\/([^/]+)\/unbanned$/, (m, res) => {
+		mockMemberBans.delete(`${m[1]}:${m[2]}`);
+		return ok(res, eventUserRows(m[1]).find((row) => row.id === m[2]) ?? null);
+	}],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/users$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = eventMemberIds(m[1]);
+			const adding = Array.isArray(body.user_id_list) ? body.user_id_list.map(String) : [String(body.user_id ?? "")].filter(Boolean);
+			for (const id of adding) if (!ids.includes(id)) ids.push(id);
+			return ok(res, null);
+		})],
+	["DELETE", /^\/api\/admin\/events\/([^/]+)\/users$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = eventMemberIds(m[1]);
+			const removing = Array.isArray(body.user_id_list) ? body.user_id_list.map(String) : [];
+			mockEventMembers[m[1]] = ids.filter((id) => !removing.includes(id));
+			return ok(res, removing.length);
+		})],
 	["GET", /^\/api\/admin\/events$/, (_m, res, req) => okPage(res, adminEvents.filter((e) => mockFilterMatch(req, e)), req)],
 	["GET", /^\/api\/admin\/events\/([^/]+)$/, (m, res) => {
 		ok(res, adminEvents.find((item) => item.id === m[1]) ?? adminEvents[0]);
@@ -1956,7 +2012,7 @@ const routes = [
 	["GET", /^\/api\/admin\/events\/([^/]+)\/data$/, (_m, res) =>
 		ok(res, {
 			event: events[0],
-			user_count: 42,
+			user_count: mockUsers.length,
 			team_count: 0,
 			solved_recent_15: solves.map((solve) => ({
 				user_nickname: solve.nickname,
