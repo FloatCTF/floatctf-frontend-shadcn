@@ -655,6 +655,7 @@ export default {
 		},
 		columns: {
 			gamebox: "GameBox",
+			safeName: "安全名",
 			versionBuild: "版本 / 构建",
 			image: "镜像",
 			resources: "资源",

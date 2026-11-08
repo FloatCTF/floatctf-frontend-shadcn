@@ -681,6 +681,7 @@ export default {
 		},
 		columns: {
 			gamebox: "GameBox",
+			safeName: "Safe name",
 			versionBuild: "Version / build",
 			image: "Image",
 			resources: "Resources",

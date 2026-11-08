@@ -561,16 +561,15 @@ export function AdminGameboxesPage(): ReactNode {
 		{
 			id: "name",
 			header: t("adminCore.gameboxes.columns.gamebox"),
-			cell: (row) => (
-				<div className="min-w-0">
-					<p className="truncate text-sm font-medium">{row.name}</p>
-					<div className="flex flex-wrap items-center gap-1.5">
-						<MonoText className="text-muted-foreground">{row.safe_name}</MonoText>
-						<span className="text-xs text-muted-foreground">· {row.category}</span>
-					</div>
-				</div>
-			),
+			cell: (row) => <span className="text-sm font-medium">{row.name}</span>,
 			sortValue: (row) => row.name,
+		},
+		{
+			id: "safe_name",
+			header: t("adminCore.gameboxes.columns.safeName"),
+			cell: (row) => <MonoText>{row.safe_name}</MonoText>,
+			sortValue: (row) => row.safe_name,
+			hideBelow: "md",
 		},
 		{
 			id: "version",
@@ -607,62 +606,6 @@ export function AdminGameboxesPage(): ReactNode {
 					</span>
 				),
 			hideBelow: "lg",
-		},
-		{
-			id: "runtime",
-			header: t("adminCore.gameboxes.columns.resources"),
-			cell: (row) => (
-				<div className="tnum font-mono text-xs text-muted-foreground">
-					{t("adminCore.common.runtimeValue", {
-						cpu: row.cpu_millis !== null ? `${row.cpu_millis}m` : "—",
-						memory: row.memory_bytes !== null ? formatBytes(row.memory_bytes) : "—",
-						pids: row.pids_limit ?? "—",
-					})}
-				</div>
-			),
-			hideBelow: "xl",
-		},
-		{
-			id: "judge",
-			header: t("adminCore.gameboxes.columns.judge"),
-			cell: (row) => (
-				<div className="space-y-0.5 text-xs">
-					{row.judge_script_name ? (
-						<MonoText>{row.judge_script_name}</MonoText>
-					) : (
-						<span className="text-muted-foreground">
-							{t("adminCore.gameboxes.noScript")}
-						</span>
-					)}
-					<div className="tnum font-mono text-muted-foreground">
-						{t("adminCore.gameboxes.judgeTiming", {
-							timeout:
-								row.judge_timeout_secs === null || row.judge_timeout_secs === undefined
-									? t("adminCore.gameboxes.defaultValue")
-									: `${row.judge_timeout_secs}s`,
-							retry:
-								row.judge_retry_interval_secs === null ||
-								row.judge_retry_interval_secs === undefined
-									? t("adminCore.gameboxes.defaultValue")
-									: `${row.judge_retry_interval_secs}s`,
-						})}
-					</div>
-				</div>
-			),
-			hideBelow: "xl",
-		},
-		{
-			id: "healthchecks",
-			header: t("adminCore.gameboxes.columns.healthchecks"),
-			cell: (row) =>
-				row.healthchecks_json === null || row.healthchecks_json === undefined ? (
-					<TonePill tone="muted">{t("adminCore.common.notConfigured")}</TonePill>
-				) : (
-					<TonePill tone="success" title={formatJsonText(row.healthchecks_json)}>
-						{t("adminCore.common.configured")}
-					</TonePill>
-				),
-			hideBelow: "sm",
 		},
 		{
 			id: "hidden",

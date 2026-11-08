@@ -166,3 +166,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：管理端前端选择页按 Default 简化为「当前生效前端」下拉 + 保存/刷新，移除统计表与详情抽屉。
 
 - 2026-11-08：管理端 Dashboard 顺序改为 Default 的统计/赛事/需要关注/最近活动/基础设施，移除独立版本卡。
+
+- 2026-11-08：管理端 GameBox 库列改为 Default 的名称/安全名/版本构建/镜像/可见性。
