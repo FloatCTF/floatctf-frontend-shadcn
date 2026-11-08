@@ -1,6 +1,14 @@
 {
-	"generatedAt": "2026-11-08T02:10:06.151Z",
+	"generatedAt": "2026-11-08T02:26:55.547Z",
 	"routes": [
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/challenge_sets"
+		},
+		{
+			"method": "DELETE",
+			"pattern": "\\/api\\/admin\\/challenge_sets\\/([^/]+)\\/challenges"
+		},
 		{
 			"method": "DELETE",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd\\/gameboxes\\/([^/]+)"
@@ -79,6 +87,10 @@
 		},
 		{
 			"method": "GET",
+			"pattern": "\\/api\\/admin\\/challenge_sets\\/([^/]+)"
+		},
+		{
+			"method": "GET",
 			"pattern": "\\/api\\/admin\\/challenges"
 		},
 		{
@@ -100,6 +112,10 @@
 		{
 			"method": "GET",
 			"pattern": "\\/api\\/admin\\/docker\\/networks"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/download"
 		},
 		{
 			"method": "GET",
@@ -159,11 +175,19 @@
 		},
 		{
 			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/report"
+		},
+		{
+			"method": "GET",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/teams"
 		},
 		{
 			"method": "GET",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/users"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/writeups"
 		},
 		{
 			"method": "GET",
@@ -448,6 +472,14 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/__sse\\/close"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/challenge_sets"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/challenge_sets\\/([^/]+)\\/challenges"
 		},
 		{
 			"method": "POST",

@@ -1298,6 +1298,19 @@ const eventUserRows = (eventId) =>
 			},
 		}));
 
+
+/** 题集（mock）：题集与题目的关系单独维护，便于验证加题/移题。 */
+let mockChallengeSets = [
+	{
+		id: "set-1",
+		name: "Web 入门题集",
+		description: "给新生的 Web 方向练习集合。",
+		created_at: iso(now - 20 * D),
+		updated_at: iso(now - 3 * D),
+	},
+];
+const mockSetChallenges = { "set-1": ["c-0002"] };
+
 const routes = [
 
 
@@ -1896,6 +1909,31 @@ const routes = [
 
 	// 管理端
 	["GET", /^\/api\/admin\/dashboard\/summary$/, (_m, res) => ok(res, dashboardSummary)],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/writeups$/, (m, res, req) => {
+		const rows = [
+			{
+				event_id: m[1],
+				user_id: me.id,
+				team_id: null,
+				file_url: "writeups/event-1/liming.pdf",
+				created_at: iso(now - 6 * H),
+			},
+			{
+				event_id: m[1],
+				user_id: "u-2",
+				team_id: null,
+				file_url: "writeups/event-1/byte-me.pdf",
+				created_at: iso(now - 4 * H),
+			},
+		];
+		return okPage(res, rows, req);
+	}],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/report$/, (_m, res) => ok(res, "reports/event-1-report.zip")],
+	["GET", /^\/api\/admin\/download$/, (_m, res, req) => {
+		const url = new URL(req.url ?? "/", "http://mock.local");
+		const key = url.searchParams.get("key") ?? "download.bin";
+		return ok(res, `/public/${key.replace(/^\/+/, "")}`);
+	}],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/users$/, (m, res, req) => {
 		return okPage(res, eventUserRows(m[1]).filter((row) => mockFilterMatch(req, row)), req);
 	}],
@@ -2037,7 +2075,45 @@ const routes = [
 			trend,
 		})],
 	["GET", /^\/api\/admin\/challenges$/, (_m, res, req) => okPage(res, challenges.filter((c) => mockFilterMatch(req, c)), req)],
-	["GET", /^\/api\/admin\/challenge_sets$/, (_m, res, req) => ok(res, [], req)],
+	["GET", /^\/api\/admin\/challenge_sets$/, (_m, res, req) => okPage(res, mockChallengeSets, req)],
+	["POST", /^\/api\/admin\/challenge_sets$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const set = {
+				id: `set-${Date.now()}`,
+				name: String(body.name ?? "未命名题集"),
+				description: String(body.description ?? ""),
+				created_at: iso(now),
+				updated_at: iso(now),
+			};
+			mockChallengeSets.push(set);
+			mockSetChallenges[set.id] = [];
+			return ok(res, set);
+		})],
+	["DELETE", /^\/api\/admin\/challenge_sets$/, (_m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const ids = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			mockChallengeSets = mockChallengeSets.filter((set) => !ids.includes(set.id));
+			return ok(res, ids.length);
+		})],
+	["GET", /^\/api\/admin\/challenge_sets\/([^/]+)$/, (m, res, req) => {
+		const ids = mockSetChallenges[m[1]] ?? [];
+		return okPage(res, challenges.filter((c) => ids.includes(c.id)), req);
+	}],
+	["POST", /^\/api\/admin\/challenge_sets\/([^/]+)\/challenges$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const list = Array.isArray(body.challenge_id_list) ? body.challenge_id_list.map(String) : [];
+			const current = mockSetChallenges[m[1]] ?? (mockSetChallenges[m[1]] = []);
+			for (const id of list) if (!current.includes(id)) current.push(id);
+			return ok(res, null);
+		})],
+	["DELETE", /^\/api\/admin\/challenge_sets\/([^/]+)\/challenges$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const list = Array.isArray(body.id_list) ? body.id_list.map(String) : [];
+			const current = mockSetChallenges[m[1]] ?? [];
+			const matched = current.filter((id) => list.includes(id));
+			mockSetChallenges[m[1]] = current.filter((id) => !list.includes(id));
+			return ok(res, matched.length);
+		})],
 	["GET", /^\/api\/admin\/users$/, (_m, res, req) =>
 		okPage(res, mockUsers.filter((row) => mockFilterMatch(req, row)), req)],
 	["DELETE", /^\/api\/admin\/users$/, (_m, res, req) =>

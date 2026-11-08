@@ -492,6 +492,7 @@ export function AdminChallengeSetDetailPage(): ReactNode {
 							data={result.items}
 							getRowId={(row) => row.id}
 							selectable
+							isRowSelectable={(row) => !(items.data?.items ?? []).some((item) => item.id === row.id)}
 							selectedIds={picked}
 							onSelectionChange={setPicked}
 							columns={[
