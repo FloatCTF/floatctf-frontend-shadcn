@@ -3058,7 +3058,8 @@ const routes = [
 			return ok(res, before - challenges.length);
 		})],
 	["GET", /^\/api\/admin\/challenges$/, (_m, res, req) => okPage(res, challenges.filter((c) => mockFilterMatch(req, c)), req)],
-	["GET", /^\/api\/admin\/challenge_sets$/, (_m, res, req) => okPage(res, mockChallengeSets, req)],
+	["GET", /^\/api\/admin\/challenge_sets$/, (_m, res, req) =>
+		okPage(res, mockChallengeSets.filter((row) => mockFilterMatch(req, row)), req)],
 	["POST", /^\/api\/admin\/challenge_sets$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const set = {
