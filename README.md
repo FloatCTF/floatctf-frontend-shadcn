@@ -57,6 +57,13 @@ mise exec -- pnpm --filter @floatctf/frontend-shadcn dev
 mise exec -- pnpm --filter @floatctf/frontend-shadcn mock:api -- --host 127.0.0.1 --host 10.66.66.2
 ```
 
+mock 路由有快照校验（误删会立即失败）：
+
+```bash
+mise exec -- pnpm --filter @floatctf/frontend-shadcn mock:check          # 对比 scripts/mock-routes.snapshot.json
+mise exec -- pnpm --filter @floatctf/frontend-shadcn mock:check -- --update  # 有意新增路由后落盘
+```
+
 mock 覆盖到「能点通」的程度（赛事 / 题库 / 题解 / 训练场 / AWD / AWDP / 管理端运维），
 并包含 **SSE**：`/events/{id}/awd/stream`、`/events/{id}/awdp/stream`、
 `/service/awdp/runs/{id}/stream` 会保持连接并心跳，因此 UI 的实时通道显示「已连接」。

@@ -14,7 +14,8 @@
 		"preview": "vite preview",
 		"i18n:check": "node scripts/i18n-check.mjs",
 		"theme:audit": "node scripts/theme-audit.mjs",
-		"mock:api": "node scripts/mock-api.mjs"
+		"mock:api": "node scripts/mock-api.mjs",
+		"mock:check": "node scripts/mock-check.mjs"
 	},
 	"dependencies": {
 		"@floatctf/frontend-runtime": "workspace:*",
