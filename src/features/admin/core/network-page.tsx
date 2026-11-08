@@ -317,10 +317,15 @@ export function AdminNetworkPage(): ReactNode {
 											<span className="text-sm font-medium">{entry.label}</span>
 											<TonePill tone={entry.tone}>{entry.status}</TonePill>
 										</div>
-										<MonoText className="text-muted-foreground">{entry.keyName}</MonoText>
-										{entry.raw && entry.raw !== entry.status ? (
-											<MonoText className="text-muted-foreground">{entry.raw}</MonoText>
-										) : null}
+										<div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+											<MonoText>{entry.keyName}</MonoText>
+											{entry.raw && entry.raw !== entry.status ? (
+												<>
+													<span aria-hidden="true">·</span>
+													<MonoText>{entry.raw}</MonoText>
+												</>
+											) : null}
+										</div>
 										<p className="text-xs text-muted-foreground">{entry.hint}</p>
 									</div>
 								))}

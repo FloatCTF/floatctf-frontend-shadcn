@@ -76,8 +76,12 @@ function useDeleteDiscussion() {
 	const mutation = useMutation({
 		mutationFn: (discussionId: string) =>
 			callVoid(client.service.discussions.remove(discussionId), t("community.requests.discussionDelete")),
-		onSuccess: () => {
+		onSuccess: (_data, discussionId) => {
 			toast.success(t("community.discussions.toasts.discussionDeleted"));
+			// 详情页删除后仍挂载着 detail/comments 查询：如果先 invalidate，
+			// 会在跳转前重新请求已删除的 id，控制台留下 404。先移除再失效列表。
+			queryClient.removeQueries({ queryKey: qk.discussions.detail(discussionId) });
+			queryClient.removeQueries({ queryKey: qk.discussions.comments(discussionId) });
 			void queryClient.invalidateQueries({ queryKey: qk.discussions.all });
 		},
 		onError: (error) =>
@@ -583,12 +587,15 @@ export function DiscussionDetailPage(): ReactNode {
 	const [editOpen, setEditOpen] = useState(false);
 	const [newComment, setNewComment] = useState("");
 	const [submittingComment, setSubmittingComment] = useState(false);
+	// 删除成功后详情仍在路由卸载前的一帧里：禁用查询，避免窗口焦点/失效触发
+	// 对已删除 id 的重新请求（控制台 404）。
+	const [deleted, setDeleted] = useState(false);
 
 	const discussionQuery = useQuery({
 		queryKey: qk.discussions.detail(discussionId),
 		queryFn: () =>
 			call<DiscussionWithAuthor>(client.service.discussions.get(discussionId), t("community.requests.discussionDetail")),
-		enabled: discussionId !== "",
+		enabled: discussionId !== "" && !deleted,
 	});
 
 	const commentsQuery = useQuery({
@@ -600,7 +607,7 @@ export function DiscussionDetailPage(): ReactNode {
 				client.service.discussions.getComments(discussionId),
 				t("community.requests.commentList"),
 			),
-		enabled: discussionId !== "",
+		enabled: discussionId !== "" && !deleted,
 	});
 
 	const discussion = discussionQuery.data;
@@ -678,8 +685,14 @@ export function DiscussionDetailPage(): ReactNode {
 	const removeDiscussion = useMutation({
 		mutationFn: () => callVoid(client.service.discussions.remove(discussionId), t("community.requests.discussionDelete")),
 		onSuccess: () => {
+			setDeleted(true);
 			toast.success(t("community.discussions.toasts.discussionDeleted"));
-			void queryClient.invalidateQueries({ queryKey: qk.discussions.all });
+			queryClient.removeQueries({ queryKey: qk.discussions.detail(discussionId) });
+			queryClient.removeQueries({ queryKey: qk.discussions.comments(discussionId) });
+			// 只失效列表 / 我的；不要失效 detail/comments，否则仍挂载的详情观察者
+			// 会在跳转前重新请求已删除的 id（控制台 404）。
+			void queryClient.invalidateQueries({ queryKey: ["discussions", "list"] });
+			void queryClient.invalidateQueries({ queryKey: ["discussions", "mine"] });
 			void navigate("/community/discussions/mine", { replace: true });
 		},
 		onError: (error) =>
