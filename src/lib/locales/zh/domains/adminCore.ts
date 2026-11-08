@@ -565,6 +565,9 @@ export default {
 			description: "没有用户名 / 昵称 / 邮箱匹配「{{query}}」的账号。",
 		},
 		columns: {
+			id: "ID",
+			username: "用户名",
+			nickname: "昵称",
 			user: "用户",
 			email: "邮箱",
 			createdAt: "注册时间",

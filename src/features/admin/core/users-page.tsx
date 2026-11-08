@@ -232,13 +232,27 @@ export function AdminUsersPage(): ReactNode {
 
 	const columns: DataTableColumn<Users>[] = [
 		{
-			id: "user",
-			header: t("adminCore.users.columns.user"),
-			cell: (row) => (
-				// 只用 username / nickname / avatar —— 绝不渲染 password。
-				<UserCell username={row.username} nickname={row.nickname} avatar={row.avatar} />
-			),
+			id: "id",
+			header: t("adminCore.users.columns.id"),
+			cell: (row) => <MonoText className="text-muted-foreground">{row.id}</MonoText>,
+			sortValue: (row) => row.id,
+			hideBelow: "md",
+		},
+		{
+			id: "username",
+			header: t("adminCore.users.columns.username"),
+			cell: (row) => <span className="text-sm font-medium">{row.username}</span>,
 			sortValue: (row) => row.username,
+		},
+		{
+			id: "nickname",
+			header: t("adminCore.users.columns.nickname"),
+			cell: (row) => (
+				<span className="text-sm" data-user-data>
+					{row.nickname || "—"}
+				</span>
+			),
+			sortValue: (row) => row.nickname,
 		},
 		{
 			id: "email",
@@ -250,25 +264,6 @@ export function AdminUsersPage(): ReactNode {
 					<span className="text-xs text-muted-foreground">—</span>
 				),
 			sortValue: (row) => row.email,
-			hideBelow: "sm",
-		},
-		{
-			id: "created_at",
-			header: t("adminCore.users.columns.createdAt"),
-			cell: (row) => (
-				<span className="tnum text-xs text-muted-foreground">{formatDateTime(row.created_at)}</span>
-			),
-			sortValue: (row) => Date.parse(row.created_at),
-			hideBelow: "md",
-		},
-		{
-			id: "updated_at",
-			header: t("adminCore.users.columns.updatedAt"),
-			cell: (row) => (
-				<span className="tnum text-xs text-muted-foreground">{formatDateTime(row.updated_at)}</span>
-			),
-			sortValue: (row) => Date.parse(row.updated_at),
-			hideBelow: "lg",
 		},
 	];
 

@@ -586,6 +586,9 @@ export default {
 			description: "No account matches “{{query}}” on username / nickname / email.",
 		},
 		columns: {
+			id: "ID",
+			username: "Username",
+			nickname: "Nickname",
 			user: "User",
 			email: "Email",
 			createdAt: "Registered",
