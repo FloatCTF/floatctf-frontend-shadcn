@@ -210,3 +210,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：AWD 概览的战队/Writeup 移出状态查询，AWD 未配置时也能看到已建战队与提交入口。
 
 - 2026-11-08：AWDP 个人赛未参赛概览改用 Join/Leave，不再显示战队表单。
+
+- 2026-11-08：选手端 Top 页按 Default 收敛为一张 Top 15 表，移除额外统计卡与分页。

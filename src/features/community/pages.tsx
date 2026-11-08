@@ -10,7 +10,7 @@
  *   页面描述里会写明该事实。
  */
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
@@ -30,7 +30,6 @@ import {
 	PageHeader,
 	PaginationBar,
 	SectionCard,
-	StatCard,
 	Toolbar,
 } from "~/components/app/page";
 import {
@@ -57,9 +56,6 @@ export function RankPage(): ReactNode {
 	const { t } = useTranslation();
 	useDocumentTitle(t("community.rank.documentTitle"));
 	const client = useClient();
-	const [page, setPage] = useState(1);
-	const [pageSize, setPageSize] = useState(10);
-
 	const query = useQuery({
 		queryKey: qk.solves.top15(),
 		queryFn: () => call<TopUser[]>(client.service.solves.getTop15Users(), t("community.requests.top15")),
@@ -68,15 +64,6 @@ export function RankPage(): ReactNode {
 	});
 
 	const rows = query.data ?? [];
-	const paged = useMemo(
-		() => rows.slice((page - 1) * pageSize, page * pageSize),
-		[rows, page, pageSize],
-	);
-	const leader = rows[0];
-	const latest = rows.reduce<string | null>(
-		(acc, row) => (acc === null || row.solved_last_at > acc ? row.solved_last_at : acc),
-		null,
-	);
 
 	const columns: DataTableColumn<TopUser>[] = [
 		{
@@ -153,52 +140,11 @@ export function RankPage(): ReactNode {
 		<PageBody>
 			{header}
 
-			<div className="grid gap-4 sm:grid-cols-3">
-				<StatCard
-					label={t("community.rank.stats.usersLabel")}
-					value={query.isPending ? "…" : formatInt(rows.length)}
-					hint={t("community.rank.stats.usersHint")}
-					icon={<Trophy aria-hidden="true" className="size-4" />}
-				/>
-				<StatCard
-					label={t("community.rank.stats.leaderLabel")}
-					value={leader?.nickname ?? t("common.empty")}
-					hint={
-						leader
-							? t("community.rank.stats.leaderHint", {
-									count: formatInt(leader.solved_count),
-								})
-							: t("community.rank.stats.leaderEmptyHint")
-					}
-					icon={<Trophy aria-hidden="true" className="size-4" />}
-					tone="success"
-				/>
-				<StatCard
-					label={t("community.rank.stats.latestLabel")}
-					value={<RelativeTime value={latest} className="text-sm" />}
-					hint={t("community.rank.stats.latestHint")}
-					icon={<Activity aria-hidden="true" className="size-4" />}
-				/>
-			</div>
-
 			<SectionCard
 				title={t("community.rank.section.title")}
 				description={t("community.rank.section.description")}
 				actions={<RefreshingBadge active={query.isFetching && !query.isPending} />}
 				contentClassName="px-0"
-				footer={
-					<PaginationBar
-						page={page}
-						pageSize={pageSize}
-						total={rows.length}
-						onPageChange={setPage}
-						onPageSizeChange={(size) => {
-							setPageSize(size);
-							setPage(1);
-						}}
-						pageSizeOptions={[10, 15]}
-					/>
-				}
 			>
 				<QueryState
 					query={query}
@@ -220,7 +166,7 @@ export function RankPage(): ReactNode {
 				>
 					{() => (
 						<DataTable
-							data={paged}
+							data={rows}
 							getRowId={(row) => String(row.no)}
 							columns={columns}
 							mobileCard={(row) => (
