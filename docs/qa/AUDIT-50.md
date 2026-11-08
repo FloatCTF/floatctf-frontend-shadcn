@@ -204,3 +204,15 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 
 验证：E1 战队空状态、E2 战队 3 行、E1 实例标签仍在、E2/E6 深链接回退配置；
 `vite build` / i18n / mock-check 全绿。
+
+## 第 8 轮补充（个人赛隐藏无意义战队标签）
+
+已完成：
+
+- **个人赛事件控制台隐藏「战队」标签**：`participant_mode=individual` 时不再显示一个只能打开空状态的
+  标签；深链接 `?tab=teams` 回退到「配置」。战队赛（E2）仍保留「战队」标签。
+- 复测个人赛 teams 接口已按 `participant_mode` 返回空列表（E1），战队赛返回 3 行（E2），
+  标签显隐与接口语义一致。
+- 回归：AWD/AWDP 非 Jeopardy 标签收敛、E1 实例/Writeup 标签、社区删除无 404、移动端无横向溢出。
+
+验证：`vite build` / i18n / theme / mock-check 全绿。
