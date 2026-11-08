@@ -51,6 +51,16 @@ const me = {
 	grants_all: true,
 };
 
+// 一个只用于 mock 的「JWT 形状」令牌：前端会用 payload.sub 识别「本人」。
+// 不参与任何验签；仅为让管理端日志的本人标记在 mock 下也能被验证。
+const mockToken = (() => {
+	const payload = Buffer.from(
+		JSON.stringify({ sub: me.id, purpose: "session" }),
+		"utf8",
+	).toString("base64url");
+	return `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${payload}.mock-signature`;
+})();
+
 const events = [
 	{
 		id: "e0a1b2c3-0001-4a11-9a11-000000000001",
@@ -117,6 +127,23 @@ const events = [
 		updated_at: iso(now - 4 * D),
 		family: "awdp",
 		purpose: "practice",
+		participant_mode: "individual",
+		is_virtual: false,
+	},
+	{
+		id: "e0a1b2c3-0006-4a11-9a11-000000000006",
+		title: "AWDP 自动化攻防 · 校内赛",
+		description: "自动化攻防正式赛：Break 阶段提交 flag，Fix 阶段上传补丁并参与回合判定。",
+		hidden: false,
+		start_time: iso(now - 40 * 60000),
+		end_time: iso(now + 2 * H),
+		rules: "禁止攻击比赛平台；补丁只在本赛事环境内生效。",
+		allow_join: true,
+		flag_prefix: "flag{",
+		created_at: iso(now - 3 * D),
+		updated_at: iso(now - 30 * 60000),
+		family: "awdp",
+		purpose: "competition",
 		participant_mode: "individual",
 		is_virtual: false,
 	},
@@ -250,9 +277,10 @@ const eventChallenges = challenges.map((challenge, index) => ({
 	id: challenge.id,
 	challenge,
 	current_points: [500, 450, 430, 410, 380, 350][index] ?? 300,
-	solved_count: [42, 31, 18, 12, 9, 4][index] ?? 0,
+	// 赛事只有 12 名成员；解出人数不能大于参赛人数。
+	solved_count: [9, 7, 5, 4, 3, 1][index] ?? 0,
 	solved: [true, true, false, false, true, false][index] ?? false,
-	solved_no: [7, 12, 0, 0, 21, 0][index] ?? 0,
+	solved_no: [3, 5, 0, 0, 8, 0][index] ?? 0,
 }));
 
 const teams = [
@@ -267,6 +295,17 @@ const teams = [
 	["Null Pointer", 1760, 2],
 	["Hex Hazard", 1540, 2],
 ];
+
+// 当前账号在 mock 的 AWD 赛事里属于 Byte Me（teams[3]）。
+// 战队面板、选手端状态分、积分榜高亮与 flag 加分必须都指向同一行，
+// 否则会出现「战队面板 1240 / 积分榜高亮 Kernel Panic / 加的分跑到 0x7f」这种自相矛盾。
+const MY_AWD_TEAM_INDEX = 3;
+const MY_AWD_TEAM_ID = `team-${MY_AWD_TEAM_INDEX}`;
+
+// mock 的基准参赛关系：E1（Jeopardy）与 E2（AWD）默认已参赛。
+// 注意：AWD 选手端接口在真实后端会 403 未参赛账号，mock 必须同构。
+const baseJoinedEvent = (eventId) =>
+	eventId.endsWith("0001") || eventId.endsWith("0002") || eventId.endsWith("0006");
 
 const scoreboard = teams.map(([name, score, solved], index) => ({
 	id: `team-${index}`,
@@ -404,7 +443,7 @@ const discussions = [
 		view_count: 128,
 		like_count: 6,
 		is_liked: false,
-		comment_count: 3,
+		comment_count: 0,
 		created_at: iso(now - 6 * H),
 		updated_at: iso(now - 2 * H),
 	},
@@ -414,9 +453,9 @@ const discussions = [
 const challengeWriteups = [
 	{
 		id: "w-1",
-		nickname: "Byte Me",
+		nickname: "李明",
 		avatar: undefined,
-		email: "byte@example.edu",
+		email: "liming@example.edu",
 		challenge: challenges[1],
 		writeup: {
 			id: "cw-1",
@@ -512,7 +551,9 @@ const dashboardSummary = {
 		hidden: event.hidden,
 		awd:
 			event.family === "awd"
-				? { status: "running", phase: "attack", started_at: event.start_time }
+				? Date.parse(event.start_time) > now
+					? { status: "verified", phase: "hardening", started_at: null }
+					: { status: "running", phase: "attack", started_at: event.start_time }
 				: null,
 	})),
 	activity: {
@@ -572,6 +613,7 @@ const ok = (res, data, req) => {
 
 // ── 管理端 AWDP 运维 ──────────────────────────────────────────────────
 let awdpAdminPhase = process.env.MOCK_AWDP_ADMIN_PHASE ?? "break";
+const awdpAdminOverrides = {};
 const awdpAdminConfig = (eventId) => ({
 	event_id: eventId,
 	phase: awdpAdminPhase,
@@ -590,6 +632,7 @@ const awdpAdminConfig = (eventId) => ({
 	finished_at: awdpAdminPhase === "ended" ? iso(now - 60000) : null,
 	current_round: awdpAdminPhase === "fix" ? 1 : 0,
 	next_action_at: iso(now + 40 * 60000),
+	...awdpAdminOverrides[eventId],
 });
 const awdpAdminGameboxes = (eventId) => [
 	{
@@ -651,7 +694,8 @@ const awdTeams = (eventId) =>
 	}));
 
 // ── 管理端 AWD 运维（赛事状态机 / 网络 / 赛事靶机 / 预检）──────────────
-let awdAdminStatus = process.env.MOCK_AWD_ADMIN_STATUS ?? "verified";
+let awdAdminStatus = process.env.MOCK_AWD_ADMIN_STATUS ?? "running";
+const awdAdminOverrides = {};
 const awdAdminState = (eventId) => ({
 	event_id: eventId,
 	status: awdAdminStatus,
@@ -672,6 +716,7 @@ const awdAdminState = (eventId) => ({
 		: null,
 	updated_at: iso(now - 5 * 60000),
 	final_settlement: false,
+	...awdAdminOverrides[eventId],
 });
 const awdEventNetwork = (eventId) => ({
 	event_id: eventId,
@@ -732,9 +777,11 @@ const awdPrecheckRuns = (eventId) => [
 	{
 		id: "pc-1",
 		event_id: eventId,
-		status: "succeeded",
+		status: "passed",
 		trigger: "manual",
 		error_msg: null,
+		started_at: iso(now - 50 * 60000),
+		completed_at: iso(now - 48 * 60000),
 		created_at: iso(now - 50 * 60000),
 		finished_at: iso(now - 48 * 60000),
 	},
@@ -883,7 +930,7 @@ const awdGameboxes = [
 const awdScoreRows = () =>
 	teams
 		.map(([name, base], index) => {
-			const score = base + (index === 0 ? mockAwdBonus : 0);
+			const score = base + (index === MY_AWD_TEAM_INDEX ? mockAwdBonus : 0);
 			// 防守分用「合计 - 攻击」反推，避免两边各自四舍五入导致 攻击+防守≠合计。
 			const attack = Math.round(score * 0.55);
 			return {
@@ -926,7 +973,8 @@ const currentAwdpInstance = () => ({ ...awdpInstance, runtime_state: awdpInstanc
 
 const awdpOverview = (eventId) => ({
 	event_id: eventId,
-	phase: process.env.MOCK_AWDP_PHASE ?? "break",
+	// 与管理端阶段推进同源：管理端点「进入 Fix」后选手端必须立即看到。
+	phase: awdpAdminPhase,
 	break_duration_secs: 5400,
 	fix_duration_secs: 3600,
 	fix_round_interval_secs: 600,
@@ -934,13 +982,14 @@ const awdpOverview = (eventId) => ({
 	break_score: 200,
 	fix_round_score: 100,
 	started_at: iso(now - 40 * 60000),
-	break_ends_at: iso(now + 50 * 60000),
-	fix_started_at: null,
-	fix_ends_at: null,
-	finished_at: null,
-	current_round: 0,
-	next_action_at: iso(now + 50 * 60000),
-	my_score: 200,
+	break_ends_at: awdpAdminPhase === "break" ? iso(now + 50 * 60000) : iso(now - 10 * 60000),
+	fix_started_at: ["fix", "ended"].includes(awdpAdminPhase) ? iso(now - 10 * 60000) : null,
+	fix_ends_at: awdpAdminPhase === "fix" ? iso(now + 50 * 60000) : null,
+	finished_at: awdpAdminPhase === "ended" ? iso(now - 60000) : null,
+	current_round: awdpAdminPhase === "fix" ? 1 : 0,
+	next_action_at:
+		awdpAdminPhase === "break" ? iso(now + 50 * 60000) : iso(now + 20 * 60000),
+	my_score: awdpScores.find((row) => row.subject_id === "s-1")?.total_score ?? 0,
 	gameboxes: [
 		{
 			id: awdpGameboxId,
@@ -956,28 +1005,37 @@ const awdpOverview = (eventId) => ({
 		},
 	],
 });
-const awdpRounds = [
-	{ id: "r-1", sequence: 1, starts_at: iso(now - 20 * 60000), cutoff_at: iso(now + 10 * 60000), status: "completed" },
-	{ id: "r-2", sequence: 2, starts_at: iso(now + 10 * 60000), cutoff_at: iso(now + 40 * 60000), status: "pending" },
-];
-const awdpEvaluations = [
-	{
-		id: "ev-1",
-		instance_id: "inst-awdp-1",
-		event_gamebox_id: awdpGameboxId,
-		fix_round_id: null,
-		round_sequence: null,
-		kind: "manual",
-		status: "patched",
-		healthcheck_result: "ok",
-		judge_result: "ok",
-		finished_at: iso(now - 15 * 60000),
-	},
-];
+// Break 阶段还没有 Fix 回合与评测；进入 Fix 后才出现（与管理端阶段同源）。
+const awdpRounds = () =>
+	awdpAdminPhase === "fix" || awdpAdminPhase === "ended"
+		? [
+				{ id: "r-1", sequence: 1, starts_at: iso(now - 10 * 60000), cutoff_at: iso(now + 20 * 60000), status: "pending" },
+				{ id: "r-2", sequence: 2, starts_at: iso(now + 20 * 60000), cutoff_at: iso(now + 50 * 60000), status: "pending" },
+			]
+		: [];
+const awdpEvaluations = () =>
+	awdpAdminPhase === "fix" || awdpAdminPhase === "ended"
+		? [
+				{
+					id: "ev-1",
+					instance_id: "inst-awdp-1",
+					event_gamebox_id: awdpGameboxId,
+					fix_round_id: null,
+					round_sequence: null,
+					kind: "manual",
+					status: "patched",
+					healthcheck_result: "ok",
+					judge_result: "ok",
+					finished_at: iso(now - 5 * 60000),
+				},
+			]
+		: [];
+// E6 是个人赛（individual）：积分榜主体必须是选手，不是战队。
+// 当前默认阶段是 Break，Fix 分只能为 0（否则会出现「Break 阶段已有 Fix 得分」）。
 const awdpScores = [
-	{ subject_id: "s-1", subject_name: "Byte Me", break_score: 200, fix_score: 100, total_score: 300, rank: 1 },
-	{ subject_id: "s-2", subject_name: "NOP Sled", break_score: 200, fix_score: 0, total_score: 200, rank: 2 },
-	{ subject_id: "s-3", subject_name: "SegFault Club", break_score: 0, fix_score: 100, total_score: 100, rank: 3 },
+	{ subject_id: "s-1", subject_name: "李明", break_score: 200, fix_score: 0, total_score: 200, rank: 1 },
+	{ subject_id: "s-2", subject_name: "0x7f", break_score: 200, fix_score: 0, total_score: 200, rank: 2 },
+	{ subject_id: "s-3", subject_name: "NOP Sled", break_score: 0, fix_score: 0, total_score: 0, rank: 3 },
 ];
 
 
@@ -1125,11 +1183,11 @@ let mockRoles = [
 /** 战队详情（mock）：仅 team 模式的赛事返回，用于验证战队面板与成员角色。 */
 const mockTeamFor = (event) => ({
 	team: {
-		id: "team-6",
+		id: MY_AWD_TEAM_ID,
 		event_id: event.id,
 		name: "Byte Me",
 		description: "Mock 战队",
-		points: 1240,
+		points: teams[MY_AWD_TEAM_INDEX][1] + mockAwdBonus,
 		created_at: iso(now - 3 * D),
 		updated_at: iso(now - 2 * H),
 		banned: process.env.MOCK_TEAM_BANNED === "1",
@@ -1137,11 +1195,11 @@ const mockTeamFor = (event) => ({
 	members: [
 		{
 			member_name: me.nickname,
-			member: { event_id: event.id, team_id: "team-6", user_id: me.id, role: "captain", joined_at: iso(now - 3 * D) },
+			member: { event_id: event.id, team_id: MY_AWD_TEAM_ID, user_id: me.id, role: "captain", joined_at: iso(now - 3 * D) },
 		},
 		{
 			member_name: "NOP Sled",
-			member: { event_id: event.id, team_id: "team-6", user_id: "u-2", role: "member", joined_at: iso(now - 2 * D) },
+			member: { event_id: event.id, team_id: MY_AWD_TEAM_ID, user_id: "u-2", role: "member", joined_at: iso(now - 2 * D) },
 		},
 	],
 });
@@ -1535,7 +1593,16 @@ const routes = [
 	["GET", /^\/api\/service\/awdp\/runs\/[^/]+\/stream$/, (_m, res, req) => sse(res, req)],
 	// 管理端 AWD 运维（状态机 / 网络 / 赛事靶机 / 预检 / 积分）
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awd$/, (m, res) => ok(res, awdAdminState(m[1]))],
-	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awd$/, (m, res) => ok(res, awdAdminState(m[1]))],
+	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awd$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const { expected_updated_at: _stale, ...patch } = body;
+			awdAdminOverrides[m[1]] = {
+				...(awdAdminOverrides[m[1]] ?? {}),
+				...patch,
+				updated_at: iso(now),
+			};
+			return ok(res, awdAdminState(m[1]));
+		})],
 	// 管理端 AWD：生命周期（状态机）/ 网络 / 赛事靶机 / 实例 / 预检 / 积分 / 战队
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/(deploy|start|pause|resume|finish|archive)$/, (m, res) => {
 		const next = { deploy: "deployed", start: "running", pause: "paused", resume: "running", finish: "finished", archive: "archived" }[m[2]];
@@ -1547,7 +1614,10 @@ const routes = [
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awd\/precheck$/, (m, res) =>
 		ok(res, {
 			run_id: "pc-mock-new",
-			status: "succeeded",
+			// 选手端 / 管理端契约是 passed；不要用 succeeded 让成功预检显示成失败。
+			status: "passed",
+			started_at: iso(now - 5000),
+			completed_at: iso(now),
 			error_msg: null,
 			failed_checks: [],
 			checks: [{ name: "network", ok: true, detail: "mock" }],
@@ -1612,7 +1682,16 @@ const routes = [
 
 	// 管理端 AWDP 运维（配置 / 阶段推进 / 挂载 / 实例 / 积分 / 大屏）
 	["GET", /^\/api\/admin\/events\/([^/]+)\/awdp$/, (m, res) => ok(res, awdpAdminConfig(m[1]))],
-	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awdp$/, (m, res) => ok(res, awdpAdminConfig(m[1]))],
+	["PATCH", /^\/api\/admin\/events\/([^/]+)\/awdp$/, (m, res, req) =>
+		readJsonBody(req).then((body) => {
+			const { expected_updated_at: _stale, ...patch } = body;
+			awdpAdminOverrides[m[1]] = {
+				...(awdpAdminOverrides[m[1]] ?? {}),
+				...patch,
+				updated_at: iso(now),
+			};
+			return ok(res, awdpAdminConfig(m[1]));
+		})],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awdp\/start$/, (m, res) => { awdpAdminPhase = "break"; return ok(res, null); }],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awdp\/break-to-fix$/, (m, res) => { awdpAdminPhase = "fix"; return ok(res, null); }],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/awdp\/finish$/, (m, res) => { awdpAdminPhase = "ended"; return ok(res, null); }],
@@ -1630,10 +1709,10 @@ const routes = [
 			gameboxes: [{ id: "aegb-1", name: "web-shop", category: "Web", break_count: 2, fix_count: 1 }],
 			scoreboard_top10: awdpScores,
 			trend: [
-				{ name: "Byte Me", points: [{ name: "Byte Me", score: 200, time: iso(now - 30 * 60000) }, { name: "Byte Me", score: 300, time: iso(now - 10 * 60000) }] },
+				{ name: "李明", points: [{ name: "李明", score: 100, time: iso(now - 30 * 60000) }, { name: "李明", score: 200, time: iso(now - 10 * 60000) }] },
 			],
 			recent_activity: [
-				{ subject_name: "Byte Me", gamebox_name: "web-shop", gamebox_category: "Web", action: "break", delta: 200, created_at: iso(now - 20 * 60000) },
+				{ subject_name: "李明", gamebox_name: "web-shop", gamebox_category: "Web", action: "break", delta: 200, created_at: iso(now - 20 * 60000) },
 			],
 		});
 	}],
@@ -1673,14 +1752,14 @@ const routes = [
 
 	// AWDP 选手端（总览 / 轮次 / 评估 / 积分 / 趋势 / 实例动作）
 	["GET", /^\/api\/events\/([^/]+)\/awdp$/, (m, res) => ok(res, awdpOverview(m[1]))],
-	["GET", /^\/api\/events\/([^/]+)\/awdp\/rounds$/, (_m, res) => ok(res, awdpRounds)],
-	["GET", /^\/api\/events\/([^/]+)\/awdp\/evaluations$/, (_m, res) => ok(res, awdpEvaluations)],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/rounds$/, (_m, res) => ok(res, awdpRounds())],
+	["GET", /^\/api\/events\/([^/]+)\/awdp\/evaluations$/, (_m, res) => ok(res, awdpEvaluations())],
 	["GET", /^\/api\/events\/([^/]+)\/awdp\/scores$/, (_m, res) => ok(res, awdpScores)],
 	["GET", /^\/api\/events\/([^/]+)\/awdp\/scoreboard$/, (_m, res) =>
 		ok(res, {
 			participant_mode: "individual",
 			gameboxes: [{ id: awdpGameboxId, name: "web-shop", category: "Web" }],
-			rounds: awdpRounds.map((r) => ({ sequence: r.sequence, status: r.status, cutoff_at: r.cutoff_at })),
+			rounds: awdpRounds().map((r) => ({ sequence: r.sequence, status: r.status, cutoff_at: r.cutoff_at })),
 			rows: awdpScores.map((row) => ({
 				subject_id: row.subject_id,
 				subject_name: row.subject_name,
@@ -1696,7 +1775,7 @@ const routes = [
 		})],
 	["GET", /^\/api\/events\/([^/]+)\/awdp\/trend$/, (_m, res) =>
 		ok(res, [
-			{ name: "Byte Me", points: [{ name: "Byte Me", score: 200, time: iso(now - 30 * 60000) }, { name: "Byte Me", score: 300, time: iso(now - 10 * 60000) }] },
+			{ name: "李明", points: [{ name: "李明", score: 100, time: iso(now - 30 * 60000) }, { name: "李明", score: 200, time: iso(now - 10 * 60000) }] },
 			{ name: "NOP Sled", points: [{ name: "NOP Sled", score: 200, time: iso(now - 30 * 60000) }, { name: "NOP Sled", score: 200, time: iso(now - 10 * 60000) }] },
 		])],
 
@@ -1813,8 +1892,8 @@ const routes = [
 		ok(res, "https://files.example.edu/mock/web-shop-src.tar.gz")],
 
 	// 认证 / 账号
-	["POST", /^\/api\/session$/, (_m, res) => ok(res, "mock-token-0001")],
-	["POST", /^\/api\/users$/, (_m, res) => ok(res, "mock-token-0001")],
+	["POST", /^\/api\/session$/, (_m, res) => ok(res, mockToken)],
+	["POST", /^\/api\/users$/, (_m, res) => ok(res, mockToken)],
 	["PATCH", /^\/api\/uploads\/avatar$/, (_m, res, req) => {
 		// multipart：mock 不解析内容，只更新当前账号头像并返回 URL。
 		req.resume();
@@ -1846,7 +1925,7 @@ const routes = [
 		ok(
 			res,
 			events.map((event) => {
-				const joined = event.id.endsWith("0001") || event.id.endsWith("0002");
+				const joined = baseJoinedEvent(event.id);
 				return {
 					id: event.id,
 					event,
@@ -1858,7 +1937,7 @@ const routes = [
 		)],
 	["GET", /^\/api\/events\/([^/]+)$/, (m, res) => {
 		const event = events.find((item) => item.id === m[1]) ?? events[0];
-		const baseJoined = event.id.endsWith("0001") || event.id.endsWith("0002");
+		const baseJoined = baseJoinedEvent(event.id);
 		const dynamicTeam = mockTeamResult(event);
 		const joined = baseJoined || mockEventJoined.has(event.id);
 		ok(res, {
@@ -1917,7 +1996,17 @@ const routes = [
 	["GET", /^\/api\/events\/([^/]+)\/scoreboard$/, (_m, res) => ok(res, scoreboard)],
 	["GET", /^\/api\/events\/([^/]+)\/trend$/, (_m, res) => ok(res, trend)],
 	["GET", /^\/api\/events\/([^/]+)\/announcements$/, (_m, res, req) => ok(res, announcements, req)],
-	["GET", /^\/api\/events\/([^/]+)\/instances$/, (_m, res) => ok(res, [])],
+	["GET", /^\/api\/events\/([^/]+)\/instances$/, (m, res) =>
+		ok(
+			res,
+			Object.values(mockChallengeInstances)
+				.filter((instance) => instance.event_id === m[1])
+				.map((instance) => ({
+					instance,
+					challenge_name: instance.challenge_title ?? instance.challenge_id,
+					user_nickname: me.nickname,
+				})),
+		)],
 	["GET", /^\/api\/events\/([^/]+)\/own_wp$/, (_m, res) => ok(res, mockWriteup)],
 	["POST", /^\/api\/submit\/writeup$/, (_m, res) => {
 		mockWriteup = "writeup.pdf";
@@ -1934,14 +2023,21 @@ const routes = [
 	["POST", /^\/api\/instances\/launch$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const challengeId = String(body.challenge_id ?? "");
+			const eventId = String(body.event_id ?? "");
+			const challenge = challenges.find((item) => item.id === challengeId);
+			const event = events.find((item) => item.id === eventId);
 			const instance = {
 				id: `inst-${Date.now()}`,
 				status: "running",
-				flag: "flag{mock_instance_flag}",
+				// 真实后端恒定脱敏：实例 DTO 不返回 flag。
+				flag: "",
 				content: null,
 				challenge_id: challengeId,
-				event_id: "",
+				event_id: eventId,
 				user_id: me.id,
+				user_name: me.nickname,
+				challenge_title: challenge?.name ?? challengeId,
+				event_title: event?.title ?? "",
 				identifier: `fctf-${challengeId}`,
 				created_at: iso(now),
 				updated_at: iso(now),
@@ -1952,6 +2048,9 @@ const routes = [
 		})],
 	["GET", /^\/api\/challenges\/([^/]+)\/instance$/, (m, res) =>
 		ok(res, mockChallengeInstances[m[1]] ?? null)],
+	// 赛事内题目实例：与练习共用一份实例状态（实例带 event_id 区分）。
+	["GET", /^\/api\/events\/([^/]+)\/challenges\/([^/]+)\/instance$/, (m, res) =>
+		ok(res, mockChallengeInstances[m[2]] ?? null)],
 	["DELETE", /^\/api\/instances\/([^/]+)$/, (m, res) => {
 		for (const [key, instance] of Object.entries(mockChallengeInstances)) {
 			if (instance.id === m[1]) delete mockChallengeInstances[key];
@@ -1961,27 +2060,45 @@ const routes = [
 	["POST", /^\/api\/submit\/flag$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const correct = String(body.flag ?? "").trim() === "flag{mock_instance_flag}";
-			// 后端语义：flag 正确后平台自动回收该题实例。
-			if (correct) {
-				// 提交接口可能只带 instance_id（不带 challenge_id），两种键都支持。
-				for (const [key, instance] of Object.entries(mockChallengeInstances)) {
-					if (instance.id === body.instance_id || instance.challenge_id === body.challenge_id) {
-						delete mockChallengeInstances[key];
+			// 与真实后端一致：错误 flag 是业务失败（code≠0），不是「200 返回 correct:false」。
+			// 前端在信封守卫里会把它转成 rejection 并显示错误 toast。
+			if (!correct) {
+				return json(res, 200, { code: 400, message: "flag 错误", data: null, meta: null });
+			}
+			// flag 正确后平台自动回收该题实例，并标记题目已解出（列表/积分榜重新拉取后必须变化）。
+			// 提交接口可能只带 instance_id（不带 challenge_id），两种键都支持。
+			for (const [key, instance] of Object.entries(mockChallengeInstances)) {
+				if (instance.id === body.instance_id || instance.challenge_id === body.challenge_id) {
+					const challengeId = instance.challenge_id;
+					const eventChallenge = eventChallenges.find(
+						(item) => item.challenge.id === challengeId,
+					);
+					if (eventChallenge && !eventChallenge.solved) {
+						// 解出顺序必须 > 0；否则 UI 会显示「已解出 #0」。
+						eventChallenge.solved = true;
+						eventChallenge.solved_no =
+							Math.max(0, ...eventChallenges.map((item) => item.solved_no || 0)) + 1;
 					}
+					const catalogChallenge = challenges.find((item) => item.id === challengeId);
+					if (catalogChallenge) catalogChallenge.solved = true;
+					delete mockChallengeInstances[key];
 				}
 			}
-			return ok(res, {
-				correct,
-				message: correct ? "flag 正确" : "flag 错误",
-				score: correct ? 100 : 0,
-				challenge_id: body.challenge_id ?? null,
-			});
+			return ok(res, null);
 		})],
 	["GET", /^\/api\/challenges\/([^/]+)\/writeups$/, (_m, res, req) => ok(res, challengeWriteups, req)],
 	["GET", /^\/api\/challenges\/([^/]+)\/my_writeup$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/challenges\/([^/]+)\/submit$/, (_m, res) => ok(res, { correct: true, points: 500 })],
-	["GET", /^\/api\/challenge_sets$/, (_m, res, req) => ok(res, [], req)],
-	["GET", /^\/api\/challenge_sets\/([^/]+)$/, (_m, res) => ok(res, null)],
+	// 选手端题集：与管理员端同一份状态（mockChallengeSets / mockSetChallenges），
+	// 否则会出现「管理端有 1 个题集、选手端却显示还没有题集」。
+	["GET", /^\/api\/challenge_sets$/, (_m, res, req) => ok(res, mockChallengeSets, req)],
+	["GET", /^\/api\/challenge_sets\/([^/]+)$/, (m, res) =>
+		ok(
+			res,
+			(mockSetChallenges[m[1]] ?? [])
+				.map((id) => challenges.find((challenge) => challenge.id === id))
+				.filter(Boolean),
+		)],
 
 	// 社区
 	["GET", /^\/api\/announcements$/, (_m, res, req) =>
@@ -2092,25 +2209,43 @@ const routes = [
 	}],
 	["GET", /^\/public\/(.+)$/, (m, res) => handlePublicFile(m[1], res)],
 	["GET", /^\/api\/weapons$/, (_m, res, req) => ok(res, weapons, req)],
-	["GET", /^\/api\/instances$/, (_m, res, req) => ok(res, [], req)],
+	["GET", /^\/api\/instances$/, (_m, res, req) =>
+		ok(res, Object.values(mockChallengeInstances), req)],
 
 	// AWD 驾驶舱
-	["GET", /^\/api\/events\/([^/]+)\/awd\/status$/, (m, res) =>
+	["GET", /^\/api\/events\/([^/]+)\/awd\/status$/, (m, res) => {
+		const eventId = m[1];
+		const event = events.find((item) => item.id === eventId);
+		if (!event) return json(res, 404, { code: 404, message: "未找到该赛事", data: null, meta: null });
+		if (event.family !== "awd") {
+			return json(res, 404, { code: 404, message: "AWD event not configured", data: null, meta: null });
+		}
+		// 与真实后端一致：未参赛账号读取选手端 AWD 状态返回 403。
+		if (!(baseJoinedEvent(eventId) || mockEventJoined.has(eventId))) {
+			return json(res, 403, { code: 403, message: "你不是本赛事的参赛者", data: null, meta: null });
+		}
+		// 管理端阶段推进必须反映到选手端；不能各写一份「正在攻击」的假状态。
+		const running = awdAdminStatus === "running";
+		const paused = awdAdminStatus === "paused";
 		ok(res, {
-			event_id: m[1],
-			status: "running",
-			phase: "attack",
-			current_round: 3,
+			event_id: eventId,
+			status: running ? "running" : paused ? "paused" : awdAdminStatus,
+			phase: running || paused ? "attack" : "hardening",
+			current_round: running ? 3 : 0,
 			round_count: 8,
 			banned: process.env.MOCK_TEAM_BANNED === "1",
-			score: 1240 + mockAwdBonus,
-			final_settlement: false,
-		})],
-	["GET", /^\/api\/events\/([^/]+)\/awd\/gameboxes$/, (_m, res) =>
-		ok(res, [
+			score: teams[MY_AWD_TEAM_INDEX][1] + mockAwdBonus,
+			final_settlement: awdAdminStatus === "finished",
+		});
+	}],
+	["GET", /^\/api\/events\/([^/]+)\/awd\/gameboxes$/, (m, res) => {
+		if (!(baseJoinedEvent(m[1]) || mockEventJoined.has(m[1]))) {
+			return json(res, 403, { code: 403, message: "你不是本赛事的参赛者", data: null, meta: null });
+		}
+		return ok(res, [
 			{
 				id: "gb-1",
-				team_id: "team-6",
+				team_id: MY_AWD_TEAM_ID,
 				event_gamebox_id: "egb-1",
 				gamebox_name: "web-01",
 				status: "running",
@@ -2120,7 +2255,7 @@ const routes = [
 			},
 			{
 				id: "gb-2",
-				team_id: "team-6",
+				team_id: MY_AWD_TEAM_ID,
 				event_gamebox_id: "egb-2",
 				gamebox_name: "pwn-01",
 				status: "running",
@@ -2128,15 +2263,17 @@ const routes = [
 				container_name: "fctf-awd-e2-t6-pwn01",
 				health_status: "healthy",
 			},
-		])],
+		]);
+	}],
 	["GET", /^\/api\/events\/([^/]+)\/awd\/scores$/, (_m, res) =>
 		ok(res, awdScoreRows())],
 	["POST", /^\/api\/events\/([^/]+)\/awd\/submissions$/, (_m, res, req) =>
 		readJsonBody(req).then((body) => {
 			const flag = String(body.flag ?? "").trim();
-			if (!flag.startsWith("FLAG{") || !flag.endsWith("}")) {
+			if (!/^flag\{.+\}$/i.test(flag)) {
 				return json(res, 200, { code: 400, message: "flag 不正确", data: null, meta: null });
 			}
+			// 加分必须落在当前账号所在队伍（Byte Me），而不是随便加到榜首。
 			mockAwdBonus += 100;
 			broadcastSse({ type: "score.updated", sequence: Date.now(), occurred_at: iso(now) });
 			return ok(res, null);
@@ -2297,16 +2434,39 @@ const routes = [
 		const key = url.searchParams.get("key") ?? "download.bin";
 		return ok(res, `/public/${key.replace(/^\/+/, "")}`);
 	}],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/challenges$/, (m, res, req) =>
+		okPage(
+			res,
+			eventChallenges.map((item) => ({
+				event_challenge: {
+					event_id: m[1],
+					challenge_id: item.challenge.id,
+					hidden: false,
+					points: item.current_points,
+				},
+				challenge: item.challenge,
+			})),
+			req,
+		)],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/announcements$/, (m, res, req) =>
+		ok(
+			res,
+			announcements.map((item) => ({ ...item, event_id: m[1] })),
+			req,
+		)],
 	["GET", /^\/api\/admin\/events\/([^/]+)\/users$/, (m, res, req) => {
 		return okPage(res, eventUserRows(m[1]).filter((row) => mockFilterMatch(req, row)), req);
 	}],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/teams\/([^/]+)\/banned$/, (_m, res) => ok(res, null)],
+	["POST", /^\/api\/admin\/events\/([^/]+)\/teams\/([^/]+)\/unbanned$/, (_m, res) => ok(res, null)],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/users\/([^/]+)\/banned$/, (m, res) => {
 		mockMemberBans.add(`${m[1]}:${m[2]}`);
-		return ok(res, eventUserRows(m[1]).find((row) => row.id === m[2]) ?? null);
+		// 真实后端是 UniResponse::ok_none()（data:null），不是回传成员对象。
+		return ok(res, null);
 	}],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/users\/([^/]+)\/unbanned$/, (m, res) => {
 		mockMemberBans.delete(`${m[1]}:${m[2]}`);
-		return ok(res, eventUserRows(m[1]).find((row) => row.id === m[2]) ?? null);
+		return ok(res, null);
 	}],
 	["POST", /^\/api\/admin\/events\/([^/]+)\/users$/, (m, res, req) =>
 		readJsonBody(req).then((body) => {
@@ -2414,29 +2574,65 @@ const routes = [
 			},
 			req,
 		)],
-	["GET", /^\/api\/admin\/events\/([^/]+)\/data$/, (_m, res) =>
-		ok(res, {
-			event: events[0],
-			user_count: eventMemberIds(m[1]).length,
-			team_count: 0,
-			solved_recent_15: solves.map((solve) => ({
-				user_nickname: solve.nickname,
-				challenge_name: solve.challenge_name,
-				challenge_category: "Misc",
-				created_at: solve.created_at,
-				bonus_points: 0,
-			})),
-			event_challenges: eventChallenges.map((item) => ({
-				name: item.challenge.name,
-				category: item.challenge.category,
-				points: item.current_points,
-				solved_count: item.solved_count,
-				// 后端返回的是比例（0..1），前端 formatPercent 再乘 100；不能直接给百分数。
-				solved_percent: Math.min(1, item.solved_count / 42),
-			})),
-			scoreboard_top10: scoreboard.slice(0, 10),
-			trend,
-		})],
+	["GET", /^\/api\/admin\/events\/([^/]+)\/data$/, (m, res) => {
+		const event = events.find((item) => item.id === m[1]);
+		if (!event) {
+			return json(res, 404, { code: 404, message: "未找到该赛事", data: null, meta: null });
+		}
+		const isJeopardy = event.family === "jeopardy";
+		const isAwd = event.family === "awd";
+		const memberCount = eventMemberIds(event.id).length;
+		return ok(res, {
+			event,
+			user_count: memberCount,
+			team_count: isAwd ? awdTeams(event.id).length : 0,
+			solved_recent_15: isJeopardy
+				? solves.map((solve) => ({
+						user_nickname: solve.nickname,
+						challenge_name: solve.challenge_name,
+						challenge_category: "Misc",
+						created_at: solve.created_at,
+						bonus_points: 0,
+					}))
+				: [],
+			event_challenges: isJeopardy
+				? eventChallenges.map((item) => ({
+						name: item.challenge.name,
+						category: item.challenge.category,
+						points: item.current_points,
+						solved_count: item.solved_count,
+						// 后端返回的是比例（0..1），前端 formatPercent 再乘 100；不能直接给百分数。
+						// 分母必须是本赛事参赛人数，而不是某个全局常量（否则会出现 42/12 > 100%）。
+						solved_percent: Math.min(
+							1,
+							item.solved_count / Math.max(1, memberCount),
+						),
+					}))
+				: [],
+			scoreboard_top10: isJeopardy
+				? scoreboard.slice(0, 10)
+				: isAwd
+					? awdScoreRows()
+							.slice(0, 10)
+							.map((row) => ({
+								id: row.team_id,
+								no: row.rank,
+								name: row.team_name,
+								score: row.total_score,
+								solved_count: 0,
+								challenges: [],
+							}))
+					: awdpScores.slice(0, 10).map((row) => ({
+							id: row.subject_id,
+							no: row.rank,
+							name: row.subject_name,
+							score: row.total_score,
+							solved_count: 0,
+							challenges: [],
+						})),
+			trend: isJeopardy ? trend : [],
+		});
+	}],
 	["GET", /^\/api\/admin\/challenges$/, (_m, res, req) => okPage(res, challenges.filter((c) => mockFilterMatch(req, c)), req)],
 	["GET", /^\/api\/admin\/challenge_sets$/, (_m, res, req) => okPage(res, mockChallengeSets, req)],
 	["POST", /^\/api\/admin\/challenge_sets$/, (_m, res, req) =>
@@ -2520,7 +2716,10 @@ const routes = [
 		readJsonBody(req).then((body) => {
 			const role = mockRoles.find((item) => item.id === m[1]);
 			if (!role) return json(res, 404, { code: 404, message: "角色不存在", data: null, meta: null });
-			if (role.protected) return json(res, 200, { code: 409, message: "内置角色不可修改", data: null, meta: null });
+			// 与后端一致：内置角色可以改名称 / 描述，但携带 permissions 会 409。
+			if (role.protected && body.permissions !== undefined) {
+				return json(res, 200, { code: 409, message: "内置角色的权限集不可修改", data: null, meta: null });
+			}
 			if (body.name !== undefined) role.name = String(body.name);
 			if (body.description !== undefined) role.description = String(body.description);
 			if (Array.isArray(body.permissions)) role.permissions = body.permissions;
@@ -2737,8 +2936,18 @@ const server = http.createServer((req, res) => {
 			}
 		}
 	}
-	// 未实现的端点：返回空数据而不是 404，避免页面整块报错（预览用途）。
+	// 未实现的端点：
+	// - 读接口返回空数据，避免预览页整块报错；
+	// - **写接口必须失败**，否则 UI 会显示「保存成功」但状态根本没变（比报错更糟）。
 	if (path.startsWith("/api/")) {
+		if (req.method !== "GET") {
+			return json(res, 501, {
+				code: 501,
+				message: `mock: ${req.method} ${path} 未实现`,
+				data: null,
+				meta: null,
+			});
+		}
 		return json(res, 200, { code: 0, message: "OK (mock fallback)", data: null, meta: null });
 	}
 	json(res, 404, { code: 404, message: "not found", data: null });

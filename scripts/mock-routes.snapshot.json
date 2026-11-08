@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-11-08T03:22:01.521Z",
+	"generatedAt": "2026-11-08T04:47:27.378Z",
 	"routes": [
 		{
 			"method": "DELETE",
@@ -159,6 +159,10 @@
 		},
 		{
 			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/announcements"
+		},
+		{
+			"method": "GET",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awd"
 		},
 		{
@@ -200,6 +204,10 @@
 		{
 			"method": "GET",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/scores"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/challenges"
 		},
 		{
 			"method": "GET",
@@ -384,6 +392,10 @@
 		{
 			"method": "GET",
 			"pattern": "\\/api\\/events\\/([^/]+)\\/challenges"
+		},
+		{
+			"method": "GET",
+			"pattern": "\\/api\\/events\\/([^/]+)\\/challenges\\/([^/]+)\\/instance"
 		},
 		{
 			"method": "GET",
@@ -608,6 +620,14 @@
 		{
 			"method": "POST",
 			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/awdp\\/start"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/teams\\/([^/]+)\\/banned"
+		},
+		{
+			"method": "POST",
+			"pattern": "\\/api\\/admin\\/events\\/([^/]+)\\/teams\\/([^/]+)\\/unbanned"
 		},
 		{
 			"method": "POST",
