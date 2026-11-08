@@ -80,8 +80,12 @@ export function AbsoluteTime({
 	className?: string;
 	seconds?: boolean;
 }): ReactNode {
+	const parsed = value ? new Date(value) : null;
+	// 未知时间（缺失 / 非法 / epoch 0）不把 1970 放进 tooltip。
+	const unknown =
+		parsed === null || Number.isNaN(parsed.getTime()) || parsed.getTime() === 0;
 	return (
-		<span className={cn("tnum text-xs", className)} title={value ?? undefined}>
+		<span className={cn("tnum text-xs", className)} title={unknown ? undefined : value ?? undefined}>
 			{value ? formatDateTimeLocal(value, seconds) : "—"}
 		</span>
 	);
