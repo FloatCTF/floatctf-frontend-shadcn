@@ -52,6 +52,12 @@ import {
 	AwdSshPanel,
 	AwdWireGuardPanel,
 } from "~/features/awd/components";
+import {
+	AwdpGameboxList,
+	AwdpRoundsEvaluationsPanel,
+	AwdpScoreboardPanel,
+	AwdpTrendPanel,
+} from "~/features/awdp/components";
 
 const AWD_STATUS_KEYS: Record<string, string> = {
 	draft: "events.awd.status.draft",
@@ -898,4 +904,56 @@ export function AwdSshTab({ eventId }: { eventId: string }) {
 			<AwdSshPanel eventId={eventId} />
 		</SectionCard>
 	);
+}
+
+
+/* ── AWDP：Default 的六子页 ─────────────────────────────────────────────── */
+
+export function AwdpGameboxesTab({ eventId }: { eventId: string }) {
+	const { t } = useTranslation();
+	const client = useClient();
+	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const query = useQuery({
+		queryKey: qk.awdp.overview(eventId),
+		queryFn: () => call<AwdpOverview>(client.awdp.player.overview(eventId), t("awdp.calls.overview")),
+	});
+	return (
+		<QueryState
+			query={query}
+			skeleton={<LoadingBlock label={t("awdp.states.loadingOverview")} />}
+			errorTitle={t("awdp.page.loadError")}
+		>
+			{(overview) => (
+				<SectionCard
+					title={t("awdp.gameboxes.sectionTitle")}
+					description={t("awdp.gameboxes.sectionDescription")}
+				>
+					<AwdpGameboxList
+						gameboxes={overview.gameboxes}
+						selectedId={selectedId}
+						onSelect={setSelectedId}
+					/>
+					<div className="mt-4">
+						<Button asChild variant="outline" size="sm">
+							<Link to={`/lab/${eventId}`}>
+								{t("awdp.gameboxes.openWorkbench")}
+							</Link>
+						</Button>
+					</div>
+				</SectionCard>
+			)}
+		</QueryState>
+	);
+}
+
+export function AwdpRoundsTab({ eventId }: { eventId: string }) {
+	return <AwdpRoundsEvaluationsPanel eventId={eventId} enabled />;
+}
+
+export function AwdpScoreboardTab({ eventId }: { eventId: string }) {
+	return <AwdpScoreboardPanel eventId={eventId} />;
+}
+
+export function AwdpTrendTab({ eventId }: { eventId: string }) {
+	return <AwdpTrendPanel eventId={eventId} />;
 }

@@ -175,6 +175,7 @@ export default {
 			trend: "Trend",
 			instances: "Instances",
 			gameboxes: "GameBoxes",
+			rounds: "Rounds",
 			wireguard: "WireGuard",
 			ssh: "SSH",
 			bulletin: "Bulletin",

@@ -111,3 +111,6 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：AWD 赛事工作区改为 Default 五子页：Overview / GameBoxes / Scoreboard /
   WireGuard / SSH；复用真实 AWD 面板，不再把 trend/instances 当一级 Tab。Jeopardy/AWDP
   的 Tab 顺序与子页内容仍在继续对齐。
+
+- 2026-11-08：AWDP 赛事工作区改为 Default 六子页：Overview / GameBoxes / Rounds /
+  Scoreboard / Trend / Announcement；复用真实 AWDP 面板，概览使用 AWDP 状态摘要。

@@ -2,6 +2,7 @@
 
 export default {
 	page: {
+		loadError: 'Failed to load the AWDP workbench',
 		docTitle: "AWDP workspace · FloatCTF",
 		title: "AWDP workspace",
 		subtitle:
@@ -59,6 +60,7 @@ export default {
 		unclassified: "Uncategorized",
 		exposed: "Exposed",
 		disabled: "Disabled",
+		openWorkbench: "Open Break/Fix workbench",
 	},
 	runtime: {
 		running: "Running",

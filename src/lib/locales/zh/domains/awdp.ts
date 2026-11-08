@@ -2,6 +2,7 @@
 
 export default {
 	page: {
+		loadError: "加载 AWDP 工作台失败",
 		docTitle: "AWDP 工作台 · FloatCTF",
 		title: "AWDP 工作台",
 		subtitle:
@@ -58,6 +59,7 @@ export default {
 		unclassified: "未分类",
 		exposed: "暴露",
 		disabled: "已禁用",
+		openWorkbench: "打开 Break/Fix 工作台",
 	},
 	runtime: {
 		running: "运行中",

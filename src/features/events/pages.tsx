@@ -69,6 +69,10 @@ import {
 import { ChallengeWorkbench } from "~/features/jeopardy/workbench";
 import {
 	ArenaSummaryTab,
+	AwdpGameboxesTab,
+	AwdpRoundsTab,
+	AwdpScoreboardTab,
+	AwdpTrendTab,
 	AwdGameboxesTab,
 	AwdScoreboardTab,
 	AwdSshTab,
@@ -492,11 +496,16 @@ export function EventWorkspacePage() {
 					// 深链接可能带来过期/越权的 tab（?tab=arena 但本赛事是 Jeopardy）：
 					// Radix 对未知 value 不会选中任何项 → 页面变空白。统一回落到 overview。
 					const isAwd = data.event.family === "awd";
+					const isAwdp = data.event.family === "awdp";
 					const availableTabs = isAwd
 						? canAccessContent
 							? ["overview", "gameboxes", "scoreboard", "wireguard", "ssh"]
 							: ["overview"]
-						: [
+						: isAwdp
+							? canAccessContent
+								? ["overview", "gameboxes", "rounds", "scoreboard", "trend", "bulletin"]
+								: ["overview"]
+							: [
 								"overview",
 								...(caps.challenges && canAccessContent ? ["challenges"] : []),
 								...(caps.arena && canAccessContent ? ["arena"] : []),
@@ -572,6 +581,22 @@ export function EventWorkspacePage() {
 														</TabsTrigger>
 													</>
 												) : null}
+												{isAwdp && canAccessContent ? (
+													<>
+														<TabsTrigger value="gameboxes" className="shrink-0">
+															{t("events.workspace.tabs.gameboxes")}
+														</TabsTrigger>
+														<TabsTrigger value="rounds" className="shrink-0">
+															{t("events.workspace.tabs.rounds")}
+														</TabsTrigger>
+														<TabsTrigger value="scoreboard" className="shrink-0">
+															{t("events.workspace.tabs.scoreboard")}
+														</TabsTrigger>
+														<TabsTrigger value="trend" className="shrink-0">
+															{t("events.workspace.tabs.trend")}
+														</TabsTrigger>
+													</>
+												) : null}
 												{caps.challenges && canAccessContent ? (
 													<TabsTrigger value="challenges" className="shrink-0">
 														{t("events.workspace.tabs.challenges")}
@@ -582,17 +607,17 @@ export function EventWorkspacePage() {
 														{t("events.workspace.tabs.arena")}
 													</TabsTrigger>
 												) : null}
-												{!isAwd && caps.lab && canAccessContent ? (
+												{!isAwd && !isAwdp && caps.lab && canAccessContent ? (
 													<TabsTrigger value="lab" className="shrink-0">
 														{t("events.workspace.tabs.lab")}
 													</TabsTrigger>
 												) : null}
-												{!isAwd && caps.scoreboard ? (
+												{!isAwd && !isAwdp && caps.scoreboard ? (
 													<TabsTrigger value="scoreboard" className="shrink-0">
 														{t("events.workspace.tabs.scoreboard")}
 													</TabsTrigger>
 												) : null}
-												{!isAwd && caps.trend ? (
+												{!isAwd && !isAwdp && caps.trend ? (
 													<TabsTrigger value="trend" className="shrink-0">
 														{t("events.workspace.tabs.trend")}
 													</TabsTrigger>
@@ -610,7 +635,11 @@ export function EventWorkspacePage() {
 											</TabsList>
 
 											<TabsContent value="overview" className="mt-4">
-												<OverviewTab info={data} />
+												{isAwdp ? (
+													<LabSummaryTab eventId={resolvedEventId} />
+												) : (
+													<OverviewTab info={data} />
+												)}
 											</TabsContent>
 											{isAwd ? (
 												<>
@@ -631,6 +660,22 @@ export function EventWorkspacePage() {
 													</TabsContent>
 												</>
 											) : null}
+											{isAwdp && canAccessContent ? (
+												<>
+													<TabsContent value="gameboxes" className="mt-4">
+														<AwdpGameboxesTab eventId={resolvedEventId} />
+													</TabsContent>
+													<TabsContent value="rounds" className="mt-4">
+														<AwdpRoundsTab eventId={resolvedEventId} />
+													</TabsContent>
+													<TabsContent value="scoreboard" className="mt-4">
+														<AwdpScoreboardTab eventId={resolvedEventId} />
+													</TabsContent>
+													<TabsContent value="trend" className="mt-4">
+														<AwdpTrendTab eventId={resolvedEventId} />
+													</TabsContent>
+												</>
+											) : null}
 											{caps.challenges && canAccessContent ? (
 												<TabsContent value="challenges" className="mt-4">
 													<ChallengesTab eventId={resolvedEventId} participantMode={data.event.participant_mode} />
@@ -641,17 +686,17 @@ export function EventWorkspacePage() {
 													<ArenaSummaryTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
-											{!isAwd && caps.lab && canAccessContent ? (
+											{!isAwd && !isAwdp && caps.lab && canAccessContent ? (
 												<TabsContent value="lab" className="mt-4">
 													<LabSummaryTab eventId={resolvedEventId} />
 												</TabsContent>
 											) : null}
-											{!isAwd && caps.scoreboard ? (
+											{!isAwd && !isAwdp && caps.scoreboard ? (
 												<TabsContent value="scoreboard" className="mt-4">
 													<ScoreboardTab info={data} />
 												</TabsContent>
 											) : null}
-											{!isAwd && caps.trend ? (
+											{!isAwd && !isAwdp && caps.trend ? (
 												<TabsContent value="trend" className="mt-4">
 													<TrendTab eventId={resolvedEventId} />
 												</TabsContent>

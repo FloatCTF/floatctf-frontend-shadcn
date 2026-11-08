@@ -172,6 +172,7 @@ export default {
 			trend: "趋势",
 			instances: "实例",
 			gameboxes: "靶机箱",
+			rounds: "轮次",
 			wireguard: "WireGuard",
 			ssh: "SSH",
 			bulletin: "公告",
