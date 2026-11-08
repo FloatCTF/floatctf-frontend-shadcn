@@ -808,3 +808,33 @@ SQL 控制台的 int2/int4 后端映射 bug 仍待后端修复。
   9 个未 mock 仅信息提示。
 
 无失败项。
+
+## 第 50 轮（最终验收）
+
+50 轮真实 dev 环境 QA 完成。累计修复的高价值问题包括：
+
+- 题集创建 `data:null` 误报失败 + 创建后自动进入详情；
+- AWD 部署失败状态刷新、部署/预检门禁与后端状态机对齐；
+- AWD/AWDP 提前开赛时选手端 / 赛事页 / 参赛锁的正确状态；
+- AWDP 补丁格式、gzip 魔数；PDF 精确魔数；ZIP 魔数；
+- 头像与 Markdown 插图的真实可解码校验；
+- 敏感设置、解析值、题目静态 Flag 的默认遮蔽与显隐切换；
+- 非法 UUID 深链接的 not-found 语义；
+- 单点趋势图 key、epoch 0 时间显示；
+- 移动端 320 / 390 路由无溢出、无 console 错误。
+
+最终质量门禁全绿：
+
+- `tsc --noEmit`；
+- `vite build`；
+- i18n zh/en 5037 keys；
+- theme audit；
+- mock-check（235 条路由，信息性覆盖 148/157）。
+
+真实 dev 栈运行中；测试用户 / 角色 / 赛事 / 题目 / 题集 / 讨论 / 武器已清理；
+test-g GameBox 与训练 fixture 保留。
+
+遗留（非前端、未擅自改后端）：
+
+- SQL 控制台 `rows_to_json` 把 INT2 / INT4 解码为 i64，导致结果 NULL；
+  建议按 INT2 → i16、INT4 → i32、INT8 → i64 修复。
