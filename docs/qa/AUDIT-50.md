@@ -555,3 +555,15 @@ AWD/AWDP 挂载新增与解除（第 4 轮修复后复测）。
 - 实测 `SMTP_URI` 编辑：默认 `type=password`，点「显示原值」切到 `text`，再点可隐藏。
 
 验证：`vite build` / i18n（5027 keys）/ theme 全绿。
+
+## 第 31 轮补充（解析值里的 Secret）
+
+上一轮把敏感设置的编辑输入改成 password，但编辑 Sheet 底部的「当前解析值」仍用
+`CopyText` 明文展示 `SMTP_URI` 的完整解析结果。
+
+- 敏感键的解析值改用 `SecretValue` 遮蔽；
+- 普通设置继续用 `CopyText` 展示/复制；
+- 实测 SMTP_URI 编辑：输入框 `type=password`，解析值显示 `••••••••`，
+  Sheet 文本中不再出现原始 `SMTP_PASS`。
+
+验证：`vite build` / i18n（5027 keys）/ theme 全绿。
