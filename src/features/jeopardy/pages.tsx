@@ -488,127 +488,6 @@ export function ChallengeDetailPage() {
 	);
 }
 
-function ChallengeSetDialog({
-	set,
-	onClose,
-}: {
-	set: ChallengeSets;
-	onClose: () => void;
-}) {
-	const { t } = useTranslation();
-	const client = useClient();
-	const query = useQuery({
-		queryKey: qk.sets.detail(set.id),
-		queryFn: () => call(client.service.challenges.getChallengeSet(set.id), "题集详情"),
-	});
-
-	const columns: DataTableColumn<ChallengesListItem>[] = [
-		{
-			id: "name",
-			header: t("jeopardy.setDetail.columns.challenge"),
-			sortValue: (row) => row.name,
-			cell: (row) => (
-				<div className="min-w-0">
-					<Link
-						to={`/challenges/${row.id}`}
-						className="truncate text-sm font-medium hover:underline"
-						title={row.name}
-					>
-						{row.name}
-					</Link>
-					<p className="truncate text-xs text-muted-foreground" title={row.safe_name}>
-						{row.safe_name}
-					</p>
-				</div>
-			),
-		},
-		{
-			id: "category",
-			header: t("jeopardy.setDetail.columns.category"),
-			sortValue: (row) => row.category,
-			cell: (row) => (
-				<TonePill tone="neutral">
-					{row.category || t("jeopardy.common.categoryFallback")}
-				</TonePill>
-			),
-		},
-		{
-			id: "solved",
-			header: t("jeopardy.setDetail.columns.status"),
-			align: "right",
-			sortValue: (row) => (row.solved ? 1 : 0),
-			cell: (row) =>
-				row.solved ? (
-					<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
-						{t("jeopardy.common.solved")}
-					</TonePill>
-				) : (
-					<TonePill tone="muted">{t("jeopardy.common.unsolved")}</TonePill>
-				),
-		},
-	];
-
-	return (
-		<Dialog open onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="max-h-[85svh] w-full max-w-4xl overflow-y-auto p-5 sm:max-w-4xl sm:p-6">
-				<DialogHeader>
-					<DialogTitle>{set.name}</DialogTitle>
-					<DialogDescription>
-						{set.description || t("jeopardy.sets.noDescription")}
-					</DialogDescription>
-				</DialogHeader>
-				<QueryState
-					query={query}
-					skeleton={<LoadingBlock label={t("jeopardy.setDetail.loading")} />}
-					errorTitle={t("jeopardy.setDetail.loadError")}
-					isEmpty={(items) => items.length === 0}
-					empty={
-						<EmptyBlock
-							title={t("jeopardy.setDetail.emptyTitle")}
-							description={t("jeopardy.setDetail.emptyDescription")}
-						/>
-					}
-				>
-					{(items) => (
-						<div className="space-y-3">
-							<p className="text-sm text-muted-foreground">
-								{t("jeopardy.setDetail.count", { count: items.length })}
-							</p>
-							<DataTable
-								data={items}
-								getRowId={(row) => row.id}
-								columns={columns}
-								mobileCard={(row) => (
-									<div className="flex items-center justify-between gap-3">
-										<div className="min-w-0">
-											<Link
-												to={`/challenges/${row.id}`}
-												className="truncate text-sm font-medium hover:underline"
-											>
-												{row.name}
-											</Link>
-											<p className="truncate text-xs text-muted-foreground">
-												{row.category || t("jeopardy.common.categoryFallback")}
-											</p>
-										</div>
-										{row.solved ? (
-											<TonePill tone="success">
-												{t("jeopardy.common.solved")}
-											</TonePill>
-										) : (
-											<TonePill tone="muted">{t("jeopardy.common.unsolved")}</TonePill>
-										)}
-									</div>
-								)}
-							/>
-						</div>
-					)}
-				</QueryState>
-			</DialogContent>
-		</Dialog>
-	);
-}
-
 export function ChallengeSetsPage() {
 	const { t } = useTranslation();
 	useDocumentTitle(t("jeopardy.sets.documentTitle"));
@@ -616,7 +495,6 @@ export function ChallengeSetsPage() {
 	const now = useNow(60_000);
 	const [draftFilter, setDraftFilter] = useState("");
 	const [appliedFilter, setAppliedFilter] = useState("");
-	const [openSet, setOpenSet] = useState<ChallengeSets | null>(null);
 	const query = useQuery({
 		queryKey: qk.sets.list({}),
 		queryFn: () => call(client.service.challenges.getChallengeSets(), "题集列表"),
@@ -628,13 +506,12 @@ export function ChallengeSetsPage() {
 			header: t("jeopardy.sets.columns.name"),
 			sortValue: (row) => row.name,
 			cell: (row) => (
-				<button
-					type="button"
-					onClick={() => setOpenSet(row)}
-					className="max-w-full truncate text-left text-sm font-medium hover:underline"
+				<Link
+					to={`/challenge-sets/${row.id}`}
+					className="truncate text-sm font-medium hover:underline"
 				>
 					{row.name}
-				</button>
+				</Link>
 			),
 		},
 		{
@@ -745,10 +622,9 @@ export function ChallengeSetsPage() {
 									/>
 								}
 								mobileCard={(row) => (
-									<button
-										type="button"
-										onClick={() => setOpenSet(row)}
-										className="flex items-start justify-between gap-3 text-left"
+									<Link
+										to={`/challenge-sets/${row.id}`}
+										className="flex items-start justify-between gap-3"
 									>
 										<div className="min-w-0">
 											<p className="truncate text-sm font-medium">{row.name}</p>
@@ -757,17 +633,55 @@ export function ChallengeSetsPage() {
 											</p>
 										</div>
 										<ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-									</button>
+									</Link>
 								)}
 							/>
 						</SectionCard>
 					);
 				}}
 			</QueryState>
-					{openSet ? (
-				<ChallengeSetDialog set={openSet} onClose={() => setOpenSet(null)} />
-			) : null}
-</PageBody>
+		</PageBody>
+	);
+}
+
+function SetChallengeDialog({
+	row,
+	onClose,
+}: {
+	row: ChallengesListItem;
+	onClose: () => void;
+}) {
+	const { t } = useTranslation();
+	const client = useClient();
+	const query = useQuery({
+		queryKey: qk.challenges.detail(row.id),
+		queryFn: () => call(client.service.challenges.get(row.id), "题目详情"),
+	});
+
+	return (
+		<Dialog open onOpenChange={(open) => !open && onClose()}>
+			<DialogContent className="max-h-[85svh] w-full max-w-2xl overflow-y-auto p-5 sm:max-w-2xl sm:p-6">
+				<DialogHeader>
+					<DialogTitle>{query.data?.name ?? row.name}</DialogTitle>
+					<DialogDescription>
+						{query.data?.category || t("jeopardy.common.categoryFallback")}
+					</DialogDescription>
+				</DialogHeader>
+				<QueryState
+					query={query}
+					skeleton={<LoadingBlock label={t("jeopardy.detail.loading")} />}
+					errorTitle={t("jeopardy.detail.loadError")}
+				>
+					{(challenge) => (
+						<ChallengeWorkbench
+							challenge={challenge}
+							mode={{ kind: "practice" }}
+							showWriteup={false}
+						/>
+					)}
+				</QueryState>
+			</DialogContent>
+		</Dialog>
 	);
 }
 
@@ -776,6 +690,7 @@ export function ChallengeSetDetailPage() {
 	useDocumentTitle(t("jeopardy.setDetail.documentTitle"));
 	const { setId = "" } = useParams<{ setId: string }>();
 	const client = useClient();
+	const [openChallenge, setOpenChallenge] = useState<ChallengesListItem | null>(null);
 	const query = useQuery({
 		queryKey: qk.sets.detail(setId),
 		queryFn: () => call(client.service.challenges.getChallengeSet(setId), "题集详情"),
@@ -811,13 +726,14 @@ export function ChallengeSetDetailPage() {
 			sortValue: (row) => row.name,
 			cell: (row) => (
 				<div className="min-w-0">
-					<Link
-						to={`/challenges/${row.id}`}
-						className="truncate text-sm font-medium hover:underline"
+					<button
+						type="button"
+						onClick={() => setOpenChallenge(row)}
+						className="max-w-full truncate text-left text-sm font-medium hover:underline"
 						title={row.name}
 					>
 						{row.name}
-					</Link>
+					</button>
 					<p className="truncate text-xs text-muted-foreground" title={row.safe_name}>
 						{row.safe_name}
 					</p>
@@ -893,13 +809,14 @@ export function ChallengeSetDetailPage() {
 							mobileCard={(row) => (
 								<div className="flex items-center justify-between gap-3">
 									<div className="min-w-0">
-										<Link
-											to={`/challenges/${row.id}`}
-											className="truncate text-sm font-medium hover:underline"
+										<button
+											type="button"
+											onClick={() => setOpenChallenge(row)}
+											className="max-w-full truncate text-left text-sm font-medium hover:underline"
 											title={row.name}
 										>
 											{row.name}
-										</Link>
+										</button>
 										<p className="truncate text-xs text-muted-foreground">
 											{row.category || t("jeopardy.common.categoryFallback")}
 										</p>
@@ -917,6 +834,12 @@ export function ChallengeSetDetailPage() {
 					</SectionCard>
 				)}
 			</QueryState>
-		</PageBody>
+					{openChallenge ? (
+				<SetChallengeDialog
+					row={openChallenge}
+					onClose={() => setOpenChallenge(null)}
+				/>
+			) : null}
+</PageBody>
 	);
 }

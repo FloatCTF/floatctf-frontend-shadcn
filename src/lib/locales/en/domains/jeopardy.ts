@@ -73,7 +73,7 @@ export default {
 		updatedAt: "Updated {{time}}",
 		open: "Open",
 		listTitle: "Challenge sets",
-		listDescription: "Challenges grouped by topic; click a name to view the set contents in a dialog.",
+		listDescription: "Challenges grouped by topic; click a name to open the set detail.",
 		addFilter: "Add Filter",
 		filterBy: "Filter by field",
 		applyFilters: "Apply Filters",
