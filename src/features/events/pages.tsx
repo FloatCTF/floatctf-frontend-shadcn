@@ -37,13 +37,7 @@ import {
 } from "~/components/app/workspace-access";
 import { TonePill } from "~/components/app/badges";
 import { Button } from "~/components/ui/button";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "~/components/ui/select";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import type { AwdPlayerStatus, AwdpOverview, EventChallengeResult, EventInfo } from "@floatctf/sdk";
 import { formatDateTime, formatRange, formatScore } from "~/lib/format";
@@ -225,24 +219,6 @@ export function EventsListPage() {
 				contentClassName="px-0"
 				actions={
 					<div className="flex w-full flex-wrap items-center gap-2">
-						<Select
-							value={String(pageSize)}
-							onValueChange={(value) => {
-								setPageSize(Number(value));
-								setPage(1);
-							}}
-						>
-							<SelectTrigger className="w-28" aria-label={t("common.pagination.pageSize")}>
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{[10, 20, 50, 100].map((size) => (
-									<SelectItem key={size} value={String(size)}>
-										{size} / {t("common.pagination.page")}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
 						<FilterBar
 							keys={[
 								{ key: "title", label: t("events.list.columns.event") },
