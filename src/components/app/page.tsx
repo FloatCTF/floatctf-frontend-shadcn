@@ -358,7 +358,7 @@ export function PaginationBar({
 	const from = (page - 1) * pageSize + 1;
 	const to = Math.min(total, page * pageSize);
 	return (
-		<div className="flex flex-wrap items-center justify-between gap-3">
+		<div className="flex w-full flex-wrap items-center justify-between gap-3">
 			<p className="tnum text-xs text-muted-foreground">
 					{total > 0 ? t("common.pagination.range", { total, from, to }) : t("common.pagination.total", { total })}
 			</p>
