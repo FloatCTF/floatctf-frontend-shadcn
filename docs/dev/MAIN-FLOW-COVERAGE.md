@@ -71,3 +71,16 @@
 结果：全部 HTTP 200，页面主内容非空，无 `Something went wrong` / React 更新深度错误；Playwright 控制台错误 0 条。
 
 已参赛 AWD/AWDP 的玩家 Tab 与战队/Writeup 另用临时赛事验收并清理。终端仅验收未连接态，未在生产执行宿主 shell。
+
+## 宽屏回归（2026-11-09，shadcn 0.2.54）
+
+题目详情在 2659×1577 下暴露：外层 5:7 + 工作台内部 1fr+360px 导致描述列仅约 90px、中文逐字竖排。
+
+修复：`ChallengeWorkbench` 改为单列（描述 → 环境 → Flag → 可选 Writeup），外层仍保持 Default 的 5:7。
+
+回归结果：
+
+- 2659px：左栏卡片宽 613px，右题解 859px，无窄文本元素；
+- 1280px：左栏卡片宽 400px，右题解 560px；
+- 390px：卡片 358px，页面 `scrollWidth = clientWidth`，无横向溢出；
+- 扫描选手端 10 个页面、管理端 16 个页面，未再发现 <100px 且长文本的窄列。
