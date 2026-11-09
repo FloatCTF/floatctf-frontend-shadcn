@@ -55,6 +55,14 @@ import { cn } from "~/lib/utils";
 
 export type WorkbenchMode = { kind: "practice" } | { kind: "event"; eventId: string };
 
+/**
+ * 题目包导入时常见“字面量换行”：后端存的是 `\n` 两个字符而不是换行符。
+ * 直接在 Markdown 里渲染会把 `\n` 原样显示，这里只对题目描述做一次安全归一化。
+ */
+function normalizeDescription(value: string | null | undefined): string {
+	return (value ?? "").replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n");
+}
+
 export interface ChallengeWorkbenchProps {
 	challenge: ChallengesListItem;
 	mode: WorkbenchMode;
@@ -258,7 +266,7 @@ export function ChallengeWorkbench({
 						</div>
 					}
 				>
-					<MarkdownView>{challenge.description}</MarkdownView>
+					<MarkdownView>{normalizeDescription(challenge.description)}</MarkdownView>
 
 					{challenge.attachment ? (
 						<>
