@@ -233,11 +233,11 @@ export function ChallengeWorkbench({
 	return (
 		<div
 			className={cn(
-				"grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden",
+				"flex min-h-0 flex-col gap-4 lg:overflow-y-auto",
 				className,
 			)}
 		>
-			<div className="min-w-0 space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+			<div className="min-w-0 space-y-4">
 				<SectionCard
 					title={t("jeopardy.workbench.descriptionTitle")}
 					description={
@@ -320,7 +320,7 @@ export function ChallengeWorkbench({
 				{children}
 			</div>
 
-			<div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+			<div className="space-y-4">
 				<SectionCard
 					title={t("jeopardy.workbench.env.title")}
 					description={t("jeopardy.workbench.env.description")}

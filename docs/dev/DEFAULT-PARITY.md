@@ -214,3 +214,5 @@ OIDC Clients、Developer Apps、Docker、Database、Terminal、Authorized Apps�
 - 2026-11-08：选手端 Top 页按 Default 收敛为一张 Top 15 表，移除额外统计卡与分页。
 
 - 2026-11-08：管理端 AWD/AWDP 控制台默认落在「总览」，与 Default 的 index 页一致；显式 ?tab=config 仍可打开配置。
+
+- 2026-11-09：题目工作台改为单列（描述/环境/Flag 纵向），修复题目详情在 5:7 分栏下描述被压成竖排的问题；同步检查无其它固定 360px 侧栏网格。
