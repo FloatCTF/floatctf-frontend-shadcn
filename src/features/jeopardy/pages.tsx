@@ -414,7 +414,7 @@ export function ChallengeDetailPage() {
 	}
 
 	return (
-		<PageBody className="lg:flex lg:h-[calc(100svh-3.5rem)] lg:flex-col lg:gap-4 lg:space-y-0 lg:overflow-hidden">
+		<PageBody className="max-w-5xl">
 			<QueryState
 				query={query}
 				skeleton={<LoadingBlock label={t("jeopardy.detail.loading")} className="lg:flex-1" />}
@@ -442,11 +442,8 @@ export function ChallengeDetailPage() {
 								) : null
 							}
 						/>
-						<div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[5fr_7fr]">
-							<Tabs
-								defaultValue="challenge"
-								className="flex min-h-0 flex-col gap-3"
-							>
+						<div className="space-y-4">
+							<Tabs defaultValue="challenge" className="space-y-3">
 								<TabsList className="w-fit">
 									<TabsTrigger value="challenge">
 										{t("jeopardy.detail.tabs.challenge")}
@@ -455,15 +452,14 @@ export function ChallengeDetailPage() {
 										{t("jeopardy.detail.tabs.writeup")}
 									</TabsTrigger>
 								</TabsList>
-								<TabsContent value="challenge" className="min-h-0 flex-1">
+								<TabsContent value="challenge">
 									<ChallengeWorkbench
 										challenge={challenge}
 										mode={{ kind: "practice" }}
 										showWriteup={false}
-										className="lg:min-h-0 lg:flex-1"
 									/>
 								</TabsContent>
-								<TabsContent value="writeup" className="min-h-0 flex-1 overflow-y-auto">
+								<TabsContent value="writeup">
 									<SectionCard
 										title={t("jeopardy.detail.writeupsTitle")}
 										description={t("jeopardy.detail.writeupsDescription")}
@@ -476,7 +472,6 @@ export function ChallengeDetailPage() {
 							<SectionCard
 								title={t("jeopardy.workbench.myWriteup.title")}
 								description={t("jeopardy.workbench.myWriteup.description")}
-								className="min-h-0 overflow-y-auto"
 							>
 								<MyWriteupEditor challengeId={challengeId} />
 							</SectionCard>
