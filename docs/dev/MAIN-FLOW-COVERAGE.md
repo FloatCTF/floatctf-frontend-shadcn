@@ -13,8 +13,8 @@
 | `/events/:id/challenges/:cid` | 赛事题目工作台与 flag 提交 | 代码路径复用 |
 | `/challenges` | 题目 / 分类 / 状态 / 作者 / 版本 / 更新时间 | 目标站验收 |
 | `/challenges/:id` | 左侧 Challenge/WriteUp、右侧常驻我的题解 | 目标站验收 |
-| `/challenge-sets` | FilterBar + 名称进入详情 | 目标站验收 |
-| `/challenge-sets/:id` | 题集详情与题目列表 | 目标站验收 |
+| `/challenge-sets` | FilterBar + 名称打开弹窗查看题集内容 | 目标站验收（URL 不切换） |
+| `/challenge-sets/:id` | 深链兜底详情页 | 保留 |
 | `/gameboxes` | 名称 / 分类 / 已解出 / 作者 / 版本 / 更新 | 目标站验收 |
 | `/instances` | 内容 / 类型 / 状态 / 赛事 / 标识 / 用户 / 销毁时间 | 目标站验收 |
 | `/solves` | 题目 / 用户 / 更新时间 | 目标站验收 |
@@ -84,3 +84,10 @@
 - 1280px：左栏卡片宽 400px，右题解 560px；
 - 390px：卡片 358px，页面 `scrollWidth = clientWidth`，无横向溢出；
 - 扫描选手端 10 个页面、管理端 16 个页面，未再发现 <100px 且长文本的窄列。
+
+## 题集交互调整（2026-11-09）
+
+- 选手端题集列表点击名称不再跳转 `/challenge-sets/:id`，改为弹窗展示题集内容；
+- 桌面弹窗宽度 4xl（896px），移动端不溢出；
+- URL 保持在 `/challenge-sets`，关闭弹窗即返回列表；
+- 深链详情路由保留，作为直接访问兜底。
