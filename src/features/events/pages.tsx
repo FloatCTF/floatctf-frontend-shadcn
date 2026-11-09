@@ -241,7 +241,7 @@ export function EventsListPage() {
 					</div>
 				}
 				footer={
-					filtered.length > 0 ? (
+					filtered.length > pageSize ? (
 						<PaginationBar
 							page={page}
 							pageSize={pageSize}
