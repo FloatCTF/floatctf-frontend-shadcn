@@ -660,26 +660,29 @@ function SetChallengeDialog({
 
 	return (
 		<Dialog open onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="max-h-[85svh] w-full max-w-2xl overflow-y-auto p-5 sm:max-w-2xl sm:p-6">
-				<DialogHeader>
+			<DialogContent className="flex max-h-[85svh] w-full max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+				<DialogHeader className="shrink-0 border-b px-6 pt-6 pb-4">
 					<DialogTitle>{query.data?.name ?? row.name}</DialogTitle>
 					<DialogDescription>
 						{query.data?.category || t("jeopardy.common.categoryFallback")}
 					</DialogDescription>
 				</DialogHeader>
-				<QueryState
-					query={query}
-					skeleton={<LoadingBlock label={t("jeopardy.detail.loading")} />}
-					errorTitle={t("jeopardy.detail.loadError")}
-				>
-					{(challenge) => (
-						<ChallengeWorkbench
-							challenge={challenge}
-							mode={{ kind: "practice" }}
-							showWriteup={false}
-						/>
-					)}
-				</QueryState>
+				<div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+					<QueryState
+						query={query}
+						skeleton={<LoadingBlock label={t("jeopardy.detail.loading")} />}
+						errorTitle={t("jeopardy.detail.loadError")}
+					>
+						{(challenge) => (
+							<ChallengeWorkbench
+								challenge={challenge}
+								mode={{ kind: "practice" }}
+								showWriteup={false}
+								className="lg:overflow-visible"
+							/>
+						)}
+					</QueryState>
+				</div>
 			</DialogContent>
 		</Dialog>
 	);

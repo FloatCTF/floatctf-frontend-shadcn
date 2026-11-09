@@ -206,7 +206,7 @@ export function EmptyBlock({
 		variant === "filtered" ? t("common.table.emptyFilteredTitle") : t("common.table.emptyTitle");
 	const Media = variant === "filtered" ? SearchX : Inbox;
 	return (
-		<Empty className={cn("border border-dashed py-10", className)}>
+		<Empty className={cn("mx-4 my-4 border border-dashed py-10", className)}>
 			<EmptyHeader>
 				<EmptyMedia variant="icon">{icon ?? <Media className="size-6" />}</EmptyMedia>
 				<EmptyTitle>{title ?? fallbackTitle}</EmptyTitle>

@@ -165,7 +165,7 @@ export function TrainingCatalogPage(): ReactNode {
 					</div>
 				}
 				footer={
-					result ? (
+					result && result.items.length > 0 ? (
 						<PaginationBar
 							page={page}
 							pageSize={pageSize}
