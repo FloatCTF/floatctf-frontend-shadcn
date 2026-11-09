@@ -72,7 +72,7 @@ export default {
 		updatedAt: "更新于 {{time}}",
 		open: "打开",
 		listTitle: "题集列表",
-		listDescription: "按主题组织的题目集合；点击名称进入题集详情。",
+		listDescription: "按主题组织的题目集合；点击名称在弹窗中查看题集内容。",
 		addFilter: "添加筛选",
 		filterBy: "按字段筛选",
 		applyFilters: "应用筛选",

@@ -550,7 +550,7 @@ function ChallengeSetDialog({
 
 	return (
 		<Dialog open onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="max-h-[85svh] max-w-4xl overflow-y-auto">
+			<DialogContent className="max-h-[85svh] w-full max-w-4xl overflow-y-auto p-5 sm:max-w-4xl sm:p-6">
 				<DialogHeader>
 					<DialogTitle>{set.name}</DialogTitle>
 					<DialogDescription>
