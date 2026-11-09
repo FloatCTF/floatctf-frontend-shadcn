@@ -34,6 +34,13 @@ import {
 } from "~/components/app/states";
 import { TonePill } from "~/components/app/badges";
 import { Button } from "~/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import {
 	Select,
@@ -481,6 +488,127 @@ export function ChallengeDetailPage() {
 	);
 }
 
+function ChallengeSetDialog({
+	set,
+	onClose,
+}: {
+	set: ChallengeSets;
+	onClose: () => void;
+}) {
+	const { t } = useTranslation();
+	const client = useClient();
+	const query = useQuery({
+		queryKey: qk.sets.detail(set.id),
+		queryFn: () => call(client.service.challenges.getChallengeSet(set.id), "题集详情"),
+	});
+
+	const columns: DataTableColumn<ChallengesListItem>[] = [
+		{
+			id: "name",
+			header: t("jeopardy.setDetail.columns.challenge"),
+			sortValue: (row) => row.name,
+			cell: (row) => (
+				<div className="min-w-0">
+					<Link
+						to={`/challenges/${row.id}`}
+						className="truncate text-sm font-medium hover:underline"
+						title={row.name}
+					>
+						{row.name}
+					</Link>
+					<p className="truncate text-xs text-muted-foreground" title={row.safe_name}>
+						{row.safe_name}
+					</p>
+				</div>
+			),
+		},
+		{
+			id: "category",
+			header: t("jeopardy.setDetail.columns.category"),
+			sortValue: (row) => row.category,
+			cell: (row) => (
+				<TonePill tone="neutral">
+					{row.category || t("jeopardy.common.categoryFallback")}
+				</TonePill>
+			),
+		},
+		{
+			id: "solved",
+			header: t("jeopardy.setDetail.columns.status"),
+			align: "right",
+			sortValue: (row) => (row.solved ? 1 : 0),
+			cell: (row) =>
+				row.solved ? (
+					<TonePill tone="success" icon={<CheckCircle2 aria-hidden="true" />}>
+						{t("jeopardy.common.solved")}
+					</TonePill>
+				) : (
+					<TonePill tone="muted">{t("jeopardy.common.unsolved")}</TonePill>
+				),
+		},
+	];
+
+	return (
+		<Dialog open onOpenChange={(open) => !open && onClose()}>
+			<DialogContent className="max-h-[85svh] max-w-4xl overflow-y-auto">
+				<DialogHeader>
+					<DialogTitle>{set.name}</DialogTitle>
+					<DialogDescription>
+						{set.description || t("jeopardy.sets.noDescription")}
+					</DialogDescription>
+				</DialogHeader>
+				<QueryState
+					query={query}
+					skeleton={<LoadingBlock label={t("jeopardy.setDetail.loading")} />}
+					errorTitle={t("jeopardy.setDetail.loadError")}
+					isEmpty={(items) => items.length === 0}
+					empty={
+						<EmptyBlock
+							title={t("jeopardy.setDetail.emptyTitle")}
+							description={t("jeopardy.setDetail.emptyDescription")}
+						/>
+					}
+				>
+					{(items) => (
+						<div className="space-y-3">
+							<p className="text-sm text-muted-foreground">
+								{t("jeopardy.setDetail.count", { count: items.length })}
+							</p>
+							<DataTable
+								data={items}
+								getRowId={(row) => row.id}
+								columns={columns}
+								mobileCard={(row) => (
+									<div className="flex items-center justify-between gap-3">
+										<div className="min-w-0">
+											<Link
+												to={`/challenges/${row.id}`}
+												className="truncate text-sm font-medium hover:underline"
+											>
+												{row.name}
+											</Link>
+											<p className="truncate text-xs text-muted-foreground">
+												{row.category || t("jeopardy.common.categoryFallback")}
+											</p>
+										</div>
+										{row.solved ? (
+											<TonePill tone="success">
+												{t("jeopardy.common.solved")}
+											</TonePill>
+										) : (
+											<TonePill tone="muted">{t("jeopardy.common.unsolved")}</TonePill>
+										)}
+									</div>
+								)}
+							/>
+						</div>
+					)}
+				</QueryState>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 export function ChallengeSetsPage() {
 	const { t } = useTranslation();
 	useDocumentTitle(t("jeopardy.sets.documentTitle"));
@@ -488,6 +616,7 @@ export function ChallengeSetsPage() {
 	const now = useNow(60_000);
 	const [draftFilter, setDraftFilter] = useState("");
 	const [appliedFilter, setAppliedFilter] = useState("");
+	const [openSet, setOpenSet] = useState<ChallengeSets | null>(null);
 	const query = useQuery({
 		queryKey: qk.sets.list({}),
 		queryFn: () => call(client.service.challenges.getChallengeSets(), "题集列表"),
@@ -499,12 +628,13 @@ export function ChallengeSetsPage() {
 			header: t("jeopardy.sets.columns.name"),
 			sortValue: (row) => row.name,
 			cell: (row) => (
-				<Link
-					to={`/challenge-sets/${row.id}`}
-					className="truncate text-sm font-medium hover:underline"
+				<button
+					type="button"
+					onClick={() => setOpenSet(row)}
+					className="max-w-full truncate text-left text-sm font-medium hover:underline"
 				>
 					{row.name}
-				</Link>
+				</button>
 			),
 		},
 		{
@@ -615,9 +745,10 @@ export function ChallengeSetsPage() {
 									/>
 								}
 								mobileCard={(row) => (
-									<Link
-										to={`/challenge-sets/${row.id}`}
-										className="flex items-start justify-between gap-3"
+									<button
+										type="button"
+										onClick={() => setOpenSet(row)}
+										className="flex items-start justify-between gap-3 text-left"
 									>
 										<div className="min-w-0">
 											<p className="truncate text-sm font-medium">{row.name}</p>
@@ -626,14 +757,17 @@ export function ChallengeSetsPage() {
 											</p>
 										</div>
 										<ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-									</Link>
+									</button>
 								)}
 							/>
 						</SectionCard>
 					);
 				}}
 			</QueryState>
-		</PageBody>
+					{openSet ? (
+				<ChallengeSetDialog set={openSet} onClose={() => setOpenSet(null)} />
+			) : null}
+</PageBody>
 	);
 }
 

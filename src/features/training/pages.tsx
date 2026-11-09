@@ -143,6 +143,7 @@ export function TrainingCatalogPage(): ReactNode {
 							<RefreshCw />
 						</Button>
 						<FilterBar
+							className="min-w-0 flex-1 flex-wrap"
 							keys={[
 								{ key: "name", label: t("training.catalog.columns.gamebox") },
 								{ key: "category", label: t("training.catalog.columns.category") },

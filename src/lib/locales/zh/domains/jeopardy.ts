@@ -76,7 +76,7 @@ export default {
 		addFilter: "添加筛选",
 		filterBy: "按字段筛选",
 		applyFilters: "应用筛选",
-		filterPlaceholder: "搜索或过滤，如 name:web & description:入门",
+		filterPlaceholder: "搜索或过滤，如 name:web",
 		filteredEmptyTitle: "没有匹配的题集",
 		filteredEmptyDescription: "试试清除筛选条件。",
 		noDescription: "（无描述）",

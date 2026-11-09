@@ -17,7 +17,7 @@ export default {
 	filter: {
 		add: "添加筛选",
 		byField: "按字段筛选",
-		placeholder: "搜索或过滤，如 name:web & description:入门",
+		placeholder: "搜索或过滤，如 name:web",
 		apply: "应用筛选",
 	},
  close: "关闭",
