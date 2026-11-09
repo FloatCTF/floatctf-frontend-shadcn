@@ -98,7 +98,7 @@ export function SectionCard({
 			) : null}
 			<CardContent className={cn(title ? "" : "pt-5", contentClassName)}>{children}</CardContent>
 			{footer ? (
-				<div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/50 px-4 py-3">
+				<div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5">
 					{footer}
 				</div>
 			) : null}
